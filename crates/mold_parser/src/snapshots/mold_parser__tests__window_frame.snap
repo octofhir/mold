@@ -1,0 +1,54 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..88
+  SELECT_STMT@0..88
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..82
+      SELECT_ITEM@7..82
+        FUNC_CALL@7..82
+          FUNC_CALL@7..14
+            SUM_KW@7..10 "SUM"
+            L_PAREN@10..11 "("
+            COLUMN_REF@11..12
+              IDENT@11..12 "x"
+            R_PAREN@12..13 ")"
+            WHITESPACE@13..14 " "
+          OVER_CLAUSE@14..82
+            OVER_KW@14..18 "OVER"
+            WHITESPACE@18..19 " "
+            L_PAREN@19..20 "("
+            ORDER_BY_CLAUSE@20..32
+              ORDER_KW@20..25 "ORDER"
+              WHITESPACE@25..26 " "
+              BY_KW@26..28 "BY"
+              WHITESPACE@28..29 " "
+              ORDER_BY_ITEM@29..32
+                COLUMN_REF@29..32
+                  IDENT@29..31 "id"
+                  WHITESPACE@31..32 " "
+            FRAME_CLAUSE@32..80
+              ROWS_KW@32..36 "ROWS"
+              WHITESPACE@36..37 " "
+              BETWEEN_KW@37..44 "BETWEEN"
+              WHITESPACE@44..45 " "
+              FRAME_BOUND@45..65
+                UNBOUNDED_KW@45..54 "UNBOUNDED"
+                WHITESPACE@54..55 " "
+                PRECEDING_KW@55..64 "PRECEDING"
+                WHITESPACE@64..65 " "
+              AND_KW@65..68 "AND"
+              WHITESPACE@68..69 " "
+              FRAME_BOUND@69..80
+                CURRENT_KW@69..76 "CURRENT"
+                WHITESPACE@76..77 " "
+                ROW_KW@77..80 "ROW"
+            R_PAREN@80..81 ")"
+            WHITESPACE@81..82 " "
+    FROM_CLAUSE@82..88
+      FROM_KW@82..86 "FROM"
+      WHITESPACE@86..87 " "
+      TABLE_REF@87..88
+        IDENT@87..88 "t"

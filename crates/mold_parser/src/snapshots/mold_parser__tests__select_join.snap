@@ -1,0 +1,53 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..66
+  SELECT_STMT@0..66
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..21
+      SELECT_ITEM@7..11
+        COLUMN_REF@7..11
+          IDENT@7..8 "u"
+          DOT@8..9 "."
+          IDENT@9..11 "id"
+      COMMA@11..12 ","
+      WHITESPACE@12..13 " "
+      SELECT_ITEM@13..21
+        COLUMN_REF@13..21
+          IDENT@13..14 "p"
+          DOT@14..15 "."
+          IDENT@15..20 "title"
+          WHITESPACE@20..21 " "
+    FROM_CLAUSE@21..66
+      FROM_KW@21..25 "FROM"
+      WHITESPACE@25..26 " "
+      JOIN_EXPR@26..66
+        TABLE_REF@26..34
+          IDENT@26..31 "users"
+          WHITESPACE@31..32 " "
+          IDENT@32..33 "u"
+          WHITESPACE@33..34 " "
+        JOIN_KW@34..38 "JOIN"
+        WHITESPACE@38..39 " "
+        TABLE_REF@39..47
+          IDENT@39..44 "posts"
+          WHITESPACE@44..45 " "
+          IDENT@45..46 "p"
+          WHITESPACE@46..47 " "
+        ON_KW@47..49 "ON"
+        WHITESPACE@49..50 " "
+        JOIN_CONDITION@50..66
+          BINARY_EXPR@50..66
+            COLUMN_REF@50..55
+              IDENT@50..51 "u"
+              DOT@51..52 "."
+              IDENT@52..54 "id"
+              WHITESPACE@54..55 " "
+            EQ@55..56 "="
+            WHITESPACE@56..57 " "
+            COLUMN_REF@57..66
+              IDENT@57..58 "p"
+              DOT@58..59 "."
+              IDENT@59..66 "user_id"

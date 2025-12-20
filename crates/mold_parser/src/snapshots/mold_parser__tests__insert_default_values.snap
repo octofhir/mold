@@ -1,0 +1,16 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..35
+  INSERT_STMT@0..35
+    INSERT_KW@0..6 "INSERT"
+    WHITESPACE@6..7 " "
+    INTO_KW@7..11 "INTO"
+    WHITESPACE@11..12 " "
+    TABLE_REF@12..21
+      IDENT@12..20 "counters"
+      WHITESPACE@20..21 " "
+    DEFAULT_KW@21..28 "DEFAULT"
+    WHITESPACE@28..29 " "
+    VALUES_KW@29..35 "VALUES"

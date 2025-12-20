@@ -1,0 +1,16 @@
+---
+source: crates/mold_parser/src/grammar/jsonpath.rs
+expression: "format_tree(\"$.items.size()\")"
+---
+JSONPATH_LITERAL
+  JP_ROOT
+    JP_DOLLAR Some("$")
+  JP_MEMBER_ACCESS
+    JP_DOT Some(".")
+    JP_KEY
+      JP_IDENT Some("items")
+  JP_METHOD
+    JP_DOT Some(".")
+    JP_SIZE_KW Some("size")
+    JP_L_PAREN Some("(")
+    JP_R_PAREN Some(")")

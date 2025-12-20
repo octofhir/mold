@@ -1,0 +1,39 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..52
+  SELECT_STMT@0..52
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..9
+      SELECT_ITEM@7..9
+        STAR_EXPR@7..9
+          STAR@7..8 "*"
+          WHITESPACE@8..9 " "
+    FROM_CLAUSE@9..20
+      FROM_KW@9..13 "FROM"
+      WHITESPACE@13..14 " "
+      TABLE_REF@14..20
+        IDENT@14..19 "users"
+        WHITESPACE@19..20 " "
+    WHERE_CLAUSE@20..52
+      WHERE_KW@20..25 "WHERE"
+      WHITESPACE@25..26 " "
+      BINARY_EXPR@26..52
+        COLUMN_REF@26..31
+          IDENT@26..30 "data"
+          WHITESPACE@30..31 " "
+        AT_AT@31..33 "@@"
+        WHITESPACE@33..34 " "
+        JSONPATH_LITERAL@34..52
+          JSONPATH_CONTENT@34..52
+            JP_QUOTE@34..35 "'"
+            JP_DOLLAR@35..36 "$"
+            JP_DOT@36..37 "."
+            JP_IDENT@37..43 "active"
+            JP_WHITESPACE@43..44 " "
+            JP_EQ_EQ@44..46 "=="
+            JP_WHITESPACE@46..47 " "
+            JP_TRUE_KW@47..51 "true"
+            JP_QUOTE@51..52 "'"

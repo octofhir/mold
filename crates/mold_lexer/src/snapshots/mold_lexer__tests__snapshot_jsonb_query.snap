@@ -1,0 +1,23 @@
+---
+source: crates/mold_lexer/src/lib.rs
+expression: format_tokens(sql)
+---
+SELECT_KW@0..6 "SELECT"
+WHITESPACE@6..7 " "
+IDENT@7..11 "data"
+ARROW@11..13 "->"
+STRING@13..19 "'name'"
+ARROW_TEXT@19..22 "->>"
+STRING@22..29 "'first'"
+WHITESPACE@29..30 " "
+FROM_KW@30..34 "FROM"
+WHITESPACE@34..35 " "
+IDENT@35..40 "users"
+WHITESPACE@40..41 " "
+WHERE_KW@41..46 "WHERE"
+WHITESPACE@46..47 " "
+IDENT@47..51 "data"
+WHITESPACE@51..52 " "
+AT_GT@52..54 "@>"
+WHITESPACE@54..55 " "
+STRING@55..73 "'{\"active\": true}'"

@@ -1,0 +1,15 @@
+---
+source: crates/mold_parser/src/grammar/jsonpath.rs
+expression: "format_tree(\"$[0 to 5]\")"
+---
+JSONPATH_LITERAL
+  JP_ROOT
+    JP_DOLLAR Some("$")
+  JP_ARRAY_SLICE
+    JP_L_BRACKET Some("[")
+    JP_NUMBER_LIT Some("0")
+    JP_WHITESPACE Some(" ")
+    JP_TO_KW Some("to")
+    JP_WHITESPACE Some(" ")
+    JP_NUMBER_LIT Some("5")
+    JP_R_BRACKET Some("]")

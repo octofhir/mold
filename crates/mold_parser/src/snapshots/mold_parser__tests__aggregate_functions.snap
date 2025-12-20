@@ -1,0 +1,30 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..40
+  SELECT_STMT@0..40
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..29
+      SELECT_ITEM@7..15
+        FUNC_CALL@7..15
+          COUNT_KW@7..12 "count"
+          L_PAREN@12..13 "("
+          STAR@13..14 "*"
+          R_PAREN@14..15 ")"
+      COMMA@15..16 ","
+      WHITESPACE@16..17 " "
+      SELECT_ITEM@17..29
+        FUNC_CALL@17..29
+          SUM_KW@17..20 "sum"
+          L_PAREN@20..21 "("
+          COLUMN_REF@21..27
+            IDENT@21..27 "amount"
+          R_PAREN@27..28 ")"
+          WHITESPACE@28..29 " "
+    FROM_CLAUSE@29..40
+      FROM_KW@29..33 "FROM"
+      WHITESPACE@33..34 " "
+      TABLE_REF@34..40
+        IDENT@34..40 "orders"

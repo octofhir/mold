@@ -1,0 +1,46 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..71
+  SELECT_STMT@0..71
+    WITH_CLAUSE@0..51
+      WITH_KW@0..4 "WITH"
+      WHITESPACE@4..5 " "
+      CTE@5..51
+        IDENT@5..11 "inline"
+        WHITESPACE@11..12 " "
+        AS_KW@12..14 "AS"
+        WHITESPACE@14..15 " "
+        NOT_KW@15..18 "NOT"
+        WHITESPACE@18..19 " "
+        MATERIALIZED_KW@19..31 "MATERIALIZED"
+        WHITESPACE@31..32 " "
+        L_PAREN@32..33 "("
+        SELECT_STMT@33..49
+          SELECT_KW@33..39 "SELECT"
+          WHITESPACE@39..40 " "
+          SELECT_ITEM_LIST@40..43
+            SELECT_ITEM@40..43
+              COLUMN_REF@40..43
+                IDENT@40..42 "id"
+                WHITESPACE@42..43 " "
+          FROM_CLAUSE@43..49
+            FROM_KW@43..47 "FROM"
+            WHITESPACE@47..48 " "
+            TABLE_REF@48..49
+              IDENT@48..49 "t"
+        R_PAREN@49..50 ")"
+        WHITESPACE@50..51 " "
+    SELECT_KW@51..57 "SELECT"
+    WHITESPACE@57..58 " "
+    SELECT_ITEM_LIST@58..60
+      SELECT_ITEM@58..60
+        STAR_EXPR@58..60
+          STAR@58..59 "*"
+          WHITESPACE@59..60 " "
+    FROM_CLAUSE@60..71
+      FROM_KW@60..64 "FROM"
+      WHITESPACE@64..65 " "
+      TABLE_REF@65..71
+        IDENT@65..71 "inline"

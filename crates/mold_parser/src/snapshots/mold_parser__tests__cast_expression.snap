@@ -1,0 +1,44 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..54
+  SELECT_STMT@0..54
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..48
+      SELECT_ITEM@7..15
+        CAST_EXPR@7..15
+          COLUMN_REF@7..9
+            IDENT@7..9 "id"
+          DOUBLE_COLON@9..11 "::"
+          TYPE_NAME@11..15
+            TEXT_KW@11..15 "text"
+      COMMA@15..16 ","
+      WHITESPACE@16..17 " "
+      SELECT_ITEM@17..48
+        CAST_EXPR@17..48
+          CAST_KW@17..21 "CAST"
+          L_PAREN@21..22 "("
+          COLUMN_REF@22..29
+            IDENT@22..28 "amount"
+            WHITESPACE@28..29 " "
+          AS_KW@29..31 "AS"
+          WHITESPACE@31..32 " "
+          TYPE_NAME@32..46
+            NUMERIC_KW@32..39 "numeric"
+            L_PAREN@39..40 "("
+            LITERAL@40..42
+              INTEGER@40..42 "10"
+            COMMA@42..43 ","
+            WHITESPACE@43..44 " "
+            LITERAL@44..45
+              INTEGER@44..45 "2"
+            R_PAREN@45..46 ")"
+          R_PAREN@46..47 ")"
+          WHITESPACE@47..48 " "
+    FROM_CLAUSE@48..54
+      FROM_KW@48..52 "FROM"
+      WHITESPACE@52..53 " "
+      TABLE_REF@53..54
+        IDENT@53..54 "t"

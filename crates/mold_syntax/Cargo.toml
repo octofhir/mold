@@ -1,0 +1,13 @@
+[package]
+name = "mold_syntax"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+cstree.workspace = true
+text-size.workspace = true
+phf.workspace = true
+
+[dev-dependencies]
+insta.workspace = true

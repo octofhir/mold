@@ -1,0 +1,14 @@
+---
+source: crates/mold_parser/src/grammar/jsonpath.rs
+expression: "format_tree(\"strict $.name\")"
+---
+JSONPATH_LITERAL
+  JP_MODE
+    JP_STRICT_KW Some("strict")
+    JP_WHITESPACE Some(" ")
+  JP_ROOT
+    JP_DOLLAR Some("$")
+  JP_MEMBER_ACCESS
+    JP_DOT Some(".")
+    JP_KEY
+      JP_IDENT Some("name")
