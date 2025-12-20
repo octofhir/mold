@@ -96,95 +96,299 @@ fn builtin_functions(prefix: Option<&str>) -> Vec<CompletionItem> {
         ("avg", "avg(expression) -> numeric", "Average of values"),
         ("min", "min(expression) -> same as input", "Minimum value"),
         ("max", "max(expression) -> same as input", "Maximum value"),
-        ("array_agg", "array_agg(expression) -> array", "Aggregate into array"),
-        ("string_agg", "string_agg(expression, delimiter) -> text", "Aggregate into string"),
+        (
+            "array_agg",
+            "array_agg(expression) -> array",
+            "Aggregate into array",
+        ),
+        (
+            "string_agg",
+            "string_agg(expression, delimiter) -> text",
+            "Aggregate into string",
+        ),
         ("bool_and", "bool_and(expression) -> boolean", "Logical AND"),
         ("bool_or", "bool_or(expression) -> boolean", "Logical OR"),
-
         // JSON/JSONB functions
-        ("jsonb_build_object", "jsonb_build_object(key, value, ...) -> jsonb", "Build JSONB object"),
-        ("jsonb_build_array", "jsonb_build_array(value, ...) -> jsonb", "Build JSONB array"),
-        ("jsonb_agg", "jsonb_agg(expression) -> jsonb", "Aggregate into JSONB array"),
-        ("jsonb_object_agg", "jsonb_object_agg(key, value) -> jsonb", "Aggregate into JSONB object"),
-        ("jsonb_extract_path", "jsonb_extract_path(jsonb, path...) -> jsonb", "Extract JSONB path"),
-        ("jsonb_extract_path_text", "jsonb_extract_path_text(jsonb, path...) -> text", "Extract JSONB path as text"),
-        ("jsonb_set", "jsonb_set(jsonb, path, value) -> jsonb", "Set JSONB value at path"),
-        ("jsonb_insert", "jsonb_insert(jsonb, path, value) -> jsonb", "Insert into JSONB"),
-        ("jsonb_pretty", "jsonb_pretty(jsonb) -> text", "Pretty-print JSONB"),
-        ("jsonb_typeof", "jsonb_typeof(jsonb) -> text", "Return JSONB type"),
-        ("jsonb_array_elements", "jsonb_array_elements(jsonb) -> setof jsonb", "Expand JSONB array"),
-        ("jsonb_array_elements_text", "jsonb_array_elements_text(jsonb) -> setof text", "Expand JSONB array as text"),
-        ("jsonb_object_keys", "jsonb_object_keys(jsonb) -> setof text", "Return JSONB object keys"),
-        ("jsonb_each", "jsonb_each(jsonb) -> setof (key, value)", "Expand JSONB to key-value pairs"),
-        ("jsonb_each_text", "jsonb_each_text(jsonb) -> setof (key, value)", "Expand JSONB to text key-value pairs"),
-        ("jsonb_strip_nulls", "jsonb_strip_nulls(jsonb) -> jsonb", "Remove null fields"),
+        (
+            "jsonb_build_object",
+            "jsonb_build_object(key, value, ...) -> jsonb",
+            "Build JSONB object",
+        ),
+        (
+            "jsonb_build_array",
+            "jsonb_build_array(value, ...) -> jsonb",
+            "Build JSONB array",
+        ),
+        (
+            "jsonb_agg",
+            "jsonb_agg(expression) -> jsonb",
+            "Aggregate into JSONB array",
+        ),
+        (
+            "jsonb_object_agg",
+            "jsonb_object_agg(key, value) -> jsonb",
+            "Aggregate into JSONB object",
+        ),
+        (
+            "jsonb_extract_path",
+            "jsonb_extract_path(jsonb, path...) -> jsonb",
+            "Extract JSONB path",
+        ),
+        (
+            "jsonb_extract_path_text",
+            "jsonb_extract_path_text(jsonb, path...) -> text",
+            "Extract JSONB path as text",
+        ),
+        (
+            "jsonb_set",
+            "jsonb_set(jsonb, path, value) -> jsonb",
+            "Set JSONB value at path",
+        ),
+        (
+            "jsonb_insert",
+            "jsonb_insert(jsonb, path, value) -> jsonb",
+            "Insert into JSONB",
+        ),
+        (
+            "jsonb_pretty",
+            "jsonb_pretty(jsonb) -> text",
+            "Pretty-print JSONB",
+        ),
+        (
+            "jsonb_typeof",
+            "jsonb_typeof(jsonb) -> text",
+            "Return JSONB type",
+        ),
+        (
+            "jsonb_array_elements",
+            "jsonb_array_elements(jsonb) -> setof jsonb",
+            "Expand JSONB array",
+        ),
+        (
+            "jsonb_array_elements_text",
+            "jsonb_array_elements_text(jsonb) -> setof text",
+            "Expand JSONB array as text",
+        ),
+        (
+            "jsonb_object_keys",
+            "jsonb_object_keys(jsonb) -> setof text",
+            "Return JSONB object keys",
+        ),
+        (
+            "jsonb_each",
+            "jsonb_each(jsonb) -> setof (key, value)",
+            "Expand JSONB to key-value pairs",
+        ),
+        (
+            "jsonb_each_text",
+            "jsonb_each_text(jsonb) -> setof (key, value)",
+            "Expand JSONB to text key-value pairs",
+        ),
+        (
+            "jsonb_strip_nulls",
+            "jsonb_strip_nulls(jsonb) -> jsonb",
+            "Remove null fields",
+        ),
         ("to_jsonb", "to_jsonb(value) -> jsonb", "Convert to JSONB"),
-
         // Window functions
-        ("row_number", "row_number() -> bigint", "Row number in partition"),
+        (
+            "row_number",
+            "row_number() -> bigint",
+            "Row number in partition",
+        ),
         ("rank", "rank() -> bigint", "Rank with gaps"),
         ("dense_rank", "dense_rank() -> bigint", "Rank without gaps"),
         ("ntile", "ntile(n) -> integer", "Divide into n buckets"),
-        ("lag", "lag(value, offset, default) -> same as input", "Previous row value"),
-        ("lead", "lead(value, offset, default) -> same as input", "Next row value"),
-        ("first_value", "first_value(value) -> same as input", "First value in window"),
-        ("last_value", "last_value(value) -> same as input", "Last value in window"),
-        ("nth_value", "nth_value(value, n) -> same as input", "Nth value in window"),
-
+        (
+            "lag",
+            "lag(value, offset, default) -> same as input",
+            "Previous row value",
+        ),
+        (
+            "lead",
+            "lead(value, offset, default) -> same as input",
+            "Next row value",
+        ),
+        (
+            "first_value",
+            "first_value(value) -> same as input",
+            "First value in window",
+        ),
+        (
+            "last_value",
+            "last_value(value) -> same as input",
+            "Last value in window",
+        ),
+        (
+            "nth_value",
+            "nth_value(value, n) -> same as input",
+            "Nth value in window",
+        ),
         // String functions
         ("concat", "concat(text, ...) -> text", "Concatenate strings"),
-        ("concat_ws", "concat_ws(separator, text, ...) -> text", "Concatenate with separator"),
+        (
+            "concat_ws",
+            "concat_ws(separator, text, ...) -> text",
+            "Concatenate with separator",
+        ),
         ("length", "length(text) -> integer", "String length"),
         ("lower", "lower(text) -> text", "Convert to lowercase"),
         ("upper", "upper(text) -> text", "Convert to uppercase"),
         ("trim", "trim(text) -> text", "Remove whitespace"),
         ("ltrim", "ltrim(text) -> text", "Remove leading whitespace"),
         ("rtrim", "rtrim(text) -> text", "Remove trailing whitespace"),
-        ("substring", "substring(text, start, length) -> text", "Extract substring"),
-        ("replace", "replace(text, from, to) -> text", "Replace occurrences"),
-        ("split_part", "split_part(text, delimiter, n) -> text", "Split and return part"),
-        ("regexp_replace", "regexp_replace(text, pattern, replacement) -> text", "Regex replace"),
-        ("regexp_matches", "regexp_matches(text, pattern) -> text[]", "Regex matches"),
-
+        (
+            "substring",
+            "substring(text, start, length) -> text",
+            "Extract substring",
+        ),
+        (
+            "replace",
+            "replace(text, from, to) -> text",
+            "Replace occurrences",
+        ),
+        (
+            "split_part",
+            "split_part(text, delimiter, n) -> text",
+            "Split and return part",
+        ),
+        (
+            "regexp_replace",
+            "regexp_replace(text, pattern, replacement) -> text",
+            "Regex replace",
+        ),
+        (
+            "regexp_matches",
+            "regexp_matches(text, pattern) -> text[]",
+            "Regex matches",
+        ),
         // Date/time functions
-        ("now", "now() -> timestamp with time zone", "Current timestamp"),
-        ("current_timestamp", "current_timestamp -> timestamp with time zone", "Current timestamp"),
+        (
+            "now",
+            "now() -> timestamp with time zone",
+            "Current timestamp",
+        ),
+        (
+            "current_timestamp",
+            "current_timestamp -> timestamp with time zone",
+            "Current timestamp",
+        ),
         ("current_date", "current_date -> date", "Current date"),
-        ("current_time", "current_time -> time with time zone", "Current time"),
-        ("extract", "extract(field from source) -> numeric", "Extract date/time field"),
-        ("date_trunc", "date_trunc(field, source) -> timestamp", "Truncate to specified precision"),
-        ("date_part", "date_part(field, source) -> double precision", "Extract date/time part"),
-        ("age", "age(timestamp, timestamp) -> interval", "Calculate age"),
-        ("to_char", "to_char(timestamp, format) -> text", "Format as string"),
+        (
+            "current_time",
+            "current_time -> time with time zone",
+            "Current time",
+        ),
+        (
+            "extract",
+            "extract(field from source) -> numeric",
+            "Extract date/time field",
+        ),
+        (
+            "date_trunc",
+            "date_trunc(field, source) -> timestamp",
+            "Truncate to specified precision",
+        ),
+        (
+            "date_part",
+            "date_part(field, source) -> double precision",
+            "Extract date/time part",
+        ),
+        (
+            "age",
+            "age(timestamp, timestamp) -> interval",
+            "Calculate age",
+        ),
+        (
+            "to_char",
+            "to_char(timestamp, format) -> text",
+            "Format as string",
+        ),
         ("to_date", "to_date(text, format) -> date", "Parse date"),
-        ("to_timestamp", "to_timestamp(text, format) -> timestamp", "Parse timestamp"),
-
+        (
+            "to_timestamp",
+            "to_timestamp(text, format) -> timestamp",
+            "Parse timestamp",
+        ),
         // Conditional functions
-        ("coalesce", "coalesce(value, ...) -> same as first non-null", "Return first non-null"),
-        ("nullif", "nullif(value1, value2) -> same as input", "Return null if equal"),
-        ("greatest", "greatest(value, ...) -> same as input", "Return greatest value"),
-        ("least", "least(value, ...) -> same as input", "Return smallest value"),
-
+        (
+            "coalesce",
+            "coalesce(value, ...) -> same as first non-null",
+            "Return first non-null",
+        ),
+        (
+            "nullif",
+            "nullif(value1, value2) -> same as input",
+            "Return null if equal",
+        ),
+        (
+            "greatest",
+            "greatest(value, ...) -> same as input",
+            "Return greatest value",
+        ),
+        (
+            "least",
+            "least(value, ...) -> same as input",
+            "Return smallest value",
+        ),
         // Math functions
         ("abs", "abs(numeric) -> numeric", "Absolute value"),
         ("ceil", "ceil(numeric) -> numeric", "Round up"),
         ("floor", "floor(numeric) -> numeric", "Round down"),
-        ("round", "round(numeric, scale) -> numeric", "Round to scale"),
-        ("trunc", "trunc(numeric, scale) -> numeric", "Truncate to scale"),
+        (
+            "round",
+            "round(numeric, scale) -> numeric",
+            "Round to scale",
+        ),
+        (
+            "trunc",
+            "trunc(numeric, scale) -> numeric",
+            "Truncate to scale",
+        ),
         ("sqrt", "sqrt(numeric) -> double precision", "Square root"),
-        ("power", "power(base, exponent) -> double precision", "Raise to power"),
+        (
+            "power",
+            "power(base, exponent) -> double precision",
+            "Raise to power",
+        ),
         ("mod", "mod(dividend, divisor) -> numeric", "Modulo"),
         ("random", "random() -> double precision", "Random value 0-1"),
-
         // Array functions
-        ("array_length", "array_length(array, dimension) -> integer", "Array length"),
-        ("array_append", "array_append(array, element) -> array", "Append to array"),
-        ("array_prepend", "array_prepend(element, array) -> array", "Prepend to array"),
-        ("array_cat", "array_cat(array, array) -> array", "Concatenate arrays"),
-        ("array_position", "array_position(array, element) -> integer", "Find element position"),
-        ("array_remove", "array_remove(array, element) -> array", "Remove element"),
-        ("unnest", "unnest(array) -> setof element", "Expand array to rows"),
-
+        (
+            "array_length",
+            "array_length(array, dimension) -> integer",
+            "Array length",
+        ),
+        (
+            "array_append",
+            "array_append(array, element) -> array",
+            "Append to array",
+        ),
+        (
+            "array_prepend",
+            "array_prepend(element, array) -> array",
+            "Prepend to array",
+        ),
+        (
+            "array_cat",
+            "array_cat(array, array) -> array",
+            "Concatenate arrays",
+        ),
+        (
+            "array_position",
+            "array_position(array, element) -> integer",
+            "Find element position",
+        ),
+        (
+            "array_remove",
+            "array_remove(array, element) -> array",
+            "Remove element",
+        ),
+        (
+            "unnest",
+            "unnest(array) -> setof element",
+            "Expand array to rows",
+        ),
         // Type conversion
         ("cast", "cast(value AS type) -> type", "Convert type"),
     ];
@@ -240,18 +444,11 @@ fn get_builtin_function_info(name: &str) -> Option<FunctionInfo> {
 
     let name_lower = name.to_lowercase();
     match name_lower.as_str() {
-        "count" => Some(
-            FunctionInfo::new("count", "bigint")
-                .with_arg(FunctionArg::new("expression")),
-        ),
-        "sum" => Some(
-            FunctionInfo::new("sum", "numeric")
-                .with_arg(FunctionArg::new("expression")),
-        ),
-        "avg" => Some(
-            FunctionInfo::new("avg", "numeric")
-                .with_arg(FunctionArg::new("expression")),
-        ),
+        "count" => {
+            Some(FunctionInfo::new("count", "bigint").with_arg(FunctionArg::new("expression")))
+        }
+        "sum" => Some(FunctionInfo::new("sum", "numeric").with_arg(FunctionArg::new("expression"))),
+        "avg" => Some(FunctionInfo::new("avg", "numeric").with_arg(FunctionArg::new("expression"))),
         "min" | "max" => Some(
             FunctionInfo::new(&name_lower, "same as input")
                 .with_arg(FunctionArg::new("expression")),

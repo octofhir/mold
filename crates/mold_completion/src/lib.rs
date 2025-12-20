@@ -43,7 +43,7 @@ pub mod providers;
 pub mod types;
 
 // Re-export main types
-pub use complete::{complete, get_prefix_at_offset, CompletionRequest};
+pub use complete::{CompletionRequest, complete, get_prefix_at_offset};
 pub use context::detect_context;
 pub use generators::{
     complete_columns, complete_functions, complete_jsonb_paths, complete_jsonpath,
@@ -114,11 +114,8 @@ mod tests {
                 ],
             );
 
-        let columns = generators::columns::complete_qualified_columns(
-            Some(&provider),
-            "users",
-            None,
-        );
+        let columns =
+            generators::columns::complete_qualified_columns(Some(&provider), "users", None);
         assert_eq!(columns.len(), 2);
         assert!(columns.iter().any(|i| i.label == "id"));
         assert!(columns.iter().any(|i| i.label == "email"));

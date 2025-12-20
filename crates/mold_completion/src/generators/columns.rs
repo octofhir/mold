@@ -27,7 +27,11 @@ pub fn complete_columns(
         };
 
         for col in columns {
-            items.push(create_column_item(&col.name, &col.data_type, Some(table_name)));
+            items.push(create_column_item(
+                &col.name,
+                &col.data_type,
+                Some(table_name),
+            ));
         }
     } else {
         // Columns from all tables in scope
@@ -40,7 +44,11 @@ pub fn complete_columns(
                 };
 
                 if matches_prefix {
-                    items.push(create_column_item(&col.name, &col.data_type, Some(table_name)));
+                    items.push(create_column_item(
+                        &col.name,
+                        &col.data_type,
+                        Some(table_name),
+                    ));
                 }
             }
         }

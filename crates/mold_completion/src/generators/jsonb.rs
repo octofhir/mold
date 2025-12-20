@@ -70,8 +70,7 @@ fn needs_quoting(key: &str) -> bool {
         return true;
     }
 
-    key.chars()
-        .any(|c| !c.is_ascii_alphanumeric() && c != '_')
+    key.chars().any(|c| !c.is_ascii_alphanumeric() && c != '_')
 }
 
 /// Generates JSONPath expression completion items.

@@ -527,9 +527,10 @@ impl AstNode for JpExpr {
             SyntaxKind::JP_EXISTS => Some(JpExpr::Exists(JpExists(node))),
             SyntaxKind::JP_ARITHMETIC => Some(JpExpr::Arithmetic(JpArithmetic(node))),
             SyntaxKind::JP_PAREN => Some(JpExpr::Paren(JpParen(node))),
-            SyntaxKind::JP_STRING | SyntaxKind::JP_NUMBER | SyntaxKind::JP_BOOL | SyntaxKind::JP_NULL => {
-                Some(JpExpr::Literal(JpLiteral(node)))
-            }
+            SyntaxKind::JP_STRING
+            | SyntaxKind::JP_NUMBER
+            | SyntaxKind::JP_BOOL
+            | SyntaxKind::JP_NULL => Some(JpExpr::Literal(JpLiteral(node))),
             SyntaxKind::JSONPATH_CONTENT => Some(JpExpr::Path(JsonPath(node))),
             _ => None,
         }
@@ -691,7 +692,10 @@ impl AstNode for JpLiteral {
     fn can_cast(kind: SyntaxKind) -> bool {
         matches!(
             kind,
-            SyntaxKind::JP_STRING | SyntaxKind::JP_NUMBER | SyntaxKind::JP_BOOL | SyntaxKind::JP_NULL
+            SyntaxKind::JP_STRING
+                | SyntaxKind::JP_NUMBER
+                | SyntaxKind::JP_BOOL
+                | SyntaxKind::JP_NULL
         )
     }
 
@@ -717,8 +721,9 @@ impl JpLiteral {
     /// Returns the literal kind.
     pub fn kind(&self) -> Option<JpLiteralKind> {
         match self.0.kind() {
-            SyntaxKind::JP_STRING => support::first_token(&self.0)
-                .map(|t| JpLiteralKind::String(t.text().to_string())),
+            SyntaxKind::JP_STRING => {
+                support::first_token(&self.0).map(|t| JpLiteralKind::String(t.text().to_string()))
+            }
             SyntaxKind::JP_NUMBER => Some(JpLiteralKind::Number),
             SyntaxKind::JP_BOOL => {
                 if support::token(&self.0, SyntaxKind::JP_TRUE_KW).is_some() {

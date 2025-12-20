@@ -8,7 +8,9 @@
 
 use std::sync::Arc;
 
-use crate::binding::{ColumnBinding, CteBinding, DataType, Resolution, ResolvedColumn, TableBinding};
+use crate::binding::{
+    ColumnBinding, CteBinding, DataType, Resolution, ResolvedColumn, TableBinding,
+};
 use crate::scope::Scope;
 
 /// Result of resolving a qualified name (e.g., schema.table.column).
@@ -109,16 +111,15 @@ pub fn resolve_table(
 /// - Simple column names: `id`
 /// - Table-qualified names: `users.id`
 /// - Schema-qualified names: `public.users.id`
-pub fn resolve_column(
-    parts: &[String],
-    scope: &Arc<Scope>,
-) -> Resolution<ResolvedColumn> {
+pub fn resolve_column(parts: &[String], scope: &Arc<Scope>) -> Resolution<ResolvedColumn> {
     let qualified = QualifiedResolution::from_parts(parts);
 
     let table_name = qualified.table.as_deref();
 
     match scope.resolve_column(&qualified.column, table_name) {
-        Resolution::Resolved((table, column)) => Resolution::Resolved(ResolvedColumn { table, column }),
+        Resolution::Resolved((table, column)) => {
+            Resolution::Resolved(ResolvedColumn { table, column })
+        }
         Resolution::Ambiguous(matches) => Resolution::Ambiguous(
             matches
                 .into_iter()

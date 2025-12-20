@@ -16,9 +16,9 @@ pub fn format_select(node: &SyntaxNode, printer: &mut Printer) {
 
     // The SELECT keyword is a direct child token of SELECT_STMT
     // Look for SELECT_KW token and SELECT_ITEM_LIST node
-    let has_select = node
-        .children_with_tokens()
-        .any(|e| matches!(e, cstree::util::NodeOrToken::Token(t) if t.kind() == SyntaxKind::SELECT_KW));
+    let has_select = node.children_with_tokens().any(
+        |e| matches!(e, cstree::util::NodeOrToken::Token(t) if t.kind() == SyntaxKind::SELECT_KW),
+    );
 
     if has_select {
         // Write SELECT keyword
@@ -359,9 +359,9 @@ fn format_table_name(node: &SyntaxNode, printer: &mut Printer) {
 /// Formats an alias.
 fn format_alias(node: &SyntaxNode, printer: &mut Printer) {
     // Check if there's an AS keyword
-    let has_as = node.children_with_tokens().any(|e| {
-        matches!(e, cstree::util::NodeOrToken::Token(t) if t.kind() == SyntaxKind::AS_KW)
-    });
+    let has_as = node
+        .children_with_tokens()
+        .any(|e| matches!(e, cstree::util::NodeOrToken::Token(t) if t.kind() == SyntaxKind::AS_KW));
 
     printer.space();
 
@@ -403,9 +403,7 @@ fn format_join_expr(node: &SyntaxNode, printer: &mut Printer, is_first: bool) {
         }
     } else {
         // No nested join - format the left table (first TABLE_REF)
-        let left_table = node
-            .children()
-            .find(|c| c.kind() == SyntaxKind::TABLE_REF);
+        let left_table = node.children().find(|c| c.kind() == SyntaxKind::TABLE_REF);
         if let Some(table) = left_table {
             format_table_ref(&table, printer);
         }

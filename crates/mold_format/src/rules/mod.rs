@@ -76,9 +76,27 @@ pub fn calculate_river_width(keywords: &[&str]) -> usize {
 
 /// Standard SQL clause keywords for river width calculation.
 pub const STANDARD_CLAUSE_KEYWORDS: &[&str] = &[
-    "SELECT", "FROM", "WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET", "WITH",
-    "RETURNING", "SET", "VALUES", "USING", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "FULL JOIN",
-    "CROSS JOIN", "ON", "AND", "OR",
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "GROUP BY",
+    "HAVING",
+    "ORDER BY",
+    "LIMIT",
+    "OFFSET",
+    "WITH",
+    "RETURNING",
+    "SET",
+    "VALUES",
+    "USING",
+    "LEFT JOIN",
+    "RIGHT JOIN",
+    "INNER JOIN",
+    "FULL JOIN",
+    "CROSS JOIN",
+    "ON",
+    "AND",
+    "OR",
 ];
 
 /// Returns the recommended river width for standard SQL formatting.

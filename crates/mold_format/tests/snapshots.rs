@@ -1,6 +1,6 @@
 //! Snapshot tests for SQL formatting.
 
-use mold_format::{format_compact, format_sqlstyle, FormatConfig};
+use mold_format::{FormatConfig, format_compact, format_sqlstyle};
 
 #[test]
 fn test_simple_select_sqlstyle() {
@@ -130,9 +130,20 @@ fn test_idempotent_with_where() {
     let formatted1 = format_sqlstyle(sql);
     let formatted2 = format_sqlstyle(&formatted1);
     // Trim trailing whitespace for comparison since that can vary
-    let f1 = formatted1.lines().map(|l| l.trim_end()).collect::<Vec<_>>().join("\n");
-    let f2 = formatted2.lines().map(|l| l.trim_end()).collect::<Vec<_>>().join("\n");
-    assert_eq!(f1, f2, "Formatting should be idempotent (modulo trailing whitespace)");
+    let f1 = formatted1
+        .lines()
+        .map(|l| l.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let f2 = formatted2
+        .lines()
+        .map(|l| l.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_eq!(
+        f1, f2,
+        "Formatting should be idempotent (modulo trailing whitespace)"
+    );
 }
 
 #[test]
@@ -158,8 +169,7 @@ fn test_coalesce_nullif() {
 
 #[test]
 fn test_lower_keyword_case() {
-    let config = FormatConfig::sqlstyle()
-        .with_keyword_case(mold_format::KeywordCase::Lower);
+    let config = FormatConfig::sqlstyle().with_keyword_case(mold_format::KeywordCase::Lower);
     let sql = "SELECT id FROM users WHERE active = TRUE";
     let formatted = mold_format::format::format(sql, &config);
     assert!(formatted.contains("select"));
@@ -169,8 +179,7 @@ fn test_lower_keyword_case() {
 
 #[test]
 fn test_trailing_comma_style() {
-    let config = FormatConfig::sqlstyle()
-        .with_comma_style(mold_format::CommaStyle::Trailing);
+    let config = FormatConfig::sqlstyle().with_comma_style(mold_format::CommaStyle::Trailing);
     let sql = "SELECT id, name, email FROM users";
     let formatted = mold_format::format::format(sql, &config);
     insta::assert_snapshot!(formatted);
