@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/mold_syntax",
+    "crates/mold_lexer",
+    "crates/mold_parser",
+    "crates/mold_hir",
+    "crates/mold_completion",
+    "crates/mold_format",
+    "crates/mold",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+# CST infrastructure (rust-analyzer's rowan fork with interning)
+cstree = "0.13"
+text-size = "1.1"
+
+# Perfect hash function for keyword lookup
+phf = { version = "0.13", features = ["macros"] }
+
+# Testing
+insta = { version = "1.34", features = ["glob"] }
+
+# Internal crates
+mold_syntax = { path = "crates/mold_syntax" }
+mold_lexer = { path = "crates/mold_lexer" }
+mold_parser = { path = "crates/mold_parser" }
+mold_hir = { path = "crates/mold_hir" }
+mold_completion = { path = "crates/mold_completion" }
+mold_format = { path = "crates/mold_format" }

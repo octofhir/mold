@@ -1,0 +1,12 @@
+[package]
+name = "mold_format"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mold_syntax.workspace = true
+text-size.workspace = true
+
+[dev-dependencies]
+insta.workspace = true

@@ -1,0 +1,45 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..74
+  SELECT_STMT@0..74
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..66
+      SELECT_ITEM@7..66
+        FUNC_CALL@7..66
+          FUNC_CALL@7..20
+            IDENT@7..17 "row_number"
+            L_PAREN@17..18 "("
+            R_PAREN@18..19 ")"
+            WHITESPACE@19..20 " "
+          OVER_CLAUSE@20..66
+            OVER_KW@20..24 "OVER"
+            WHITESPACE@24..25 " "
+            L_PAREN@25..26 "("
+            PARTITION_BY@26..44
+              PARTITION_KW@26..35 "PARTITION"
+              WHITESPACE@35..36 " "
+              BY_KW@36..38 "BY"
+              WHITESPACE@38..39 " "
+              COLUMN_REF@39..44
+                IDENT@39..43 "dept"
+                WHITESPACE@43..44 " "
+            ORDER_BY_CLAUSE@44..64
+              ORDER_KW@44..49 "ORDER"
+              WHITESPACE@49..50 " "
+              BY_KW@50..52 "BY"
+              WHITESPACE@52..53 " "
+              ORDER_BY_ITEM@53..64
+                COLUMN_REF@53..60
+                  IDENT@53..59 "salary"
+                  WHITESPACE@59..60 " "
+                DESC_KW@60..64 "DESC"
+            R_PAREN@64..65 ")"
+            WHITESPACE@65..66 " "
+    FROM_CLAUSE@66..74
+      FROM_KW@66..70 "FROM"
+      WHITESPACE@70..71 " "
+      TABLE_REF@71..74
+        IDENT@71..74 "emp"

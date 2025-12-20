@@ -1,0 +1,13 @@
+[package]
+name = "mold_completion"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+
+[dependencies]
+mold_syntax.workspace = true
+mold_hir.workspace = true
+text-size.workspace = true
+
+[dev-dependencies]
+insta.workspace = true

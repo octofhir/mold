@@ -1,0 +1,44 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..74
+  SELECT_STMT@0..74
+    WITH_CLAUSE@0..54
+      WITH_KW@0..4 "WITH"
+      WHITESPACE@4..5 " "
+      CTE@5..54
+        IDENT@5..11 "cached"
+        WHITESPACE@11..12 " "
+        AS_KW@12..14 "AS"
+        WHITESPACE@14..15 " "
+        MATERIALIZED_KW@15..27 "MATERIALIZED"
+        WHITESPACE@27..28 " "
+        L_PAREN@28..29 "("
+        SELECT_STMT@29..52
+          SELECT_KW@29..35 "SELECT"
+          WHITESPACE@35..36 " "
+          SELECT_ITEM_LIST@36..38
+            SELECT_ITEM@36..38
+              STAR_EXPR@36..38
+                STAR@36..37 "*"
+                WHITESPACE@37..38 " "
+          FROM_CLAUSE@38..52
+            FROM_KW@38..42 "FROM"
+            WHITESPACE@42..43 " "
+            TABLE_REF@43..52
+              IDENT@43..52 "big_table"
+        R_PAREN@52..53 ")"
+        WHITESPACE@53..54 " "
+    SELECT_KW@54..60 "SELECT"
+    WHITESPACE@60..61 " "
+    SELECT_ITEM_LIST@61..63
+      SELECT_ITEM@61..63
+        STAR_EXPR@61..63
+          STAR@61..62 "*"
+          WHITESPACE@62..63 " "
+    FROM_CLAUSE@63..74
+      FROM_KW@63..67 "FROM"
+      WHITESPACE@67..68 " "
+      TABLE_REF@68..74
+        IDENT@68..74 "cached"

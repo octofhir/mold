@@ -1,0 +1,46 @@
+---
+source: crates/mold_parser/src/grammar/jsonpath.rs
+expression: "format_tree(\"$[*] ? (@.price > 10 && @.active == true)\")"
+---
+JSONPATH_LITERAL
+  JP_ROOT
+    JP_DOLLAR Some("$")
+  JP_ARRAY_WILDCARD
+    JP_L_BRACKET Some("[")
+    JP_STAR Some("*")
+    JP_R_BRACKET Some("]")
+    JP_WHITESPACE Some(" ")
+  JP_FILTER
+    JP_QUESTION Some("?")
+    JP_WHITESPACE Some(" ")
+    JP_L_PAREN Some("(")
+    JP_LOGICAL_AND
+      JP_CURRENT
+        JP_AT Some("@")
+      JP_MEMBER_ACCESS
+        JP_DOT Some(".")
+        JP_KEY
+          JP_IDENT Some("price")
+          JP_WHITESPACE Some(" ")
+      JP_COMPARISON
+        JP_GT Some(">")
+        JP_WHITESPACE Some(" ")
+        JP_NUMBER
+          JP_NUMBER_LIT Some("10")
+          JP_WHITESPACE Some(" ")
+      JP_AMP_AMP Some("&&")
+      JP_WHITESPACE Some(" ")
+      JP_FILTER_EXPR
+        JP_CURRENT
+          JP_AT Some("@")
+        JP_MEMBER_ACCESS
+          JP_DOT Some(".")
+          JP_KEY
+            JP_IDENT Some("active")
+            JP_WHITESPACE Some(" ")
+        JP_COMPARISON
+          JP_EQ_EQ Some("==")
+          JP_WHITESPACE Some(" ")
+          JP_BOOL
+            JP_TRUE_KW Some("true")
+    JP_R_PAREN Some(")")

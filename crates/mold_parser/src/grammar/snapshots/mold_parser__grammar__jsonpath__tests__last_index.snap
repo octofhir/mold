@@ -1,0 +1,11 @@
+---
+source: crates/mold_parser/src/grammar/jsonpath.rs
+expression: "format_tree(\"$[last]\")"
+---
+JSONPATH_LITERAL
+  JP_ROOT
+    JP_DOLLAR Some("$")
+  JP_ARRAY_ACCESS
+    JP_L_BRACKET Some("[")
+    JP_LAST_KW Some("last")
+    JP_R_BRACKET Some("]")

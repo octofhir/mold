@@ -1,0 +1,57 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..101
+  SELECT_STMT@0..101
+    WITH_CLAUSE@0..73
+      WITH_KW@0..4 "WITH"
+      WHITESPACE@4..5 " "
+      CTE@5..73
+        IDENT@5..12 "deleted"
+        WHITESPACE@12..13 " "
+        AS_KW@13..15 "AS"
+        WHITESPACE@15..16 " "
+        L_PAREN@16..17 "("
+        DELETE_STMT@17..71
+          DELETE_KW@17..23 "DELETE"
+          WHITESPACE@23..24 " "
+          FROM_KW@24..28 "FROM"
+          WHITESPACE@28..29 " "
+          TABLE_REF@29..38
+            IDENT@29..37 "old_data"
+            WHITESPACE@37..38 " "
+          WHERE_CLAUSE@38..59
+            WHERE_KW@38..43 "WHERE"
+            WHITESPACE@43..44 " "
+            BINARY_EXPR@44..59
+              COLUMN_REF@44..52
+                IDENT@44..51 "expired"
+                WHITESPACE@51..52 " "
+              EQ@52..53 "="
+              WHITESPACE@53..54 " "
+              LITERAL@54..59
+                TRUE_KW@54..58 "true"
+                WHITESPACE@58..59 " "
+          RETURNING_CLAUSE@59..71
+            RETURNING_KW@59..68 "RETURNING"
+            WHITESPACE@68..69 " "
+            COLUMN_REF@69..71
+              IDENT@69..71 "id"
+        R_PAREN@71..72 ")"
+        WHITESPACE@72..73 " "
+    SELECT_KW@73..79 "SELECT"
+    WHITESPACE@79..80 " "
+    SELECT_ITEM_LIST@80..89
+      SELECT_ITEM@80..89
+        FUNC_CALL@80..89
+          COUNT_KW@80..85 "count"
+          L_PAREN@85..86 "("
+          STAR@86..87 "*"
+          R_PAREN@87..88 ")"
+          WHITESPACE@88..89 " "
+    FROM_CLAUSE@89..101
+      FROM_KW@89..93 "FROM"
+      WHITESPACE@93..94 " "
+      TABLE_REF@94..101
+        IDENT@94..101 "deleted"

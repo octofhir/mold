@@ -1,0 +1,15 @@
+---
+source: crates/mold_lexer/src/lib.rs
+expression: format_tokens(sql)
+---
+STRING@0..7 "'hello'"
+WHITESPACE@7..8 " "
+STRING@8..15 "'it''s'"
+WHITESPACE@15..16 " "
+DOLLAR_STRING@16..24 "$$body$$"
+WHITESPACE@24..25 " "
+DOLLAR_STRING@25..42 "$tag$content$tag$"
+WHITESPACE@42..43 " "
+BIT_STRING@43..49 "B'101'"
+WHITESPACE@49..50 " "
+HEX_STRING@50..55 "X'FF'"

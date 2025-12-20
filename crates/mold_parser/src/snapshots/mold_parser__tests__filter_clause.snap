@@ -1,0 +1,32 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..48
+  SELECT_STMT@0..48
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..38
+      SELECT_ITEM@7..38
+        FUNC_CALL@7..38
+          FUNC_CALL@7..16
+            COUNT_KW@7..12 "count"
+            L_PAREN@12..13 "("
+            STAR@13..14 "*"
+            R_PAREN@14..15 ")"
+            WHITESPACE@15..16 " "
+          FILTER_CLAUSE@16..38
+            FILTER_KW@16..22 "FILTER"
+            WHITESPACE@22..23 " "
+            L_PAREN@23..24 "("
+            WHERE_KW@24..29 "WHERE"
+            WHITESPACE@29..30 " "
+            COLUMN_REF@30..36
+              IDENT@30..36 "active"
+            R_PAREN@36..37 ")"
+            WHITESPACE@37..38 " "
+    FROM_CLAUSE@38..48
+      FROM_KW@38..42 "FROM"
+      WHITESPACE@42..43 " "
+      TABLE_REF@43..48
+        IDENT@43..48 "users"

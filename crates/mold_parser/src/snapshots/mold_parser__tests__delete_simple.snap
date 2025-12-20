@@ -1,0 +1,24 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..30
+  DELETE_STMT@0..30
+    DELETE_KW@0..6 "DELETE"
+    WHITESPACE@6..7 " "
+    FROM_KW@7..11 "FROM"
+    WHITESPACE@11..12 " "
+    TABLE_REF@12..18
+      IDENT@12..17 "users"
+      WHITESPACE@17..18 " "
+    WHERE_CLAUSE@18..30
+      WHERE_KW@18..23 "WHERE"
+      WHITESPACE@23..24 " "
+      BINARY_EXPR@24..30
+        COLUMN_REF@24..27
+          IDENT@24..26 "id"
+          WHITESPACE@26..27 " "
+        EQ@27..28 "="
+        WHITESPACE@28..29 " "
+        LITERAL@29..30
+          INTEGER@29..30 "1"
