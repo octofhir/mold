@@ -42,17 +42,23 @@ impl Analysis {
 
     /// Returns true if the analysis has errors.
     pub fn has_errors(&self) -> bool {
-        self.diagnostics.iter().any(|d| d.severity == Severity::Error)
+        self.diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error)
     }
 
     /// Returns all error diagnostics.
     pub fn errors(&self) -> impl Iterator<Item = &Diagnostic> {
-        self.diagnostics.iter().filter(|d| d.severity == Severity::Error)
+        self.diagnostics
+            .iter()
+            .filter(|d| d.severity == Severity::Error)
     }
 
     /// Returns all warning diagnostics.
     pub fn warnings(&self) -> impl Iterator<Item = &Diagnostic> {
-        self.diagnostics.iter().filter(|d| d.severity == Severity::Warning)
+        self.diagnostics
+            .iter()
+            .filter(|d| d.severity == Severity::Warning)
     }
 }
 
@@ -292,8 +298,8 @@ impl<'a> Analyzer<'a> {
             })
             .collect();
 
-        let mut binding = TableBinding::table(schema.map(String::from), name.to_string())
-            .with_columns(columns);
+        let mut binding =
+            TableBinding::table(schema.map(String::from), name.to_string()).with_columns(columns);
 
         if let Some(a) = alias {
             binding = binding.with_alias(a.to_string());
@@ -334,7 +340,8 @@ impl<'a> Analyzer<'a> {
 
     /// Records a resolved table reference.
     pub fn record_table_reference(&mut self, range: TextRange, binding: Arc<TableBinding>) {
-        self.resolved_tables.push(ResolvedTableRef { range, binding });
+        self.resolved_tables
+            .push(ResolvedTableRef { range, binding });
     }
 
     /// Completes the analysis and returns the result.
@@ -505,11 +512,10 @@ mod tests {
     fn test_expand_star() {
         let scope = ScopeBuilder::new()
             .add_table(
-                TableBinding::table(None, "users".to_string())
-                    .with_columns(vec![
-                        ColumnBinding::new("id".to_string(), 0),
-                        ColumnBinding::new("name".to_string(), 1),
-                    ]),
+                TableBinding::table(None, "users".to_string()).with_columns(vec![
+                    ColumnBinding::new("id".to_string(), 0),
+                    ColumnBinding::new("name".to_string(), 1),
+                ]),
             )
             .add_table(
                 TableBinding::table(None, "orders".to_string())
@@ -525,11 +531,10 @@ mod tests {
     fn test_expand_table_star() {
         let scope = ScopeBuilder::new()
             .add_table(
-                TableBinding::table(None, "users".to_string())
-                    .with_columns(vec![
-                        ColumnBinding::new("id".to_string(), 0),
-                        ColumnBinding::new("name".to_string(), 1),
-                    ]),
+                TableBinding::table(None, "users".to_string()).with_columns(vec![
+                    ColumnBinding::new("id".to_string(), 0),
+                    ColumnBinding::new("name".to_string(), 1),
+                ]),
             )
             .build();
 

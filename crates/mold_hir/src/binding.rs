@@ -77,7 +77,10 @@ impl TableBinding {
             name: name.clone(),
             original_name: name.clone(),
             alias: None,
-            source: TableSource::Function { name, returns_table },
+            source: TableSource::Function {
+                name,
+                returns_table,
+            },
             columns: Vec::new(),
             range: None,
         }
@@ -127,7 +130,9 @@ impl TableBinding {
     /// Finds a column by name (case-insensitive).
     pub fn find_column(&self, name: &str) -> Option<&ColumnBinding> {
         let name_lower = name.to_lowercase();
-        self.columns.iter().find(|c| c.name.to_lowercase() == name_lower)
+        self.columns
+            .iter()
+            .find(|c| c.name.to_lowercase() == name_lower)
     }
 }
 
@@ -318,11 +323,18 @@ pub enum DataType {
     BigInt,
     Real,
     DoublePrecision,
-    Numeric { precision: Option<u32>, scale: Option<u32> },
+    Numeric {
+        precision: Option<u32>,
+        scale: Option<u32>,
+    },
 
     // Character types
-    Char { length: Option<u32> },
-    VarChar { length: Option<u32> },
+    Char {
+        length: Option<u32>,
+    },
+    VarChar {
+        length: Option<u32>,
+    },
     Text,
 
     // Binary types
@@ -330,8 +342,12 @@ pub enum DataType {
 
     // Date/time types
     Date,
-    Time { with_timezone: bool },
-    Timestamp { with_timezone: bool },
+    Time {
+        with_timezone: bool,
+    },
+    Timestamp {
+        with_timezone: bool,
+    },
     Interval,
 
     // Boolean

@@ -265,7 +265,10 @@ pub fn find_token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
 
 /// Returns all child nodes of a specific kind.
 pub fn children_of_kind(node: &SyntaxNode, kind: SyntaxKind) -> Vec<SyntaxNode> {
-    node.children().filter(|c| c.kind() == kind).cloned().collect()
+    node.children()
+        .filter(|c| c.kind() == kind)
+        .cloned()
+        .collect()
 }
 
 #[cfg(test)]

@@ -45,15 +45,16 @@ pub mod scope;
 
 // Re-export main types
 pub use analyze::{
-    Analysis, Analyzer, ColumnInfo, Diagnostic, NullSchemaProvider, RelatedInfo,
-    ResolvedReference, ResolvedTableRef, SchemaProvider, Severity, TableInfo, TableType,
+    Analysis, Analyzer, ColumnInfo, Diagnostic, NullSchemaProvider, RelatedInfo, ResolvedReference,
+    ResolvedTableRef, SchemaProvider, Severity, TableInfo, TableType,
 };
 pub use binding::{
     ColumnBinding, CteBinding, DataType, Resolution, ResolvedColumn, TableBinding, TableSource,
 };
 pub use resolve::{
+    JsonbChild, JsonbColumnInfo, JsonbStructure, JsonbValueType, QualifiedResolution,
     find_jsonb_columns, jsonb_access_result_type, resolve_column, resolve_cte, resolve_order_by,
-    resolve_table, JsonbChild, JsonbColumnInfo, JsonbStructure, JsonbValueType, QualifiedResolution,
+    resolve_table,
 };
 pub use scope::{Scope, ScopeBuilder};
 
@@ -107,8 +108,8 @@ mod tests {
     #[test]
     fn test_cte_resolution() {
         // Acceptance criteria 2: Resolve CTE reference
-        let cte = CteBinding::new("x".to_string())
-            .with_columns(vec!["a".to_string(), "b".to_string()]);
+        let cte =
+            CteBinding::new("x".to_string()).with_columns(vec!["a".to_string(), "b".to_string()]);
 
         let scope = ScopeBuilder::new().add_cte(cte).build();
 

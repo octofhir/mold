@@ -113,8 +113,8 @@ mod tests {
         // - FromClause(SyntaxNode) - size of SyntaxNode
         // etc.
 
-        use std::mem::size_of;
         use crate::SyntaxNode;
+        use std::mem::size_of;
 
         // All node types should be the same size as SyntaxNode
         assert_eq!(size_of::<SourceFile>(), size_of::<SyntaxNode>());

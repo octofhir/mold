@@ -290,15 +290,14 @@ impl ScopeBuilder {
     pub fn add_cte(mut self, binding: CteBinding) -> Self {
         let name = normalize_name(&binding.name);
         // Also add as a table binding for resolution
-        let table_binding = TableBinding::cte(binding.name.clone())
-            .with_columns(
-                binding
-                    .columns
-                    .iter()
-                    .enumerate()
-                    .map(|(i, c)| ColumnBinding::new(c.clone(), i))
-                    .collect(),
-            );
+        let table_binding = TableBinding::cte(binding.name.clone()).with_columns(
+            binding
+                .columns
+                .iter()
+                .enumerate()
+                .map(|(i, c)| ColumnBinding::new(c.clone(), i))
+                .collect(),
+        );
         self.tables.insert(name.clone(), Arc::new(table_binding));
         self.ctes.insert(name, Arc::new(binding));
         self
@@ -394,9 +393,7 @@ mod tests {
     #[test]
     fn test_table_alias() {
         let scope = ScopeBuilder::new()
-            .add_table(
-                TableBinding::table(None, "users".to_string()).with_alias("u".to_string()),
-            )
+            .add_table(TableBinding::table(None, "users".to_string()).with_alias("u".to_string()))
             .build();
 
         // Alias should be resolvable

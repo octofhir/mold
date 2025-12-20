@@ -79,9 +79,17 @@ fn main() {
 
         for error in errors {
             if use_color {
-                eprintln!("  {RED}•{RESET} {} at offset {}", error.message, u32::from(error.range.start()));
+                eprintln!(
+                    "  {RED}•{RESET} {} at offset {}",
+                    error.message,
+                    u32::from(error.range.start())
+                );
             } else {
-                eprintln!("  • {} at offset {}", error.message, u32::from(error.range.start()));
+                eprintln!(
+                    "  • {} at offset {}",
+                    error.message,
+                    u32::from(error.range.start())
+                );
             }
         }
 

@@ -31,7 +31,10 @@ fn find_token_at_offset(root: &SyntaxNode, offset: TextSize) -> Option<SyntaxTok
     // Try to find a token that contains the offset
     let mut best_token: Option<SyntaxToken> = None;
 
-    for token in root.descendants_with_tokens().filter_map(|it| it.into_token()) {
+    for token in root
+        .descendants_with_tokens()
+        .filter_map(|it| it.into_token())
+    {
         let range = token.text_range();
         if range.contains(offset) || range.end() == offset {
             return Some(token.clone());
@@ -258,9 +261,7 @@ fn detect_join_condition_context(node: &SyntaxNode) -> CompletionContext {
 
 /// Finds the tables involved in a JOIN.
 fn find_join_tables(node: &SyntaxNode) -> (String, String) {
-    let join_expr = node
-        .ancestors()
-        .find(|n| n.kind() == SyntaxKind::JOIN_EXPR);
+    let join_expr = node.ancestors().find(|n| n.kind() == SyntaxKind::JOIN_EXPR);
 
     if let Some(join) = join_expr {
         let mut tables = Vec::new();
@@ -424,14 +425,10 @@ fn detect_from_token(token: &SyntaxToken, offset: TextSize) -> CompletionContext
     }
 
     match kind {
-        SyntaxKind::SELECT_KW => CompletionContext::SelectColumn {
-            tables: Vec::new(),
-        },
+        SyntaxKind::SELECT_KW => CompletionContext::SelectColumn { tables: Vec::new() },
         SyntaxKind::FROM_KW => CompletionContext::TableName { schema: None },
         SyntaxKind::WHERE_KW | SyntaxKind::AND_KW | SyntaxKind::OR_KW => {
-            CompletionContext::WhereCondition {
-                tables: Vec::new(),
-            }
+            CompletionContext::WhereCondition { tables: Vec::new() }
         }
         SyntaxKind::JOIN_KW
         | SyntaxKind::LEFT_KW
@@ -489,12 +486,65 @@ fn get_expected_keywords(token: &SyntaxToken) -> Vec<String> {
 
     // Suggest keywords that start with the current text
     let keywords = [
-        "SELECT", "FROM", "WHERE", "AND", "OR", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON",
-        "ORDER", "BY", "GROUP", "HAVING", "LIMIT", "OFFSET", "INSERT", "UPDATE", "DELETE", "INTO",
-        "VALUES", "SET", "CREATE", "DROP", "ALTER", "TABLE", "INDEX", "VIEW", "WITH", "AS",
-        "DISTINCT", "ALL", "UNION", "INTERSECT", "EXCEPT", "CASE", "WHEN", "THEN", "ELSE", "END",
-        "NULL", "NOT", "IN", "EXISTS", "BETWEEN", "LIKE", "ILIKE", "IS", "TRUE", "FALSE", "ASC",
-        "DESC", "NULLS", "FIRST", "LAST", "RETURNING", "CASCADE", "RESTRICT",
+        "SELECT",
+        "FROM",
+        "WHERE",
+        "AND",
+        "OR",
+        "JOIN",
+        "LEFT",
+        "RIGHT",
+        "INNER",
+        "OUTER",
+        "ON",
+        "ORDER",
+        "BY",
+        "GROUP",
+        "HAVING",
+        "LIMIT",
+        "OFFSET",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "INTO",
+        "VALUES",
+        "SET",
+        "CREATE",
+        "DROP",
+        "ALTER",
+        "TABLE",
+        "INDEX",
+        "VIEW",
+        "WITH",
+        "AS",
+        "DISTINCT",
+        "ALL",
+        "UNION",
+        "INTERSECT",
+        "EXCEPT",
+        "CASE",
+        "WHEN",
+        "THEN",
+        "ELSE",
+        "END",
+        "NULL",
+        "NOT",
+        "IN",
+        "EXISTS",
+        "BETWEEN",
+        "LIKE",
+        "ILIKE",
+        "IS",
+        "TRUE",
+        "FALSE",
+        "ASC",
+        "DESC",
+        "NULLS",
+        "FIRST",
+        "LAST",
+        "RETURNING",
+        "CASCADE",
+        "RESTRICT",
     ];
 
     keywords
@@ -507,11 +557,7 @@ fn get_expected_keywords(token: &SyntaxToken) -> Vec<String> {
 /// Gets keywords that typically follow a given keyword.
 fn get_keywords_after(kind: SyntaxKind) -> Vec<String> {
     match kind {
-        SyntaxKind::SELECT_KW => vec![
-            "DISTINCT".to_string(),
-            "ALL".to_string(),
-            "*".to_string(),
-        ],
+        SyntaxKind::SELECT_KW => vec!["DISTINCT".to_string(), "ALL".to_string(), "*".to_string()],
         SyntaxKind::FROM_KW => vec![],
         SyntaxKind::WHERE_KW => vec!["NOT".to_string(), "EXISTS".to_string()],
         SyntaxKind::ORDER_KW => vec!["BY".to_string()],
@@ -525,11 +571,7 @@ fn get_keywords_after(kind: SyntaxKind) -> Vec<String> {
             "VIEW".to_string(),
             "MATERIALIZED".to_string(),
         ],
-        SyntaxKind::DROP_KW => vec![
-            "TABLE".to_string(),
-            "INDEX".to_string(),
-            "VIEW".to_string(),
-        ],
+        SyntaxKind::DROP_KW => vec!["TABLE".to_string(), "INDEX".to_string(), "VIEW".to_string()],
         SyntaxKind::LEFT_KW | SyntaxKind::RIGHT_KW | SyntaxKind::FULL_KW => {
             vec!["OUTER".to_string(), "JOIN".to_string()]
         }

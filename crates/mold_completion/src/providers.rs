@@ -43,7 +43,12 @@ pub trait SchemaProvider: Send + Sync {
     fn columns(&self, schema: Option<&str>, table: &str) -> Vec<ColumnInfo>;
 
     /// Returns columns matching a prefix.
-    fn columns_by_prefix(&self, schema: Option<&str>, table: &str, prefix: &str) -> Vec<ColumnInfo> {
+    fn columns_by_prefix(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        prefix: &str,
+    ) -> Vec<ColumnInfo> {
         let prefix_lower = prefix.to_lowercase();
         self.columns(schema, table)
             .into_iter()
@@ -56,11 +61,7 @@ pub trait SchemaProvider: Send + Sync {
 
     /// Returns all available schemas.
     fn schemas(&self) -> Vec<String> {
-        let mut schemas: Vec<String> = self
-            .tables()
-            .into_iter()
-            .filter_map(|t| t.schema)
-            .collect();
+        let mut schemas: Vec<String> = self.tables().into_iter().filter_map(|t| t.schema).collect();
         schemas.sort();
         schemas.dedup();
         schemas
@@ -115,7 +116,12 @@ impl SchemaProvider for NullSchemaProvider {
         Vec::new()
     }
 
-    fn jsonb_schema(&self, _schema: Option<&str>, _table: &str, _column: &str) -> Option<JsonbSchema> {
+    fn jsonb_schema(
+        &self,
+        _schema: Option<&str>,
+        _table: &str,
+        _column: &str,
+    ) -> Option<JsonbSchema> {
         None
     }
 }

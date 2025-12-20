@@ -117,9 +117,7 @@ fn detect_context_from_text(source: &str, offset: TextSize) -> CompletionContext
     let upper = text_trimmed.to_uppercase();
 
     if upper.ends_with("SELECT") || upper.ends_with("SELECT DISTINCT") {
-        return CompletionContext::SelectColumn {
-            tables: Vec::new(),
-        };
+        return CompletionContext::SelectColumn { tables: Vec::new() };
     }
 
     if upper.ends_with("FROM") || upper.ends_with("JOIN") {
@@ -127,9 +125,7 @@ fn detect_context_from_text(source: &str, offset: TextSize) -> CompletionContext
     }
 
     if upper.ends_with("WHERE") || upper.ends_with("AND") || upper.ends_with("OR") {
-        return CompletionContext::WhereCondition {
-            tables: Vec::new(),
-        };
+        return CompletionContext::WhereCondition { tables: Vec::new() };
     }
 
     if upper.ends_with("ON") {
@@ -175,7 +171,10 @@ fn detect_context_from_text(source: &str, offset: TextSize) -> CompletionContext
 }
 
 /// Generates completion items based on context.
-fn generate_completions(context: &CompletionContext, request: &CompletionRequest<'_>) -> Vec<CompletionItem> {
+fn generate_completions(
+    context: &CompletionContext,
+    request: &CompletionRequest<'_>,
+) -> Vec<CompletionItem> {
     match context {
         CompletionContext::Statement => {
             // Statement start keywords
@@ -229,8 +228,7 @@ fn generate_completions(context: &CompletionContext, request: &CompletionRequest
                 }
                 None => {
                     // Unqualified - show all columns in scope
-                    let mut items =
-                        complete_columns(request.schema_provider, None, tables, None);
+                    let mut items = complete_columns(request.schema_provider, None, tables, None);
 
                     // Also add table names for qualification
                     for table_name in tables {
@@ -328,21 +326,17 @@ fn generate_completions(context: &CompletionContext, request: &CompletionRequest
             items
         }
 
-        CompletionContext::JsonPath { current_path } => {
-            complete_jsonpath(current_path)
-        }
+        CompletionContext::JsonPath { current_path } => complete_jsonpath(current_path),
 
         CompletionContext::FunctionArg {
             function,
             arg_index,
         } => {
             // Get function signature and suggest based on expected type
-            if let Some(func_info) =
-                crate::generators::functions::get_function_signature(
-                    request.function_provider,
-                    function,
-                )
-            {
+            if let Some(func_info) = crate::generators::functions::get_function_signature(
+                request.function_provider,
+                function,
+            ) {
                 if *arg_index < func_info.args.len() {
                     // Could suggest values based on argument type
                 }
@@ -386,9 +380,7 @@ fn generate_completions(context: &CompletionContext, request: &CompletionRequest
                 .collect()
         }
 
-        CompletionContext::Keyword { expected } => {
-            complete_keywords(Some(expected), None)
-        }
+        CompletionContext::Keyword { expected } => complete_keywords(Some(expected), None),
 
         CompletionContext::Unknown => {
             // Fallback: suggest keywords
@@ -426,8 +418,7 @@ mod tests {
 
     #[test]
     fn test_completion_request() {
-        let request = CompletionRequest::new("SELECT ", TextSize::new(7))
-            .with_limit(50);
+        let request = CompletionRequest::new("SELECT ", TextSize::new(7)).with_limit(50);
 
         assert_eq!(request.limit, 50);
         assert!(request.schema_provider.is_none());
@@ -439,10 +430,7 @@ mod tests {
             get_prefix_at_offset("SELECT us", TextSize::new(9)),
             Some("us".to_string())
         );
-        assert_eq!(
-            get_prefix_at_offset("SELECT ", TextSize::new(7)),
-            None
-        );
+        assert_eq!(get_prefix_at_offset("SELECT ", TextSize::new(7)), None);
         assert_eq!(
             get_prefix_at_offset("SELECT users.na", TextSize::new(15)),
             Some("na".to_string())

@@ -26,12 +26,8 @@ pub fn format_expression(node: &SyntaxNode, printer: &mut Printer) {
         SyntaxKind::JSONB_PATH_EXPR => format_jsonb_path(node, printer),
         SyntaxKind::COALESCE_EXPR => format_coalesce(node, printer),
         SyntaxKind::NULLIF_EXPR => format_nullif(node, printer),
-        SyntaxKind::GREATEST_EXPR | SyntaxKind::LEAST_EXPR => {
-            format_greatest_least(node, printer)
-        }
-        SyntaxKind::COLUMN_REF | SyntaxKind::QUALIFIED_NAME => {
-            format_column_ref(node, printer)
-        }
+        SyntaxKind::GREATEST_EXPR | SyntaxKind::LEAST_EXPR => format_greatest_least(node, printer),
+        SyntaxKind::COLUMN_REF | SyntaxKind::QUALIFIED_NAME => format_column_ref(node, printer),
         SyntaxKind::LITERAL => format_literal(node, printer),
         SyntaxKind::STAR_EXPR => printer.write("*"),
         SyntaxKind::OVER_CLAUSE => format_over_clause(node, printer),
@@ -115,8 +111,7 @@ fn format_func_call(node: &SyntaxNode, printer: &mut Printer) {
             cstree::util::NodeOrToken::Token(token) => {
                 if token.kind() == SyntaxKind::IDENT {
                     printer.write_identifier(token.text());
-                } else if token.kind() != SyntaxKind::L_PAREN
-                    && token.kind() != SyntaxKind::R_PAREN
+                } else if token.kind() != SyntaxKind::L_PAREN && token.kind() != SyntaxKind::R_PAREN
                 {
                     format_token(&token, printer);
                 }

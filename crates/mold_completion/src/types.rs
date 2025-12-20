@@ -671,7 +671,11 @@ mod tests {
     fn test_function_signature() {
         let func = FunctionInfo::new("jsonb_extract_path", "jsonb")
             .with_arg(FunctionArg::new("jsonb").with_name("from_json"))
-            .with_arg(FunctionArg::new("text").with_name("path").with_mode(ArgMode::Variadic));
+            .with_arg(
+                FunctionArg::new("text")
+                    .with_name("path")
+                    .with_mode(ArgMode::Variadic),
+            );
 
         let sig = func.signature();
         assert!(sig.contains("jsonb_extract_path"));
