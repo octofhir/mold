@@ -33,3 +33,15 @@ all:
 dev:
     cargo fmt --all
     cargo test --all || cargo insta accept && cargo test --all
+
+# Format SQL using mold formatter
+format-sql sql:
+    cargo run -p mold --quiet -- "{{sql}}"
+
+# Format SQL with compact style
+format-sql-compact sql:
+    cargo run -p mold --quiet -- --compact "{{sql}}"
+
+# Build the mold binary
+build-mold:
+    cargo build -p mold --release

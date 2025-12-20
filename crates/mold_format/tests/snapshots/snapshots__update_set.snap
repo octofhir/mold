@@ -1,0 +1,8 @@
+---
+source: crates/mold_format/tests/snapshots.rs
+expression: formatted
+---
+    UPDATE 
+       SET name = 'New Name'
+         , updated_at = now()
+     WHERE id = 1

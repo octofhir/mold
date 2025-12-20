@@ -4,6 +4,10 @@ version.workspace = true
 edition = "2024"
 license.workspace = true
 
+[[bin]]
+name = "mold"
+path = "src/main.rs"
+
 [dependencies]
 mold_syntax.workspace = true
 mold_lexer.workspace = true
@@ -11,3 +15,4 @@ mold_parser.workspace = true
 mold_hir.workspace = true
 mold_completion.workspace = true
 mold_format.workspace = true
+atty = "0.2"

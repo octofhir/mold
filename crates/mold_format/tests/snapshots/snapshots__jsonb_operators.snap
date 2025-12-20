@@ -1,0 +1,8 @@
+---
+source: crates/mold_format/tests/snapshots.rs
+expression: formatted
+---
+SELECT data->'name'->>'first',
+data#>'{address,city}' 
+FROM users
+WHERE data @> '{"active": true}'

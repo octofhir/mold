@@ -1,0 +1,12 @@
+---
+source: crates/mold_format/tests/snapshots.rs
+expression: formatted
+---
+      WITH RECURSIVE numbers AS ((
+        SELECT ALL 1  AS n
+          FROM numbers
+         WHERE n < 10
+    UNION 
+))
+    SELECT *
+      FROM numbers
