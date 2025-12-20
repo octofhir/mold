@@ -6,7 +6,9 @@ license.workspace = true
 
 [dependencies]
 mold_syntax.workspace = true
+mold_parser.workspace = true
 text-size.workspace = true
+cstree.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

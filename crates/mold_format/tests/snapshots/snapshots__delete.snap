@@ -1,0 +1,7 @@
+---
+source: crates/mold_format/tests/snapshots.rs
+expression: formatted
+---
+DELETE FROM 
+     WHERE id = 1 
+ RETURNING

@@ -1,0 +1,11 @@
+---
+source: crates/mold_format/tests/snapshots.rs
+expression: formatted
+---
+    SELECT u.id
+         , u.name
+         , o.amount
+      FROM users u
+           LEFT JOIN orders o
+           ON u.id = o.user_id
+     WHERE o.status = 'completed'
