@@ -12,6 +12,7 @@ use crate::printer::Printer;
 use crate::rules;
 
 /// Formats SQL source code.
+#[must_use]
 pub fn format(source: &str, config: &FormatConfig) -> String {
     // Parse the source
     let parse = mold_parser::parse(source);

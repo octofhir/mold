@@ -148,7 +148,7 @@ fn cte(p: &mut Parser<'_>) {
             super::delete::delete_stmt(p);
         }
         _ => {
-            p.error("expected SELECT, INSERT, UPDATE, or DELETE in CTE");
+            p.error("expected SELECT, INSERT, UPDATE, or DELETE in CTE body");
         }
     }
 
@@ -334,7 +334,7 @@ fn join_expr(
             true
         }
         _ => {
-            p.error("expected JOIN keyword");
+            p.error("expected JOIN, LEFT/RIGHT/FULL JOIN, CROSS JOIN, or NATURAL JOIN");
             false
         }
     };

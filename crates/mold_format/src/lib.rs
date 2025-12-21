@@ -38,11 +38,13 @@ pub use format::format;
 pub use printer::Printer;
 
 /// Formats SQL using sqlstyle.guide defaults.
+#[must_use]
 pub fn format_sqlstyle(source: &str) -> String {
     format::format(source, &FormatConfig::sqlstyle())
 }
 
 /// Formats SQL using compact style.
+#[must_use]
 pub fn format_compact(source: &str) -> String {
     format::format(source, &FormatConfig::compact())
 }
@@ -179,6 +181,10 @@ mod tests {
     fn test_types_are_send_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<FormatConfig>();
+        assert_send_sync::<KeywordCase>();
+        assert_send_sync::<IdentifierCase>();
+        assert_send_sync::<IndentStyle>();
+        assert_send_sync::<CommaStyle>();
         assert_send_sync::<Printer>();
     }
 }

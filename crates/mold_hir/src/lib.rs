@@ -196,8 +196,19 @@ mod tests {
         assert_send_sync::<TableBinding>();
         assert_send_sync::<ColumnBinding>();
         assert_send_sync::<CteBinding>();
+        assert_send_sync::<TableSource>();
         assert_send_sync::<Analysis>();
         assert_send_sync::<Diagnostic>();
         assert_send_sync::<DataType>();
+        assert_send_sync::<Resolution<ResolvedColumn>>();
+        assert_send_sync::<Severity>();
+        assert_send_sync::<TableInfo>();
+        assert_send_sync::<TableType>();
+        assert_send_sync::<RelatedInfo>();
+        assert_send_sync::<QualifiedResolution>();
+        assert_send_sync::<JsonbColumnInfo>();
+        assert_send_sync::<JsonbStructure>();
+        assert_send_sync::<JsonbValueType>();
+        assert_send_sync::<JsonbChild>();
     }
 }

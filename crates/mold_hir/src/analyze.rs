@@ -149,6 +149,7 @@ impl Diagnostic {
 }
 
 /// Severity level of a diagnostic.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Severity {
     Error,
@@ -192,6 +193,7 @@ pub struct TableInfo {
 }
 
 /// Type of a database table.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TableType {
     Table,

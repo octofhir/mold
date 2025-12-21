@@ -1,6 +1,7 @@
 //! Format configuration for SQL formatting.
 
 /// Case transformation for SQL keywords.
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum KeywordCase {
     /// UPPERCASE keywords (sqlstyle.guide default)
@@ -13,6 +14,7 @@ pub enum KeywordCase {
 }
 
 /// Case transformation for identifiers.
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IdentifierCase {
     /// lowercase identifiers
@@ -23,6 +25,7 @@ pub enum IdentifierCase {
 }
 
 /// Indentation style.
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndentStyle {
     /// Use spaces for indentation
@@ -38,6 +41,7 @@ impl Default for IndentStyle {
 }
 
 /// Comma placement style.
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CommaStyle {
     /// Commas at the end of lines (default in most languages)
@@ -48,6 +52,7 @@ pub enum CommaStyle {
 }
 
 /// Configuration for SQL formatting.
+#[must_use]
 #[derive(Debug, Clone)]
 pub struct FormatConfig {
     /// How to transform keyword case

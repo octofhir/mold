@@ -1,3 +1,16 @@
+//! Shared syntax types for the Mold SQL stack.
+//!
+//! This crate defines syntax kinds, tokens, and the `Parse` container that
+//! wraps a CST plus parse errors.
+//!
+//! # Usage
+//!
+//! ```ignore
+//! let parse = mold_parser::parse("SELECT 1");
+//! let root = parse.syntax();
+//! assert_eq!(root.kind(), mold_syntax::SyntaxKind::SELECT_STMT);
+//! ```
+
 pub mod ast;
 mod syntax_kind;
 
@@ -14,6 +27,7 @@ use text_size::{TextRange, TextSize};
 pub type SyntaxNode = ResolvedNode<SyntaxKind>;
 pub type SyntaxToken = ResolvedToken<SyntaxKind>;
 
+#[must_use]
 #[derive(Clone)]
 pub struct Parse {
     green: GreenNode,
@@ -63,6 +77,7 @@ impl std::fmt::Debug for Parse {
     }
 }
 
+#[must_use]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError {
     pub message: String,
@@ -105,5 +120,22 @@ pub struct Token {
 impl Token {
     pub fn new(kind: SyntaxKind, len: TextSize) -> Self {
         Self { kind, len }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_types_are_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<Parse>();
+        assert_send_sync::<ParseError>();
+        assert_send_sync::<Token>();
+        assert_send_sync::<SyntaxKind>();
+        assert_send_sync::<SyntaxNode>();
+        assert_send_sync::<SyntaxToken>();
     }
 }

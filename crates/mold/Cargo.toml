@@ -8,6 +8,18 @@ license.workspace = true
 name = "mold"
 path = "src/main.rs"
 
+[[bench]]
+name = "parse"
+harness = false
+
+[[bench]]
+name = "format"
+harness = false
+
+[[bench]]
+name = "complete"
+harness = false
+
 [dependencies]
 mold_syntax.workspace = true
 mold_lexer.workspace = true
@@ -16,3 +28,8 @@ mold_hir.workspace = true
 mold_completion.workspace = true
 mold_format.workspace = true
 atty = "0.2"
+
+[dev-dependencies]
+criterion.workspace = true
+text-size.workspace = true
+sqlparser = "0.60.0"

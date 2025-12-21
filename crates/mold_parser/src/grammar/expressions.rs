@@ -174,7 +174,7 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
             SyntaxKind::DOUBLE_COLON => {
                 let m = lhs.precede(p);
                 p.bump();
-                type_name(p);
+                type_name(p, "after ::");
                 m.complete(p, SyntaxKind::CAST_EXPR)
             }
 
@@ -216,7 +216,7 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
                         p.expect(SyntaxKind::FROM_KW);
                         expr(p);
                     }
-                    _ => p.error("expected NULL, TRUE, FALSE, UNKNOWN, or DISTINCT"),
+                    _ => p.error("expected NULL, TRUE, FALSE, UNKNOWN, or DISTINCT after IS"),
                 }
                 m.complete(p, SyntaxKind::IS_EXPR)
             }
@@ -558,7 +558,7 @@ fn cast_expr(p: &mut Parser<'_>) -> CompletedMarker {
     p.expect(SyntaxKind::L_PAREN);
     expr(p);
     p.expect(SyntaxKind::AS_KW);
-    type_name(p);
+    type_name(p, "after AS");
     p.expect(SyntaxKind::R_PAREN);
     m.complete(p, SyntaxKind::CAST_EXPR)
 }
@@ -714,7 +714,7 @@ fn array_expr(p: &mut Parser<'_>) -> CompletedMarker {
     m.complete(p, SyntaxKind::ARRAY_EXPR)
 }
 
-fn type_name(p: &mut Parser<'_>) {
+fn type_name(p: &mut Parser<'_>, context: &str) {
     let m = p.start();
 
     // Handle simple types and schema-qualified types
@@ -746,7 +746,7 @@ fn type_name(p: &mut Parser<'_>) {
             p.bump();
         }
         _ => {
-            p.error("expected type name");
+            p.error(format!("expected type name {context}"));
         }
     }
 

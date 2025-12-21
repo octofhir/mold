@@ -306,7 +306,7 @@ fn jp_path_expr(p: &mut JpParser<'_>) {
             }
         }
     } else if !p.at_end() {
-        p.error("expected $ or @");
+        p.error("expected $ or @ at start of JSONPath");
         p.bump_any();
     }
 

@@ -1,0 +1,12 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..22
+  SELECT_STMT@0..22
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..22
+      SELECT_ITEM@7..22
+        LITERAL@7..22
+          DOLLAR_STRING@7..22 "$$line1\nline2$$"

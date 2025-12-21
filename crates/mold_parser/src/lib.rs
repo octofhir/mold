@@ -1,3 +1,16 @@
+//! SQL parser producing a lossless CST.
+//!
+//! The parser builds a concrete syntax tree with error recovery. Consumers
+//! can inspect `Parse::errors()` while still traversing the tree.
+//!
+//! # Usage
+//!
+//! ```ignore
+//! let parse = mold_parser::parse("SELECT * FROM users");
+//! assert!(parse.errors().is_empty());
+//! let root = parse.syntax();
+//! ```
+
 mod event;
 mod grammar;
 mod parser;
@@ -10,6 +23,7 @@ pub use token_set::TokenSet;
 use mold_lexer::tokenize;
 use mold_syntax::Parse;
 
+#[must_use]
 pub fn parse(source: &str) -> Parse {
     let tokens = tokenize(source);
     let mut parser = parser::Parser::new(&tokens, source);
@@ -22,6 +36,18 @@ pub fn parse(source: &str) -> Parse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn read_fixture(path: &std::path::Path) -> String {
+        std::fs::read_to_string(path)
+            .unwrap_or_else(|err| panic!("failed to read fixture {}: {err}", path.display()))
+    }
+
+    fn fixture_dir(name: &str) -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src")
+            .join("fixtures")
+            .join(name)
+    }
 
     fn format_tree(source: &str) -> String {
         let parse = parse(source);
@@ -258,8 +284,32 @@ mod tests {
     }
 
     #[test]
+    fn test_insert_on_conflict_constraint() {
+        let sql = "INSERT INTO users (id, name) VALUES (1, 'Alice') ON CONFLICT ON CONSTRAINT users_pkey DO UPDATE SET name = EXCLUDED.name WHERE users.active = true";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_insert_on_conflict_target_where() {
+        let sql = "INSERT INTO users (id, name) VALUES (1, 'Alice') ON CONFLICT (id) WHERE id > 0 DO NOTHING";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
     fn test_insert_returning() {
         let sql = "INSERT INTO users (name) VALUES ('Alice') RETURNING id";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_insert_returning_aliases() {
+        let sql = "INSERT INTO users (name) VALUES ('Alice') RETURNING id AS user_id, name";
         let parse = parse(sql);
         assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
         insta::assert_snapshot!(format_tree(sql));
@@ -324,6 +374,66 @@ mod tests {
     #[test]
     fn test_delete_returning() {
         let sql = "DELETE FROM users WHERE id = 1 RETURNING id, name";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_parse_valid_fixtures() {
+        let dir = fixture_dir("valid");
+        let mut entries: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap_or_else(|err| panic!("failed to read fixtures {}: {err}", dir.display()))
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.path().extension().and_then(|s| s.to_str()) == Some("sql"))
+            .collect();
+
+        entries.sort_by_key(|entry| entry.path());
+
+        for entry in entries {
+            let path = entry.path();
+            let sql = read_fixture(&path);
+            let parse = parse(&sql);
+            assert!(
+                parse.errors().is_empty(),
+                "fixture {} errors: {:?}",
+                path.display(),
+                parse.errors()
+            );
+        }
+    }
+
+    // =========================================================================
+    // WITH/LATERAL and dollar-quoted strings
+    // =========================================================================
+
+    #[test]
+    fn test_with_recursive() {
+        let sql = "WITH RECURSIVE t AS (SELECT 1) SELECT * FROM t";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_select_lateral_subquery() {
+        let sql = "SELECT * FROM LATERAL (SELECT id FROM users) AS u";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_join_lateral() {
+        let sql = "SELECT * FROM users u LEFT JOIN LATERAL (SELECT * FROM orders o WHERE o.user_id = u.id) ord ON true";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_dollar_quoted_string() {
+        let sql = "SELECT $$line1\nline2$$";
         let parse = parse(sql);
         assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
         insta::assert_snapshot!(format_tree(sql));

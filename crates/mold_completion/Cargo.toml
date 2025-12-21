@@ -10,4 +10,5 @@ mold_hir.workspace = true
 text-size.workspace = true
 
 [dev-dependencies]
-insta.workspace = true
+proptest.workspace = true
+mold_parser.workspace = true

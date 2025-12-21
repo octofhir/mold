@@ -4,6 +4,7 @@
 //! to LSP types as needed.
 
 /// Information about a database table.
+#[must_use]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TableInfo {
     /// The schema name, if any.
@@ -58,6 +59,7 @@ impl TableInfo {
 }
 
 /// Type of a database table.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TableType {
     Table,
@@ -68,6 +70,7 @@ pub enum TableType {
 }
 
 /// Information about a database column.
+#[must_use]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ColumnInfo {
     /// The column name.
@@ -132,6 +135,7 @@ impl ColumnInfo {
 }
 
 /// Information about a database function.
+#[must_use]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FunctionInfo {
     /// The schema name, if any.
@@ -224,6 +228,7 @@ impl FunctionInfo {
 }
 
 /// A function argument.
+#[must_use]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FunctionArg {
     /// The argument name, if any.
@@ -270,6 +275,7 @@ impl FunctionArg {
 }
 
 /// Function argument mode.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ArgMode {
     In,
@@ -279,6 +285,7 @@ pub enum ArgMode {
 }
 
 /// Function volatility category.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Volatility {
     Immutable,
@@ -287,6 +294,7 @@ pub enum Volatility {
 }
 
 /// Schema information for a JSONB column.
+#[must_use]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JsonbSchema {
     /// Known fields at the top level.
@@ -339,6 +347,7 @@ impl Default for JsonbSchema {
 }
 
 /// A field in a JSONB schema.
+#[must_use]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JsonbField {
     /// The field name.
@@ -379,6 +388,7 @@ impl JsonbField {
 }
 
 /// Type of a JSONB field.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum JsonbFieldType {
     Object,
@@ -391,6 +401,7 @@ pub enum JsonbFieldType {
 }
 
 /// A completion item returned by the completion engine.
+#[must_use]
 #[derive(Clone, Debug)]
 pub struct CompletionItem {
     /// The kind of completion item.
@@ -481,6 +492,7 @@ impl CompletionItem {
 }
 
 /// Kind of a completion item.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CompletionItemKind {
     Table,
@@ -497,6 +509,7 @@ pub enum CompletionItemKind {
 }
 
 /// Application-specific data attached to a completion item.
+#[non_exhaustive]
 #[derive(Clone, Debug)]
 pub enum CompletionData {
     /// No additional data.
@@ -530,6 +543,7 @@ pub enum CompletionData {
 }
 
 /// Result of a completion request.
+#[must_use]
 #[derive(Clone, Debug)]
 pub struct CompletionResult {
     /// The detected completion context.
@@ -566,6 +580,7 @@ impl CompletionResult {
 }
 
 /// The context in which completion was triggered.
+#[non_exhaustive]
 #[derive(Clone, Debug)]
 pub enum CompletionContext {
     /// At the start of a statement.
@@ -718,10 +733,18 @@ mod tests {
         fn assert_send_sync<T: Send + Sync>() {}
 
         assert_send_sync::<TableInfo>();
+        assert_send_sync::<TableType>();
         assert_send_sync::<ColumnInfo>();
         assert_send_sync::<FunctionInfo>();
+        assert_send_sync::<FunctionArg>();
+        assert_send_sync::<ArgMode>();
+        assert_send_sync::<Volatility>();
         assert_send_sync::<JsonbSchema>();
+        assert_send_sync::<JsonbField>();
+        assert_send_sync::<JsonbFieldType>();
         assert_send_sync::<CompletionItem>();
+        assert_send_sync::<CompletionItemKind>();
+        assert_send_sync::<CompletionData>();
         assert_send_sync::<CompletionResult>();
         assert_send_sync::<CompletionContext>();
     }

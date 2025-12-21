@@ -315,6 +315,7 @@ impl CteBinding {
 }
 
 /// SQL data types for type tracking.
+#[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DataType {
     // Numeric types
@@ -488,6 +489,7 @@ pub struct ResolvedColumn {
 }
 
 /// A resolved reference that may be ambiguous.
+#[non_exhaustive]
 #[derive(Clone, Debug)]
 pub enum Resolution<T> {
     /// Successfully resolved to a single binding.

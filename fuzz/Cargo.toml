@@ -1,0 +1,18 @@
+[package]
+name = "mold-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+mold_completion = { path = "../crates/mold_completion" }
+mold_format = { path = "../crates/mold_format" }
+mold_parser = { path = "../crates/mold_parser" }
+text-size = "1.1"
+
+[profile.release]
+debug = 1
