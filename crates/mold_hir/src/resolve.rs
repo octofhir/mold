@@ -174,6 +174,7 @@ pub struct JsonbStructure {
 }
 
 /// Type of a JSONB value.
+#[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum JsonbValueType {
     Object,

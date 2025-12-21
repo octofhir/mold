@@ -1,3 +1,15 @@
+//! SQL lexer for tokenizing PostgreSQL dialect input.
+//!
+//! This crate exposes a single entry point, `tokenize`, which returns a flat
+//! stream of tokens with lengths suitable for CST parsing.
+//!
+//! # Usage
+//!
+//! ```ignore
+//! let tokens = mold_lexer::tokenize("SELECT 1");
+//! assert!(!tokens.is_empty());
+//! ```
+
 mod cursor;
 
 use cursor::Cursor;
@@ -469,6 +481,31 @@ mod tests {
         assert_eq!(token_kinds("$tag$content$tag$"), vec![DOLLAR_STRING]);
         assert_eq!(token_kinds("B'101'"), vec![BIT_STRING]);
         assert_eq!(token_kinds("X'FF'"), vec![HEX_STRING]);
+    }
+
+    #[test]
+    fn test_dollar_strings_nested() {
+        assert_eq!(token_kinds("$$line1\nline2$$"), vec![DOLLAR_STRING]);
+        assert_eq!(
+            token_kinds("$tag$body $$ inner $other$ ok$tag$"),
+            vec![DOLLAR_STRING]
+        );
+    }
+
+    #[test]
+    fn test_copy_tokens() {
+        assert_eq!(
+            token_kinds("COPY users FROM '/tmp/file'"),
+            vec![
+                COPY_KW, WHITESPACE, IDENT, WHITESPACE, FROM_KW, WHITESPACE, STRING
+            ]
+        );
+        assert_eq!(
+            token_kinds("\\copy users from '/tmp/file'"),
+            vec![
+                ERROR, COPY_KW, WHITESPACE, IDENT, WHITESPACE, FROM_KW, WHITESPACE, STRING
+            ]
+        );
     }
 
     #[test]

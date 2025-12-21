@@ -1,0 +1,6 @@
+WITH RECURSIVE t AS (
+    SELECT 1 AS id
+    UNION ALL
+    SELECT id + 1 FROM t WHERE id < 5
+)
+SELECT * FROM t;

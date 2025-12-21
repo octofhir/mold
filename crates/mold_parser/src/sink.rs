@@ -5,7 +5,7 @@ use cstree::green::GreenNode;
 use cstree::interning::TokenInterner;
 use mold_syntax::{ParseError, SyntaxKind, Token};
 use std::sync::Arc;
-use text_size::TextSize;
+use text_size::{TextRange, TextSize};
 
 pub struct Sink<'t> {
     builder: GreenNodeBuilder<'static, 'static, SyntaxKind>,
@@ -93,7 +93,9 @@ impl<'t> Sink<'t> {
                     }
                 }
                 Event::Error { msg } => {
-                    self.errors.push(ParseError::at_offset(msg, self.text_pos));
+                    let context = self.error_context();
+                    let message = self.format_error_message(msg, &context);
+                    self.errors.push(ParseError::new(message, context.range));
                 }
                 Event::Placeholder => {}
             }
@@ -162,6 +164,94 @@ impl<'t> Sink<'t> {
 
         self.builder.finish_node();
     }
+
+    fn error_context(&self) -> ErrorContext<'_> {
+        let mut idx = self.cursor;
+        let mut offset = self.text_pos;
+        while idx < self.tokens.len() && self.tokens[idx].kind.is_trivia() {
+            offset += self.tokens[idx].len;
+            idx += 1;
+        }
+
+        if idx < self.tokens.len() {
+            let token = &self.tokens[idx];
+            let range = TextRange::new(offset, offset + token.len);
+            let start: usize = offset.into();
+            let end: usize = (offset + token.len).into();
+            let text = self.source.get(start..end);
+            ErrorContext {
+                range,
+                kind: Some(token.kind),
+                text,
+            }
+        } else {
+            ErrorContext {
+                range: TextRange::empty(offset),
+                kind: None,
+                text: None,
+            }
+        }
+    }
+
+    fn format_error_message(&self, msg: impl Into<String>, context: &ErrorContext) -> String {
+        let mut message = msg.into();
+        match context.kind {
+            Some(kind) => {
+                let mut found = format!("{:?}", kind);
+                if let Some(text) = context.text {
+                    let snippet = sanitize_snippet(text);
+                    found.push_str(&format!(" `{}`", snippet));
+                }
+                message.push_str(&format!("; found {found}"));
+            }
+            None => {
+                message.push_str("; found end of input");
+            }
+        }
+
+        if let Some(hint) = suggestion_for(&message, context.kind) {
+            message.push_str(&format!(" ({hint})"));
+        }
+
+        message
+    }
+}
+
+struct ErrorContext<'a> {
+    range: TextRange,
+    kind: Option<SyntaxKind>,
+    text: Option<&'a str>,
+}
+
+fn sanitize_snippet(text: &str) -> String {
+    let mut snippet = text.replace('\n', "\\n").replace('\t', "\\t");
+    if snippet.len() > 32 {
+        snippet.truncate(32);
+        snippet.push_str("...");
+    }
+    snippet
+}
+
+fn suggestion_for(msg: &str, found_kind: Option<SyntaxKind>) -> Option<&'static str> {
+    if msg.contains("expected type name") {
+        return Some("Hint: use a valid type name like `text`, `int`, or `uuid`.");
+    }
+    if msg.contains("expected JOIN") {
+        return Some("Hint: add a JOIN type like `JOIN`, `LEFT JOIN`, or `CROSS JOIN`.");
+    }
+    if msg.contains("expected SELECT, INSERT, UPDATE, or DELETE in CTE body") {
+        return Some("Hint: CTE bodies must be a full SELECT/INSERT/UPDATE/DELETE statement.");
+    }
+    if msg.contains("expected DO_KW") {
+        return Some("Hint: add `DO NOTHING` or `DO UPDATE` after ON CONFLICT.");
+    }
+    if msg.contains("expected $ or @") {
+        return Some("Hint: JSONPath roots start with `$` or filter contexts with `@`.");
+    }
+    if msg.contains("expected") && found_kind == Some(SyntaxKind::COMMA) {
+        return Some("Hint: remove the trailing comma.");
+    }
+    None
 }
 
 /// Strip quotes from a SQL string literal, returning the inner content

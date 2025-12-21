@@ -12,3 +12,5 @@ cstree.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+proptest.workspace = true
+mold_parser.workspace = true

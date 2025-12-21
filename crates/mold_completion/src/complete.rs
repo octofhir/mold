@@ -14,6 +14,7 @@ use crate::providers::{FunctionProvider, SchemaProvider};
 use crate::types::{CompletionContext, CompletionItem, CompletionResult};
 
 /// A completion request.
+#[must_use]
 pub struct CompletionRequest<'a> {
     /// The source code being edited.
     pub source: &'a str,
@@ -73,6 +74,7 @@ impl<'a> CompletionRequest<'a> {
 }
 
 /// Performs completion at the specified position.
+#[must_use]
 pub fn complete(request: CompletionRequest<'_>) -> CompletionResult {
     // Detect the completion context
     let context = match request.parse {
