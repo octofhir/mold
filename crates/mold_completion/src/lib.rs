@@ -44,7 +44,7 @@ pub mod types;
 
 // Re-export main types
 pub use complete::{CompletionRequest, complete, get_prefix_at_offset};
-pub use context::detect_context;
+pub use context::{detect_context, find_cte_columns, CteInfo};
 pub use generators::{
     complete_columns, complete_functions, complete_jsonb_paths, complete_jsonpath,
     complete_keywords, complete_tables,

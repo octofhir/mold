@@ -5,6 +5,7 @@ use mold_syntax::SyntaxKind;
 
 use super::expressions::expr;
 use super::select::select_stmt;
+use super::PAREN_RECOVERY;
 
 /// Parse INSERT statement.
 ///
@@ -57,7 +58,7 @@ pub fn insert_stmt(p: &mut Parser<'_>) {
         if p.at(SyntaxKind::L_PAREN) {
             p.bump();
             select_stmt(p);
-            p.expect(SyntaxKind::R_PAREN);
+            p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         } else {
             select_stmt(p);
         }
@@ -102,7 +103,7 @@ fn column_list(p: &mut Parser<'_>) {
         }
     }
 
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::INSERT_COLUMNS);
 }
 
@@ -120,7 +121,7 @@ fn values_clause(p: &mut Parser<'_>) {
 
 fn values_row(p: &mut Parser<'_>) {
     let m = p.start();
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
 
     if !p.at(SyntaxKind::R_PAREN) {
         value_expr(p);
@@ -129,7 +130,7 @@ fn values_row(p: &mut Parser<'_>) {
         }
     }
 
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::VALUES_ROW);
 }
 
@@ -178,7 +179,7 @@ fn conflict_target(p: &mut Parser<'_>) {
         expr(p);
     }
 
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
 
     // Optional WHERE clause for partial index
     if p.at(SyntaxKind::WHERE_KW) {
@@ -217,7 +218,7 @@ fn set_item(p: &mut Parser<'_>) {
         while p.eat(SyntaxKind::COMMA) {
             p.expect(SyntaxKind::IDENT);
         }
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     } else {
         p.expect(SyntaxKind::IDENT);
     }
@@ -231,7 +232,7 @@ fn set_item(p: &mut Parser<'_>) {
         // Row subquery
         p.bump();
         select_stmt(p);
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     } else {
         expr(p);
     }

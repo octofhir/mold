@@ -235,6 +235,106 @@ pub fn after_from_keywords() -> Vec<CompletionItem> {
         CompletionItem::new(CompletionItemKind::Keyword, "LATERAL")
             .with_documentation("Lateral subquery")
             .with_insert_text("LATERAL "),
+        CompletionItem::new(CompletionItemKind::Keyword, "WHERE")
+            .with_documentation("Filter rows")
+            .with_insert_text("WHERE "),
+        CompletionItem::new(CompletionItemKind::Keyword, "JOIN")
+            .with_documentation("Join another table")
+            .with_insert_text("JOIN "),
+        CompletionItem::new(CompletionItemKind::Keyword, "GROUP BY")
+            .with_documentation("Group results")
+            .with_insert_text("GROUP BY "),
+        CompletionItem::new(CompletionItemKind::Keyword, "ORDER BY")
+            .with_documentation("Sort results")
+            .with_insert_text("ORDER BY "),
+        CompletionItem::new(CompletionItemKind::Keyword, "LIMIT")
+            .with_documentation("Limit number of rows")
+            .with_insert_text("LIMIT "),
+        CompletionItem::new(CompletionItemKind::Keyword, "OFFSET")
+            .with_documentation("Skip number of rows")
+            .with_insert_text("OFFSET "),
+    ]
+}
+
+/// Returns keywords for inside a window OVER clause.
+pub fn window_clause_keywords() -> Vec<CompletionItem> {
+    vec![
+        CompletionItem::new(CompletionItemKind::Keyword, "PARTITION BY")
+            .with_documentation("Divide rows into groups")
+            .with_insert_text("PARTITION BY ")
+            .with_sort_key("0_partition"),
+        CompletionItem::new(CompletionItemKind::Keyword, "ORDER BY")
+            .with_documentation("Order rows within partitions")
+            .with_insert_text("ORDER BY ")
+            .with_sort_key("1_order"),
+        CompletionItem::new(CompletionItemKind::Keyword, "ROWS")
+            .with_documentation("Frame using row count")
+            .with_insert_text("ROWS ")
+            .with_sort_key("2_rows"),
+        CompletionItem::new(CompletionItemKind::Keyword, "RANGE")
+            .with_documentation("Frame using value range")
+            .with_insert_text("RANGE ")
+            .with_sort_key("2_range"),
+        CompletionItem::new(CompletionItemKind::Keyword, "GROUPS")
+            .with_documentation("Frame using peer groups")
+            .with_insert_text("GROUPS ")
+            .with_sort_key("2_groups"),
+    ]
+}
+
+/// Returns keywords for window frame specification.
+pub fn window_frame_keywords() -> Vec<CompletionItem> {
+    vec![
+        CompletionItem::new(CompletionItemKind::Keyword, "BETWEEN")
+            .with_documentation("Specify frame start and end")
+            .with_insert_text("BETWEEN ")
+            .with_sort_key("0_between"),
+        CompletionItem::new(CompletionItemKind::Keyword, "UNBOUNDED PRECEDING")
+            .with_documentation("From start of partition")
+            .with_insert_text("UNBOUNDED PRECEDING ")
+            .with_sort_key("1_unbounded_preceding"),
+        CompletionItem::new(CompletionItemKind::Keyword, "UNBOUNDED FOLLOWING")
+            .with_documentation("To end of partition")
+            .with_insert_text("UNBOUNDED FOLLOWING ")
+            .with_sort_key("1_unbounded_following"),
+        CompletionItem::new(CompletionItemKind::Keyword, "CURRENT ROW")
+            .with_documentation("The current row")
+            .with_insert_text("CURRENT ROW ")
+            .with_sort_key("2_current_row"),
+        CompletionItem::new(CompletionItemKind::Keyword, "AND")
+            .with_documentation("Frame end (in BETWEEN)")
+            .with_insert_text("AND ")
+            .with_sort_key("3_and"),
+        CompletionItem::new(CompletionItemKind::Keyword, "PRECEDING")
+            .with_documentation("N rows before current")
+            .with_insert_text("PRECEDING ")
+            .with_sort_key("4_preceding"),
+        CompletionItem::new(CompletionItemKind::Keyword, "FOLLOWING")
+            .with_documentation("N rows after current")
+            .with_insert_text("FOLLOWING ")
+            .with_sort_key("4_following"),
+    ]
+}
+
+/// Returns keywords for sort direction in window ORDER BY.
+pub fn window_order_direction_keywords() -> Vec<CompletionItem> {
+    vec![
+        CompletionItem::new(CompletionItemKind::Keyword, "ASC")
+            .with_documentation("Ascending order (default)")
+            .with_insert_text("ASC ")
+            .with_sort_key("0_asc"),
+        CompletionItem::new(CompletionItemKind::Keyword, "DESC")
+            .with_documentation("Descending order")
+            .with_insert_text("DESC ")
+            .with_sort_key("0_desc"),
+        CompletionItem::new(CompletionItemKind::Keyword, "NULLS FIRST")
+            .with_documentation("Sort nulls before non-nulls")
+            .with_insert_text("NULLS FIRST ")
+            .with_sort_key("1_nulls_first"),
+        CompletionItem::new(CompletionItemKind::Keyword, "NULLS LAST")
+            .with_documentation("Sort nulls after non-nulls")
+            .with_insert_text("NULLS LAST ")
+            .with_sort_key("1_nulls_last"),
     ]
 }
 

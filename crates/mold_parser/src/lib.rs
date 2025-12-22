@@ -20,6 +20,10 @@ mod token_set;
 pub use mold_syntax::SyntaxKind;
 pub use token_set::TokenSet;
 
+// Re-export JSONPath parser for standalone JSONPath analysis
+pub use grammar::jsonpath::{parse_jsonpath, JpParse, JpParseError};
+pub use grammar::jsonpath_lexer::{tokenize_jsonpath, JpToken};
+
 use mold_lexer::tokenize;
 use mold_syntax::Parse;
 
@@ -114,6 +118,14 @@ mod tests {
     #[test]
     fn test_jsonb_access() {
         let sql = "SELECT data->'name'->>'first' FROM users";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_jsonb_access_array_index() {
+        let sql = "SELECT patient.resource->'name'->0->'family' FROM patient";
         let parse = parse(sql);
         assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
         insta::assert_snapshot!(format_tree(sql));

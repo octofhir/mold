@@ -190,6 +190,32 @@ fn builtin_functions(prefix: Option<&str>) -> Vec<CompletionItem> {
             "Remove null fields",
         ),
         ("to_jsonb", "to_jsonb(value) -> jsonb", "Convert to JSONB"),
+        // PostgreSQL 12+ JSONPath functions
+        (
+            "jsonb_path_exists",
+            "jsonb_path_exists(target jsonb, path jsonpath) -> boolean",
+            "Check if JSONPath returns any items",
+        ),
+        (
+            "jsonb_path_match",
+            "jsonb_path_match(target jsonb, path jsonpath) -> boolean",
+            "Check JSONPath predicate result",
+        ),
+        (
+            "jsonb_path_query",
+            "jsonb_path_query(target jsonb, path jsonpath) -> setof jsonb",
+            "Extract values matching JSONPath",
+        ),
+        (
+            "jsonb_path_query_array",
+            "jsonb_path_query_array(target jsonb, path jsonpath) -> jsonb",
+            "Extract values as JSONB array",
+        ),
+        (
+            "jsonb_path_query_first",
+            "jsonb_path_query_first(target jsonb, path jsonpath) -> jsonb",
+            "Extract first value matching JSONPath",
+        ),
         // Window functions
         (
             "row_number",

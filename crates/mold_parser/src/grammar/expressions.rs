@@ -1,6 +1,8 @@
 use crate::parser::{CompletedMarker, Parser};
 use mold_syntax::SyntaxKind;
 
+use super::{EXPR_LIST_RECOVERY, PAREN_RECOVERY};
+
 pub fn expr(p: &mut Parser<'_>) -> Option<CompletedMarker> {
     expr_bp(p, 0)
 }
@@ -374,7 +376,7 @@ fn func_call_args(p: &mut Parser<'_>, m: crate::parser::Marker) -> CompletedMark
         }
     }
 
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
 
     // WITHIN GROUP clause
     if p.at(SyntaxKind::WITHIN_KW) {
@@ -420,7 +422,7 @@ fn over_clause(p: &mut Parser<'_>) {
         // Named window reference
         p.bump();
     } else {
-        p.expect(SyntaxKind::L_PAREN);
+        p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
 
         // PARTITION BY
         if p.at(SyntaxKind::PARTITION_KW) {
@@ -451,7 +453,7 @@ fn over_clause(p: &mut Parser<'_>) {
             frame_clause(p);
         }
 
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     }
 
     m.complete(p, SyntaxKind::OVER_CLAUSE);
@@ -490,10 +492,10 @@ fn frame_bound(p: &mut Parser<'_>) {
 fn filter_clause(p: &mut Parser<'_>) {
     let m = p.start();
     p.bump(); // FILTER
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     p.expect(SyntaxKind::WHERE_KW);
     expr(p);
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::FILTER_CLAUSE);
 }
 
@@ -504,7 +506,7 @@ fn paren_expr(p: &mut Parser<'_>) -> CompletedMarker {
     // Check for subquery
     if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
         super::select::select_stmt(p);
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         return m.complete(p, SyntaxKind::SUBQUERY_EXPR);
     }
 
@@ -516,11 +518,11 @@ fn paren_expr(p: &mut Parser<'_>) -> CompletedMarker {
         while p.eat(SyntaxKind::COMMA) {
             expr(p);
         }
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         return m.complete(p, SyntaxKind::ROW_EXPR);
     }
 
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::PAREN_EXPR)
 }
 
@@ -555,43 +557,43 @@ fn case_expr(p: &mut Parser<'_>) -> CompletedMarker {
 fn cast_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // CAST
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     expr(p);
     p.expect(SyntaxKind::AS_KW);
     type_name(p, "after AS");
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::CAST_EXPR)
 }
 
 fn exists_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // EXISTS
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     super::select::select_stmt(p);
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::EXISTS_EXPR)
 }
 
 fn coalesce_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // COALESCE
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     expr(p);
     while p.eat(SyntaxKind::COMMA) {
         expr(p);
     }
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::COALESCE_EXPR)
 }
 
 fn nullif_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // NULLIF
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     expr(p);
     p.expect(SyntaxKind::COMMA);
     expr(p);
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::NULLIF_EXPR)
 }
 
@@ -603,42 +605,42 @@ fn greatest_least_expr(p: &mut Parser<'_>) -> CompletedMarker {
         SyntaxKind::LEAST_EXPR
     };
     p.bump();
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     expr(p);
     while p.eat(SyntaxKind::COMMA) {
         expr(p);
     }
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, kind)
 }
 
 fn extract_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // EXTRACT
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     // Field name (YEAR, MONTH, DAY, etc.)
     p.bump_any();
     p.expect(SyntaxKind::FROM_KW);
     expr(p);
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::FUNC_CALL)
 }
 
 fn position_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // POSITION
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     expr(p);
     p.expect(SyntaxKind::IN_KW);
     expr(p);
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::FUNC_CALL)
 }
 
 fn substring_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // SUBSTRING
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     expr(p);
     if p.eat(SyntaxKind::FROM_KW) {
         expr(p);
@@ -651,14 +653,14 @@ fn substring_expr(p: &mut Parser<'_>) -> CompletedMarker {
             expr(p);
         }
     }
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::FUNC_CALL)
 }
 
 fn trim_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // TRIM
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     // Optional LEADING/TRAILING/BOTH
     let _ = p.eat(SyntaxKind::LEADING_KW)
         || p.eat(SyntaxKind::TRAILING_KW)
@@ -670,14 +672,14 @@ fn trim_expr(p: &mut Parser<'_>) -> CompletedMarker {
     if p.eat(SyntaxKind::FROM_KW) {
         expr(p);
     }
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::FUNC_CALL)
 }
 
 fn overlay_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // OVERLAY
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     expr(p);
     p.expect(SyntaxKind::PLACING_KW);
     expr(p);
@@ -686,7 +688,7 @@ fn overlay_expr(p: &mut Parser<'_>) -> CompletedMarker {
     if p.eat(SyntaxKind::FOR_KW) {
         expr(p);
     }
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::FUNC_CALL)
 }
 
@@ -703,12 +705,12 @@ fn array_expr(p: &mut Parser<'_>) -> CompletedMarker {
                 expr(p);
             }
         }
-        p.expect(SyntaxKind::R_BRACKET);
+        p.expect_recover(SyntaxKind::R_BRACKET, EXPR_LIST_RECOVERY);
     } else if p.at(SyntaxKind::L_PAREN) {
         // ARRAY(subquery)
         p.bump();
         super::select::select_stmt(p);
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     }
 
     m.complete(p, SyntaxKind::ARRAY_EXPR)
@@ -763,7 +765,7 @@ fn type_name(p: &mut Parser<'_>, context: &str) {
         if p.eat(SyntaxKind::COMMA) {
             expr(p);
         }
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     }
 
     // Array type: type[]
@@ -773,7 +775,7 @@ fn type_name(p: &mut Parser<'_>, context: &str) {
         if p.at(SyntaxKind::INTEGER) {
             p.bump();
         }
-        p.expect(SyntaxKind::R_BRACKET);
+        p.expect_recover(SyntaxKind::R_BRACKET, EXPR_LIST_RECOVERY);
     }
 
     m.complete(p, SyntaxKind::TYPE_NAME);

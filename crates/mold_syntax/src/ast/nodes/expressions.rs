@@ -324,8 +324,8 @@ impl BinaryExpr {
 
     /// Returns the operator token.
     pub fn op_token(&self) -> Option<SyntaxToken> {
-        // Find the operator between the two expressions
-        for token in support::tokens(&self.0, SyntaxKind::EQ)
+        // Find the first operator token in the expression
+        support::tokens(&self.0, SyntaxKind::EQ)
             .chain(support::tokens(&self.0, SyntaxKind::NE))
             .chain(support::tokens(&self.0, SyntaxKind::LT))
             .chain(support::tokens(&self.0, SyntaxKind::LE))
@@ -340,10 +340,7 @@ impl BinaryExpr {
             .chain(support::tokens(&self.0, SyntaxKind::PIPE_PIPE))
             .chain(support::tokens(&self.0, SyntaxKind::AND_KW))
             .chain(support::tokens(&self.0, SyntaxKind::OR_KW))
-        {
-            return Some(token);
-        }
-        None
+            .next()
     }
 
     /// Returns the operator kind.

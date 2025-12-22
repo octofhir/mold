@@ -62,10 +62,60 @@ fn with_statement(p: &mut Parser<'_>) {
 
 use crate::token_set::TokenSet;
 
-const STMT_RECOVERY: TokenSet = TokenSet::new(&[
+/// Recovery set for statement boundaries.
+pub const STMT_RECOVERY: TokenSet = TokenSet::new(&[
     SyntaxKind::SELECT_KW,
     SyntaxKind::INSERT_KW,
     SyntaxKind::UPDATE_KW,
     SyntaxKind::DELETE_KW,
+    SyntaxKind::SEMICOLON,
+]);
+
+/// Recovery set for clause boundaries in SELECT statements.
+pub const CLAUSE_RECOVERY: TokenSet = TokenSet::new(&[
+    SyntaxKind::FROM_KW,
+    SyntaxKind::WHERE_KW,
+    SyntaxKind::GROUP_KW,
+    SyntaxKind::HAVING_KW,
+    SyntaxKind::ORDER_KW,
+    SyntaxKind::LIMIT_KW,
+    SyntaxKind::OFFSET_KW,
+    SyntaxKind::UNION_KW,
+    SyntaxKind::INTERSECT_KW,
+    SyntaxKind::EXCEPT_KW,
+    SyntaxKind::SEMICOLON,
+    SyntaxKind::R_PAREN,
+]);
+
+/// Recovery set for expression list boundaries.
+pub const EXPR_LIST_RECOVERY: TokenSet = TokenSet::new(&[
+    SyntaxKind::COMMA,
+    SyntaxKind::R_PAREN,
+    SyntaxKind::R_BRACKET,
+    SyntaxKind::FROM_KW,
+    SyntaxKind::WHERE_KW,
+    SyntaxKind::GROUP_KW,
+    SyntaxKind::ORDER_KW,
+    SyntaxKind::SEMICOLON,
+]);
+
+/// Recovery set for parenthesized expressions.
+pub const PAREN_RECOVERY: TokenSet = TokenSet::new(&[
+    SyntaxKind::R_PAREN,
+    SyntaxKind::COMMA,
+    SyntaxKind::SEMICOLON,
+]);
+
+/// Recovery set for JOIN clauses.
+pub const JOIN_RECOVERY: TokenSet = TokenSet::new(&[
+    SyntaxKind::JOIN_KW,
+    SyntaxKind::LEFT_KW,
+    SyntaxKind::RIGHT_KW,
+    SyntaxKind::INNER_KW,
+    SyntaxKind::FULL_KW,
+    SyntaxKind::CROSS_KW,
+    SyntaxKind::WHERE_KW,
+    SyntaxKind::GROUP_KW,
+    SyntaxKind::ORDER_KW,
     SyntaxKind::SEMICOLON,
 ]);

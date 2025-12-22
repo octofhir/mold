@@ -1,36 +1,126 @@
 //! JSONPath parser for embedded JSONPath expressions.
 //!
 //! Parses JSONPath content from SQL string literals and produces a tree.
+//! Can be used standalone for JSONPath analysis or completion.
 //!
-//! Note: Currently unused - inline tokenization is used instead.
-//! This full parser will be used for future semantic analysis.
-
-#![allow(dead_code)]
+//! # Example
+//! ```ignore
+//! use mold_parser::parse_jsonpath;
+//!
+//! let parse = parse_jsonpath("$.name.first");
+//! assert!(parse.errors().is_empty());
+//! ```
 
 use super::jsonpath_lexer::{JpToken, tokenize_jsonpath};
 use crate::event::Event;
 use cstree::build::GreenNodeBuilder;
 use cstree::green::GreenNode;
 use cstree::interning::TokenInterner;
+use cstree::syntax::ResolvedNode;
 use mold_syntax::SyntaxKind;
 use std::sync::Arc;
-use text_size::TextSize;
+use text_size::{TextRange, TextSize};
 
-/// Parse a JSONPath string and return a green tree
+/// Parse a JSONPath string and return a parse result with errors.
 pub fn parse_jsonpath(source: &str) -> JpParse {
     let tokens = tokenize_jsonpath(source);
     let mut parser = JpParser::new(&tokens, source);
     jp_path_expr(&mut parser);
-    let events = parser.finish();
+    let (events, errors) = parser.finish();
     let (green, interner) = JpSink::new(&tokens, source, events).finish();
-    JpParse { green, interner }
+    JpParse {
+        green,
+        interner,
+        errors,
+    }
 }
 
-/// Result of parsing a JSONPath expression
+/// Result of parsing a JSONPath expression.
+#[must_use]
+#[derive(Clone)]
 pub struct JpParse {
-    pub green: GreenNode,
-    pub interner: Arc<TokenInterner>,
+    green: GreenNode,
+    interner: Arc<TokenInterner>,
+    errors: Vec<JpParseError>,
 }
+
+impl JpParse {
+    /// Returns the syntax tree root.
+    pub fn syntax(&self) -> ResolvedNode<SyntaxKind> {
+        ResolvedNode::new_root_with_resolver(self.green.clone(), self.interner.clone())
+    }
+
+    /// Returns the green node.
+    pub fn green(&self) -> &GreenNode {
+        &self.green
+    }
+
+    /// Returns parse errors with their text ranges.
+    pub fn errors(&self) -> &[JpParseError] {
+        &self.errors
+    }
+
+    /// Returns the token interner.
+    pub fn interner(&self) -> &Arc<TokenInterner> {
+        &self.interner
+    }
+
+    /// Returns Ok if no errors, Err with errors otherwise.
+    pub fn ok(self) -> Result<JpParse, Vec<JpParseError>> {
+        if self.errors.is_empty() {
+            Ok(self)
+        } else {
+            Err(self.errors)
+        }
+    }
+}
+
+impl std::fmt::Debug for JpParse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JpParse")
+            .field("errors", &self.errors)
+            .finish_non_exhaustive()
+    }
+}
+
+/// A JSONPath parse error with location information.
+#[must_use]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JpParseError {
+    /// The error message.
+    pub message: String,
+    /// The text range where the error occurred.
+    pub range: TextRange,
+}
+
+impl JpParseError {
+    /// Creates a new parse error.
+    pub fn new(message: impl Into<String>, range: TextRange) -> Self {
+        Self {
+            message: message.into(),
+            range,
+        }
+    }
+
+    /// Creates an error at a specific offset.
+    pub fn at_offset(message: impl Into<String>, offset: TextSize) -> Self {
+        Self::new(message, TextRange::empty(offset))
+    }
+}
+
+impl std::fmt::Display for JpParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "JSONPath error at {}..{}: {}",
+            u32::from(self.range.start()),
+            u32::from(self.range.end()),
+            self.message
+        )
+    }
+}
+
+impl std::error::Error for JpParseError {}
 
 // =============================================================================
 // JSONPath Parser
@@ -38,9 +128,11 @@ pub struct JpParse {
 
 struct JpParser<'t> {
     tokens: &'t [JpToken],
+    #[allow(dead_code)] // Kept for potential future use in error messages
     source: &'t str,
     pos: usize,
     events: Vec<Event>,
+    errors: Vec<JpParseError>,
 }
 
 impl<'t> JpParser<'t> {
@@ -50,11 +142,23 @@ impl<'t> JpParser<'t> {
             source,
             pos: 0,
             events: Vec::new(),
+            errors: Vec::new(),
         }
     }
 
-    fn finish(self) -> Vec<Event> {
-        self.events
+    fn finish(self) -> (Vec<Event>, Vec<JpParseError>) {
+        (self.events, self.errors)
+    }
+
+    /// Returns the current text position.
+    fn current_text_pos(&self) -> TextSize {
+        let mut pos = TextSize::new(0);
+        for i in 0..self.pos {
+            if i < self.tokens.len() {
+                pos += self.tokens[i].len;
+            }
+        }
+        pos
     }
 
     fn start(&mut self) -> JpMarker {
@@ -137,7 +241,16 @@ impl<'t> JpParser<'t> {
     }
 
     fn error(&mut self, msg: impl Into<String>) {
-        self.events.push(Event::Error { msg: msg.into() });
+        let msg = msg.into();
+        let pos = self.current_text_pos();
+        // Get the current token's range if available
+        let range = if self.pos < self.tokens.len() {
+            TextRange::at(pos, self.tokens[self.pos].len)
+        } else {
+            TextRange::empty(pos)
+        };
+        self.errors.push(JpParseError::new(msg.clone(), range));
+        self.events.push(Event::Error { msg });
     }
 }
 
@@ -679,5 +792,50 @@ mod tests {
     #[test]
     fn test_complex_filter() {
         insta::assert_snapshot!(format_tree("$[*] ? (@.price > 10 && @.active == true)"));
+    }
+
+    #[test]
+    fn test_error_has_span() {
+        // Invalid JSONPath - missing $ at start
+        let parse = parse_jsonpath("name");
+        assert!(!parse.errors().is_empty());
+
+        let error = &parse.errors()[0];
+        // Error should have a non-empty range
+        assert!(error.range.start() <= error.range.end());
+        assert!(error.message.contains("expected"));
+    }
+
+    #[test]
+    fn test_valid_path_no_errors() {
+        let parse = parse_jsonpath("$.name.first");
+        assert!(parse.errors().is_empty());
+    }
+
+    #[test]
+    fn test_parse_ok_result() {
+        let parse = parse_jsonpath("$.name");
+        assert!(parse.ok().is_ok());
+
+        let parse = parse_jsonpath("invalid");
+        assert!(parse.ok().is_err());
+    }
+
+    #[test]
+    fn test_error_display() {
+        let error = JpParseError::new(
+            "test error",
+            TextRange::new(TextSize::new(5), TextSize::new(10)),
+        );
+        let display = error.to_string();
+        assert!(display.contains("5..10"));
+        assert!(display.contains("test error"));
+    }
+
+    #[test]
+    fn test_parse_is_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<JpParse>();
+        assert_send_sync::<JpParseError>();
     }
 }
