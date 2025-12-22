@@ -85,6 +85,50 @@ impl<'t> Parser<'t> {
         }
     }
 
+    /// Expects a token, recovering to the given set if not found.
+    /// Returns true if the expected token was found.
+    pub fn expect_recover(&mut self, kind: SyntaxKind, recovery: TokenSet) -> bool {
+        if self.eat(kind) {
+            return true;
+        }
+
+        // If we're already at a recovery token, just report the error
+        if self.at_set(recovery) {
+            self.error(format!("expected {:?}", kind));
+            return false;
+        }
+
+        // Skip tokens until we find the expected one or a recovery point
+        let m = self.start();
+        self.error(format!("expected {:?}", kind));
+        while !self.at_end() && !self.at(kind) && !self.at_set(recovery) {
+            self.bump_any();
+        }
+        m.complete(self, SyntaxKind::ERROR);
+
+        // Try to consume the expected token if we found it
+        self.eat(kind)
+    }
+
+    /// Skips tokens until reaching one in the recovery set.
+    #[allow(dead_code)]
+    pub fn recover_to(&mut self, recovery: TokenSet) {
+        if self.at_set(recovery) || self.at_end() {
+            return;
+        }
+        let m = self.start();
+        while !self.at_end() && !self.at_set(recovery) {
+            self.bump_any();
+        }
+        m.complete(self, SyntaxKind::ERROR);
+    }
+
+    /// Returns the current token position in the source.
+    #[allow(dead_code)]
+    pub fn current_pos(&self) -> usize {
+        self.pos
+    }
+
     pub fn bump(&mut self) {
         assert!(!self.at_end(), "bump at end of file");
         self.fuel = 256;

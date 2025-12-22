@@ -622,6 +622,8 @@ pub enum CompletionContext {
 
     /// JSONB field access.
     JsonbField {
+        /// The table name (if qualified, e.g., `patient` in `patient.resource`).
+        table: Option<String>,
         /// The base column name.
         column: String,
         /// The current access path.
@@ -650,6 +652,24 @@ pub enum CompletionContext {
         /// Expected keyword kinds.
         expected: Vec<String>,
     },
+
+    /// Inside OVER clause, before any keywords.
+    WindowClause {
+        /// Tables in scope for column references.
+        tables: Vec<String>,
+    },
+
+    /// After PARTITION BY or ORDER BY inside OVER.
+    WindowPartition {
+        /// Tables in scope for column references.
+        tables: Vec<String>,
+    },
+
+    /// After ORDER BY column, expecting sort direction.
+    WindowOrderDirection,
+
+    /// Inside frame specification (ROWS/RANGE BETWEEN).
+    WindowFrame,
 
     /// Unknown context (fallback to keyword completion).
     Unknown,

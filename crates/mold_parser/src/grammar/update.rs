@@ -6,6 +6,7 @@ use mold_syntax::SyntaxKind;
 use super::expressions::expr;
 use super::insert::returning_clause;
 use super::select::select_stmt;
+use super::PAREN_RECOVERY;
 
 /// Parse UPDATE statement.
 ///
@@ -88,7 +89,7 @@ fn set_item(p: &mut Parser<'_>) {
         while p.eat(SyntaxKind::COMMA) {
             p.expect(SyntaxKind::IDENT);
         }
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     } else {
         p.expect(SyntaxKind::IDENT);
     }
@@ -102,7 +103,7 @@ fn set_item(p: &mut Parser<'_>) {
         // Row subquery
         p.bump();
         select_stmt(p);
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     } else {
         expr(p);
     }

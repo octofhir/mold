@@ -5,7 +5,7 @@
 use mold_syntax::Parse;
 use text_size::TextSize;
 
-use crate::context::detect_context;
+use crate::context::{detect_context, find_cte_columns};
 use crate::generators::{
     complete_columns, complete_functions, complete_jsonb_paths, complete_jsonpath,
     complete_keywords, complete_tables,
@@ -77,10 +77,14 @@ impl<'a> CompletionRequest<'a> {
 #[must_use]
 pub fn complete(request: CompletionRequest<'_>) -> CompletionResult {
     // Detect the completion context
-    let context = match request.parse {
+    let mut context = match request.parse {
         Some(parse) => detect_context(parse, request.offset),
         None => detect_context_from_text(request.source, request.offset),
     };
+
+    if matches!(context, CompletionContext::Unknown) {
+        context = detect_context_from_text(request.source, request.offset);
+    }
 
     // Generate completion items based on context
     let mut items = generate_completions(&context, &request);
@@ -122,6 +126,12 @@ fn detect_context_from_text(source: &str, offset: TextSize) -> CompletionContext
         return CompletionContext::SelectColumn { tables: Vec::new() };
     }
 
+    if let Some(prefix) = table_context_prefix(source, offset) {
+        return CompletionContext::TableName {
+            schema: prefix.schema,
+        };
+    }
+
     if upper.ends_with("FROM") || upper.ends_with("JOIN") {
         return CompletionContext::TableName { schema: None };
     }
@@ -156,14 +166,6 @@ fn detect_context_from_text(source: &str, offset: TextSize) -> CompletionContext
         }
     }
 
-    // Check for JSONB operator
-    if text_trimmed.ends_with("->") || text_trimmed.ends_with("->>") {
-        return CompletionContext::JsonbField {
-            column: String::new(),
-            path: Vec::new(),
-        };
-    }
-
     // Default: statement start or keyword
     if text_before.trim().is_empty() {
         CompletionContext::Statement
@@ -185,20 +187,22 @@ fn generate_completions(
 
         CompletionContext::SelectColumn { tables } => {
             let mut items = Vec::new();
+            let tables = resolve_tables_in_scope(tables, request.source, request.offset);
+            let prefix = get_prefix_at_offset(request.source, request.offset);
 
             // Add columns from tables in scope
             items.extend(complete_columns(
                 request.schema_provider,
                 None,
-                tables,
-                None,
+                &tables,
+                prefix.as_deref(),
             ));
 
             // Add table names for qualified references
             items.extend(complete_tables(request.schema_provider, None, None));
 
             // Add functions
-            items.extend(complete_functions(request.function_provider, None));
+            items.extend(complete_functions(request.function_provider, prefix.as_deref()));
 
             // Add keywords like DISTINCT, CASE, etc.
             items.extend(crate::generators::keywords::after_select_keywords());
@@ -207,10 +211,23 @@ fn generate_completions(
         }
 
         CompletionContext::TableName { schema } => {
-            let mut items = complete_tables(request.schema_provider, schema.as_deref(), None);
+            let prefix = table_context_prefix(request.source, request.offset);
+            let schema = prefix
+                .as_ref()
+                .and_then(|value| value.schema.as_deref())
+                .or_else(|| schema.as_deref());
+            let table_prefix = prefix
+                .as_ref()
+                .and_then(|value| value.table_prefix.as_deref());
+
+            let mut items = complete_tables(
+                request.schema_provider,
+                schema,
+                table_prefix,
+            );
 
             // If no schema specified, also suggest schemas
-            if schema.is_none() {
+            if schema.is_none() && table_prefix.is_none() {
                 items.extend(crate::generators::tables::complete_schemas(
                     request.schema_provider,
                 ));
@@ -223,14 +240,59 @@ fn generate_completions(
         }
 
         CompletionContext::ColumnRef { table, tables } => {
+            let prefix = get_prefix_at_offset(request.source, request.offset);
             match table {
                 Some(t) => {
                     // Qualified column reference
-                    complete_columns(request.schema_provider, Some(t), &[], None)
+                    let mut items = complete_columns(
+                        request.schema_provider,
+                        Some(t),
+                        &[],
+                        prefix.as_deref(),
+                    );
+
+                    // If no columns from schema provider, check if it's a CTE
+                    if items.is_empty() {
+                        if let Some(parse) = request.parse {
+                            let cte_columns = find_cte_columns(&parse.syntax(), t);
+                            for col in cte_columns {
+                                if prefix
+                                    .as_ref()
+                                    .map_or(true, |p| col.to_lowercase().starts_with(&p.to_lowercase()))
+                                {
+                                    items.push(CompletionItem::new(
+                                        crate::types::CompletionItemKind::Column,
+                                        &col,
+                                    ));
+                                }
+                            }
+                        }
+                    }
+
+                    // Fallback: try tables in scope
+                    if items.is_empty() && !t.contains('.') {
+                        let tables = resolve_tables_in_scope(tables, request.source, request.offset);
+                        if tables.len() == 1 {
+                            items = complete_columns(
+                                request.schema_provider,
+                                Some(&tables[0]),
+                                &[],
+                                prefix.as_deref(),
+                            );
+                        }
+                    }
+
+                    items
                 }
                 None => {
                     // Unqualified - show all columns in scope
-                    let mut items = complete_columns(request.schema_provider, None, tables, None);
+                    let tables = resolve_tables_in_scope(tables, request.source, request.offset);
+                    let mut items = complete_columns(
+                        request.schema_provider,
+                        None,
+                        &tables,
+                        prefix.as_deref(),
+                    );
 
                     // Also add table names for qualification
                     for table_name in tables {
@@ -253,11 +315,12 @@ fn generate_completions(
             let tables = vec![left_table.clone(), right_table.clone()];
 
             // Suggest columns from both tables
+            let prefix = get_prefix_at_offset(request.source, request.offset);
             items.extend(complete_columns(
                 request.schema_provider,
                 None,
                 &tables,
-                None,
+                prefix.as_deref(),
             ));
 
             // Add table aliases for qualified references
@@ -279,13 +342,15 @@ fn generate_completions(
 
         CompletionContext::WhereCondition { tables } => {
             let mut items = Vec::new();
+            let tables = resolve_tables_in_scope(tables, request.source, request.offset);
+            let prefix = get_prefix_at_offset(request.source, request.offset);
 
             // Add columns from tables in scope
             items.extend(complete_columns(
                 request.schema_provider,
                 None,
-                tables,
-                None,
+                &tables,
+                prefix.as_deref(),
             ));
 
             // Add functions for expressions
@@ -311,19 +376,53 @@ fn generate_completions(
             items
         }
 
-        CompletionContext::JsonbField { column, path } => {
+        CompletionContext::JsonbField { table, column, path } => {
             let mut items = Vec::new();
+
+            // Use table from context if available, otherwise try to resolve from scope
+            let resolved_table = match table {
+                Some(t) => Some(t.clone()),
+                None => {
+                    let mut tables = resolve_tables_in_scope(&[], request.source, request.offset);
+                    if tables.is_empty() {
+                        tables = extract_tables_from_text_full(request.source);
+                    }
+                    tables.first().cloned()
+                }
+            };
+            let table_ref = resolved_table.as_deref();
+
+            let (column, mut path) = (column.to_string(), path.to_vec());
+            let mut prefix = get_prefix_at_offset(request.source, request.offset);
+
+            if let Some(last) = path.pop() {
+                if prefix.is_none() || prefix.as_deref() == Some(last.as_str()) {
+                    prefix = Some(last);
+                } else {
+                    path.push(last);
+                }
+            }
 
             // Get JSONB path completions from schema
             items.extend(complete_jsonb_paths(
                 request.schema_provider,
-                None,
-                column,
-                path,
+                table_ref,
+                &column,
+                &path,
             ));
 
             // Add JSONB operators
             items.extend(crate::generators::jsonb::complete_jsonb_operators());
+
+            if let Some(prefix) = prefix {
+                let prefix_lower = prefix.to_lowercase();
+                items.retain(|item| {
+                    if item.kind != crate::types::CompletionItemKind::JsonbPath {
+                        return true;
+                    }
+                    item.label.to_lowercase().starts_with(&prefix_lower)
+                });
+            }
 
             items
         }
@@ -384,11 +483,230 @@ fn generate_completions(
 
         CompletionContext::Keyword { expected } => complete_keywords(Some(expected), None),
 
+        CompletionContext::WindowClause { tables } => {
+            let mut items = Vec::new();
+
+            // Add window clause keywords first
+            items.extend(crate::generators::keywords::window_clause_keywords());
+
+            // Add columns from tables in scope for PARTITION BY / ORDER BY
+            let tables = resolve_tables_in_scope(tables, request.source, request.offset);
+            let prefix = get_prefix_at_offset(request.source, request.offset);
+            items.extend(complete_columns(
+                request.schema_provider,
+                None,
+                &tables,
+                prefix.as_deref(),
+            ));
+
+            items
+        }
+
+        CompletionContext::WindowPartition { tables } => {
+            let mut items = Vec::new();
+            let tables = resolve_tables_in_scope(tables, request.source, request.offset);
+            let prefix = get_prefix_at_offset(request.source, request.offset);
+
+            // Add columns from tables in scope
+            items.extend(complete_columns(
+                request.schema_provider,
+                None,
+                &tables,
+                prefix.as_deref(),
+            ));
+
+            // Add table names for qualified references
+            for table_name in &tables {
+                items.push(CompletionItem::new(
+                    crate::types::CompletionItemKind::Table,
+                    table_name,
+                ));
+            }
+
+            items
+        }
+
+        CompletionContext::WindowOrderDirection => {
+            // Suggest sort direction keywords
+            crate::generators::keywords::window_order_direction_keywords()
+        }
+
+        CompletionContext::WindowFrame => {
+            // Suggest frame specification keywords
+            crate::generators::keywords::window_frame_keywords()
+        }
+
         CompletionContext::Unknown => {
             // Fallback: suggest keywords
             complete_keywords(None, None)
         }
     }
+}
+
+fn resolve_tables_in_scope(tables: &[String], source: &str, offset: TextSize) -> Vec<String> {
+    if !tables.is_empty() {
+        return tables.to_vec();
+    }
+
+    extract_tables_from_text(source, offset)
+}
+
+#[derive(Clone, Debug)]
+struct TableContextPrefix {
+    schema: Option<String>,
+    table_prefix: Option<String>,
+}
+
+impl TableContextPrefix {
+    fn new(schema: Option<String>, table_prefix: Option<String>) -> Self {
+        Self {
+            schema,
+            table_prefix,
+        }
+    }
+
+    fn parse(token: &str) -> Self {
+        if let Some((schema, table)) = token.split_once('.') {
+            let schema = schema.trim();
+            let table = table.trim();
+            return Self {
+                schema: if schema.is_empty() {
+                    None
+                } else {
+                    Some(schema.to_string())
+                },
+                table_prefix: if table.is_empty() {
+                    None
+                } else {
+                    Some(table.to_string())
+                },
+            };
+        }
+
+        Self {
+            schema: None,
+            table_prefix: if token.is_empty() {
+                None
+            } else {
+                Some(token.to_string())
+            },
+        }
+    }
+}
+
+fn table_context_prefix(source: &str, offset: TextSize) -> Option<TableContextPrefix> {
+    let offset: usize = offset.into();
+    if offset == 0 || offset > source.len() {
+        return None;
+    }
+
+    let prefix = source[..offset].trim_end();
+    if prefix.is_empty() {
+        return None;
+    }
+
+    let (last_token, last_start) = last_word(prefix)?;
+    let last_upper = last_token.to_uppercase();
+
+    if is_table_keyword(&last_upper) {
+        return Some(TableContextPrefix::new(None, None));
+    }
+
+    let prev = prefix[..last_start].trim_end();
+    let (prev_word, _) = last_word(prev)?;
+    let prev_upper = prev_word.to_uppercase();
+
+    if is_table_keyword(&prev_upper) {
+        Some(TableContextPrefix::parse(last_token))
+    } else {
+        None
+    }
+}
+
+fn last_word(text: &str) -> Option<(&str, usize)> {
+    let mut end = text.len();
+    for (idx, ch) in text.char_indices().rev() {
+        if ch.is_alphanumeric() || ch == '_' || ch == '.' {
+            end = idx + ch.len_utf8();
+            break;
+        }
+    }
+
+    let mut start = end;
+    for (idx, ch) in text[..end].char_indices().rev() {
+        if ch.is_alphanumeric() || ch == '_' || ch == '.' {
+            start = idx;
+            continue;
+        }
+        start = idx + ch.len_utf8();
+        break;
+    }
+
+    if start >= end {
+        None
+    } else {
+        Some((&text[start..end], start))
+    }
+}
+
+fn is_table_keyword(word: &str) -> bool {
+    matches!(word, "FROM" | "JOIN" | "UPDATE" | "INTO")
+}
+
+fn extract_tables_from_text(source: &str, offset: TextSize) -> Vec<String> {
+    let offset: usize = offset.into();
+    let prefix = source.get(..offset).unwrap_or(source);
+
+    extract_tables_from_text_slice(prefix)
+}
+
+fn extract_tables_from_text_full(source: &str) -> Vec<String> {
+    extract_tables_from_text_slice(source)
+}
+
+fn extract_tables_from_text_slice(text: &str) -> Vec<String> {
+    let mut tables = Vec::new();
+    let mut expecting_table = false;
+
+    for token in tokenize_sql_words(text) {
+        let upper = token.to_uppercase();
+        if matches!(upper.as_str(), "FROM" | "JOIN" | "UPDATE" | "INTO") {
+            expecting_table = true;
+            continue;
+        }
+
+        if expecting_table {
+            if !token.is_empty() {
+                if !tables.contains(&token) {
+                    tables.push(token);
+                }
+                expecting_table = false;
+            }
+        }
+    }
+
+    tables
+}
+
+
+fn tokenize_sql_words(text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+
+    for ch in text.chars() {
+        if ch.is_ascii_alphanumeric() || ch == '_' || ch == '.' {
+            current.push(ch);
+        } else if !current.is_empty() {
+            tokens.push(current.clone());
+            current.clear();
+        }
+    }
+
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+
+    tokens
 }
 
 /// Gets the word being typed at the cursor position.

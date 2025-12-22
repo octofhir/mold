@@ -39,16 +39,12 @@ pub fn complete_jsonb_paths(
             let mut full_path = path.to_vec();
             full_path.push(field.name.clone());
 
-            // Insert text: quote the key if needed
-            let insert_text = if needs_quoting(&field.name) {
-                format!("'{}'", field.name)
-            } else {
-                format!("'{}'", field.name)
-            };
-
+            // Don't wrap in quotes - the user/editor controls the quoting context.
+            // If user is typing inside quotes (e.g., data->'nam|'), we just need the name.
+            // If outside quotes (e.g., data->|), the editor should handle insertion appropriately.
             CompletionItem::new(CompletionItemKind::JsonbPath, &field.name)
                 .with_detail(type_label.to_string())
-                .with_insert_text(insert_text)
+                .with_sort_key(format!("0_{}", field.name.to_lowercase()))
                 .with_documentation(field.description.clone().unwrap_or_default())
                 .with_data(CompletionData::JsonbPath {
                     base_column: column.to_string(),
@@ -58,7 +54,10 @@ pub fn complete_jsonb_paths(
         .collect()
 }
 
-/// Returns true if a JSONB key needs quoting.
+/// Returns true if a JSONB key needs quoting (special chars or starts with digit).
+/// Note: For JSONB string keys, PostgreSQL always requires quotes.
+/// This function is useful for determining if extra escaping is needed.
+#[cfg(test)]
 fn needs_quoting(key: &str) -> bool {
     // Keys need quoting if they contain special characters or start with a digit
     if key.is_empty() {
@@ -235,6 +234,12 @@ pub fn complete_jsonb_operators() -> Vec<CompletionItem> {
             .with_detail("JSONPath match")
             .with_documentation("JSONPath predicate check"),
     ]
+    .into_iter()
+    .enumerate()
+    .map(|(index, item)| {
+        item.with_sort_key(format!("9_{index:02}"))
+    })
+    .collect()
 }
 
 #[cfg(test)]

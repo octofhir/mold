@@ -2,6 +2,7 @@ use crate::parser::Parser;
 use mold_syntax::SyntaxKind;
 
 use super::expressions::expr;
+use super::{CLAUSE_RECOVERY, JOIN_RECOVERY, PAREN_RECOVERY};
 
 pub fn select_stmt(p: &mut Parser<'_>) {
     let m = p.start();
@@ -50,17 +51,17 @@ pub fn select_stmt(p: &mut Parser<'_>) {
 }
 
 fn select_core(p: &mut Parser<'_>) {
-    p.expect(SyntaxKind::SELECT_KW);
+    p.expect_recover(SyntaxKind::SELECT_KW, CLAUSE_RECOVERY);
 
     // DISTINCT / DISTINCT ON / ALL
     if p.eat(SyntaxKind::DISTINCT_KW) {
         if p.eat(SyntaxKind::ON_KW) {
-            p.expect(SyntaxKind::L_PAREN);
+            p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
             expr(p);
             while p.eat(SyntaxKind::COMMA) {
                 expr(p);
             }
-            p.expect(SyntaxKind::R_PAREN);
+            p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         }
     } else {
         p.eat(SyntaxKind::ALL_KW);
@@ -119,7 +120,7 @@ fn cte(p: &mut Parser<'_>) {
         while p.eat(SyntaxKind::COMMA) {
             p.expect(SyntaxKind::IDENT);
         }
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     }
 
     p.expect(SyntaxKind::AS_KW);
@@ -131,7 +132,7 @@ fn cte(p: &mut Parser<'_>) {
         p.eat(SyntaxKind::MATERIALIZED_KW);
     }
 
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
 
     // CTE body: SELECT, INSERT, UPDATE, or DELETE
     match p.current() {
@@ -152,7 +153,7 @@ fn cte(p: &mut Parser<'_>) {
         }
     }
 
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
 
     m.complete(p, SyntaxKind::CTE);
 }
@@ -213,10 +214,10 @@ fn table_ref(p: &mut Parser<'_>) {
             // Joined table in parens
             table_ref(p);
         }
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     } else {
         // Table name or function call
-        p.expect(SyntaxKind::IDENT);
+        p.expect_recover(SyntaxKind::IDENT, JOIN_RECOVERY);
 
         // Schema qualification
         if p.at(SyntaxKind::DOT) {
@@ -233,7 +234,7 @@ fn table_ref(p: &mut Parser<'_>) {
                     expr(p);
                 }
             }
-            p.expect(SyntaxKind::R_PAREN);
+            p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         }
     }
 
@@ -247,7 +248,7 @@ fn table_ref(p: &mut Parser<'_>) {
             while p.eat(SyntaxKind::COMMA) {
                 p.expect(SyntaxKind::IDENT);
             }
-            p.expect(SyntaxKind::R_PAREN);
+            p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         }
     } else if p.at(SyntaxKind::IDENT)
         && !is_join_keyword(p.current())
@@ -260,7 +261,7 @@ fn table_ref(p: &mut Parser<'_>) {
             while p.eat(SyntaxKind::COMMA) {
                 p.expect(SyntaxKind::IDENT);
             }
-            p.expect(SyntaxKind::R_PAREN);
+            p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         }
     }
 
@@ -319,18 +320,18 @@ fn join_expr(
             if p.at(SyntaxKind::INNER_KW) {
                 p.bump();
             }
-            p.expect(SyntaxKind::JOIN_KW);
+            p.expect_recover(SyntaxKind::JOIN_KW, JOIN_RECOVERY);
             false
         }
         SyntaxKind::LEFT_KW | SyntaxKind::RIGHT_KW | SyntaxKind::FULL_KW => {
             p.bump();
             p.eat(SyntaxKind::OUTER_KW);
-            p.expect(SyntaxKind::JOIN_KW);
+            p.expect_recover(SyntaxKind::JOIN_KW, JOIN_RECOVERY);
             false
         }
         SyntaxKind::CROSS_KW => {
             p.bump();
-            p.expect(SyntaxKind::JOIN_KW);
+            p.expect_recover(SyntaxKind::JOIN_KW, JOIN_RECOVERY);
             true
         }
         _ => {
@@ -350,12 +351,12 @@ fn join_expr(
             cm.complete(p, SyntaxKind::JOIN_CONDITION);
         } else if p.eat(SyntaxKind::USING_KW) {
             let cm = p.start();
-            p.expect(SyntaxKind::L_PAREN);
+            p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
             p.expect(SyntaxKind::IDENT);
             while p.eat(SyntaxKind::COMMA) {
                 p.expect(SyntaxKind::IDENT);
             }
-            p.expect(SyntaxKind::R_PAREN);
+            p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
             cm.complete(p, SyntaxKind::JOIN_CONDITION);
         }
     }
@@ -397,15 +398,15 @@ fn window_clause(p: &mut Parser<'_>) {
     // window_name AS (window_definition)
     p.expect(SyntaxKind::IDENT);
     p.expect(SyntaxKind::AS_KW);
-    p.expect(SyntaxKind::L_PAREN);
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
     // Window specification parsed in expressions.rs
-    p.expect(SyntaxKind::R_PAREN);
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
 
     while p.eat(SyntaxKind::COMMA) {
         p.expect(SyntaxKind::IDENT);
         p.expect(SyntaxKind::AS_KW);
-        p.expect(SyntaxKind::L_PAREN);
-        p.expect(SyntaxKind::R_PAREN);
+        p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     }
 
     m.complete(p, SyntaxKind::WINDOW_SPEC);
