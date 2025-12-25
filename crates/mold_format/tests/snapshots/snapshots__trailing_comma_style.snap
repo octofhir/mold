@@ -2,7 +2,5 @@
 source: crates/mold_format/tests/snapshots.rs
 expression: formatted
 ---
-    SELECT id,
-           name,
-           email
-      FROM users
+SELECT id, name, email
+  FROM users

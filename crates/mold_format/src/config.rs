@@ -1,5 +1,31 @@
 //! Format configuration for SQL formatting.
 
+use crate::pg_formatter::PgFormatterConfig;
+
+/// Format style preset.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FormatStyle {
+    /// sqlstyle.guide conventions (default)
+    #[default]
+    SqlStyle,
+    /// pgFormatter-compatible style
+    PgFormatter,
+    /// Compact style with minimal whitespace
+    Compact,
+}
+
+impl FormatStyle {
+    /// Creates a FormatConfig for this style.
+    pub fn to_config(self) -> FormatConfig {
+        match self {
+            FormatStyle::SqlStyle => FormatConfig::sqlstyle(),
+            FormatStyle::PgFormatter => PgFormatterConfig::default().to_format_config(),
+            FormatStyle::Compact => FormatConfig::compact(),
+        }
+    }
+}
+
 /// Case transformation for SQL keywords.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -44,10 +70,10 @@ impl Default for IndentStyle {
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CommaStyle {
-    /// Commas at the end of lines (default in most languages)
+    /// Commas at the end of lines (sqlstyle.guide default)
     #[default]
     Trailing,
-    /// Commas at the beginning of lines (sqlstyle.guide style)
+    /// Commas at the beginning of lines (some team preferences)
     Leading,
 }
 
@@ -98,7 +124,7 @@ impl FormatConfig {
             river_alignment: true,
             newline_before_logical: true,
             spaces_around_operators: true,
-            comma_style: CommaStyle::Leading,
+            comma_style: CommaStyle::Trailing,
             parentheses_spacing: false,
             align_select_items: true,
             river_width: 10, // Enough for "RETURNING " (longest common keyword)
@@ -202,7 +228,7 @@ mod tests {
         let config = FormatConfig::sqlstyle();
         assert_eq!(config.keyword_case, KeywordCase::Upper);
         assert!(config.river_alignment);
-        assert_eq!(config.comma_style, CommaStyle::Leading);
+        assert_eq!(config.comma_style, CommaStyle::Trailing);
     }
 
     #[test]

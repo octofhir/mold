@@ -1,0 +1,63 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..100
+  SELECT_STMT@0..100
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..94
+      SELECT_ITEM@7..94
+        FUNC_CALL@7..94
+          FUNC_CALL@7..14
+            SUM_KW@7..10 "SUM"
+            L_PAREN@10..11 "("
+            COLUMN_REF@11..12
+              IDENT@11..12 "x"
+            R_PAREN@12..13 ")"
+            WHITESPACE@13..14 " "
+          OVER_CLAUSE@14..94
+            OVER_KW@14..18 "OVER"
+            WHITESPACE@18..19 " "
+            L_PAREN@19..20 "("
+            ORDER_BY_CLAUSE@20..32
+              ORDER_KW@20..25 "ORDER"
+              WHITESPACE@25..26 " "
+              BY_KW@26..28 "BY"
+              WHITESPACE@28..29 " "
+              ORDER_BY_ITEM@29..32
+                COLUMN_REF@29..32
+                  IDENT@29..31 "id"
+                  WHITESPACE@31..32 " "
+            FRAME_CLAUSE@32..92
+              GROUPS_KW@32..38 "GROUPS"
+              WHITESPACE@38..39 " "
+              BETWEEN_KW@39..46 "BETWEEN"
+              WHITESPACE@46..47 " "
+              FRAME_BOUND@47..59
+                LITERAL@47..49
+                  INTEGER@47..48 "1"
+                  WHITESPACE@48..49 " "
+                PRECEDING_KW@49..58 "PRECEDING"
+                WHITESPACE@58..59 " "
+              AND_KW@59..62 "AND"
+              WHITESPACE@62..63 " "
+              FRAME_BOUND@63..75
+                LITERAL@63..65
+                  INTEGER@63..64 "1"
+                  WHITESPACE@64..65 " "
+                FOLLOWING_KW@65..74 "FOLLOWING"
+                WHITESPACE@74..75 " "
+              FRAME_EXCLUSION@75..92
+                EXCLUDE_KW@75..82 "EXCLUDE"
+                WHITESPACE@82..83 " "
+                NO_KW@83..85 "NO"
+                WHITESPACE@85..86 " "
+                OTHERS_KW@86..92 "OTHERS"
+            R_PAREN@92..93 ")"
+            WHITESPACE@93..94 " "
+    FROM_CLAUSE@94..100
+      FROM_KW@94..98 "FROM"
+      WHITESPACE@98..99 " "
+      TABLE_REF@99..100
+        IDENT@99..100 "t"

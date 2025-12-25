@@ -2,11 +2,13 @@
 source: crates/mold_format/tests/snapshots.rs
 expression: formatted
 ---
-      WITH RECURSIVE numbers AS ((
-        SELECT ALL 1  AS n
-          FROM numbers
-         WHERE n < 10
-    UNION 
-))
-    SELECT *
-      FROM numbers
+WITH RECURSIVE numbers AS (
+  SELECT 1 AS n
+
+    UNION ALL 
+  SELECT n+1
+    FROM numbers
+   WHERE n < 10
+)
+SELECT *
+FROM numbers

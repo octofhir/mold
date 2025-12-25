@@ -1,0 +1,73 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..113
+  UPDATE_STMT@0..113
+    UPDATE_KW@0..6 "UPDATE"
+    WHITESPACE@6..7 " "
+    TABLE_REF@7..13
+      IDENT@7..12 "users"
+      WHITESPACE@12..13 " "
+    IDENT@13..14 "u"
+    WHITESPACE@14..15 " "
+    SET_CLAUSE@15..37
+      SET_KW@15..18 "SET"
+      WHITESPACE@18..19 " "
+      SET_ITEM@19..37
+        IDENT@19..25 "status"
+        WHITESPACE@25..26 " "
+        EQ@26..27 "="
+        WHITESPACE@27..28 " "
+        LITERAL@28..37
+          STRING@28..36 "'active'"
+          WHITESPACE@36..37 " "
+    FROM_CLAUSE@37..91
+      FROM_KW@37..41 "FROM"
+      WHITESPACE@41..42 " "
+      TABLE_REF@42..91
+        L_PAREN@42..43 "("
+        SELECT_STMT@43..87
+          SELECT_KW@43..49 "SELECT"
+          WHITESPACE@49..50 " "
+          SELECT_ITEM_LIST@50..58
+            SELECT_ITEM@50..58
+              COLUMN_REF@50..58
+                IDENT@50..57 "user_id"
+                WHITESPACE@57..58 " "
+          FROM_CLAUSE@58..70
+            FROM_KW@58..62 "FROM"
+            WHITESPACE@62..63 " "
+            TABLE_REF@63..70
+              IDENT@63..69 "orders"
+              WHITESPACE@69..70 " "
+          WHERE_CLAUSE@70..87
+            WHERE_KW@70..75 "WHERE"
+            WHITESPACE@75..76 " "
+            BINARY_EXPR@76..87
+              COLUMN_REF@76..82
+                IDENT@76..81 "total"
+                WHITESPACE@81..82 " "
+              GT@82..83 ">"
+              WHITESPACE@83..84 " "
+              LITERAL@84..87
+                INTEGER@84..87 "100"
+        R_PAREN@87..88 ")"
+        WHITESPACE@88..89 " "
+        IDENT@89..90 "o"
+        WHITESPACE@90..91 " "
+    WHERE_CLAUSE@91..113
+      WHERE_KW@91..96 "WHERE"
+      WHITESPACE@96..97 " "
+      BINARY_EXPR@97..113
+        COLUMN_REF@97..102
+          IDENT@97..98 "u"
+          DOT@98..99 "."
+          IDENT@99..101 "id"
+          WHITESPACE@101..102 " "
+        EQ@102..103 "="
+        WHITESPACE@103..104 " "
+        COLUMN_REF@104..113
+          IDENT@104..105 "o"
+          DOT@105..106 "."
+          IDENT@106..113 "user_id"

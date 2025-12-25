@@ -9,6 +9,11 @@ mold_syntax.workspace = true
 mold_parser.workspace = true
 text-size.workspace = true
 cstree.workspace = true
+dirs = { workspace = true, optional = true }
+
+[features]
+default = []
+config-file = ["dirs"]
 
 [dev-dependencies]
 insta.workspace = true

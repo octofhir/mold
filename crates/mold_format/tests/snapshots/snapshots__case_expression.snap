@@ -2,10 +2,9 @@
 source: crates/mold_format/tests/snapshots.rs
 expression: formatted
 ---
-    SELECT id
-         , CASE
-    WHEN active THEN 'yes' 
-    WHEN status = 'pending'  THEN 'pending' 
-    ELSE 'no' 
+SELECT id, CASE
+    WHEN active THEN 'yes'
+    WHEN status = 'pending' THEN 'pending'
+    ELSE 'no'
 END AS status
-      FROM users
+  FROM users

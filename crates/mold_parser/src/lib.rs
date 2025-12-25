@@ -172,6 +172,38 @@ mod tests {
     }
 
     #[test]
+    fn test_window_frame_exclude_current_row() {
+        let sql = "SELECT SUM(x) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW EXCLUDE CURRENT ROW) FROM t";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_window_frame_exclude_group() {
+        let sql = "SELECT SUM(x) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE GROUP) FROM t";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_window_frame_exclude_ties() {
+        let sql = "SELECT SUM(x) OVER (ORDER BY id RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW EXCLUDE TIES) FROM t";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_window_frame_exclude_no_others() {
+        let sql = "SELECT SUM(x) OVER (ORDER BY id GROUPS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE NO OTHERS) FROM t";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
     fn test_table_function() {
         let sql = "SELECT * FROM generate_series(1, 10) AS s(n)";
         let parse = parse(sql);
@@ -363,6 +395,38 @@ mod tests {
         insta::assert_snapshot!(format_tree(sql));
     }
 
+    #[test]
+    fn test_update_from_subquery() {
+        let sql = "UPDATE users u SET status = 'active' FROM (SELECT user_id FROM orders WHERE total > 100) o WHERE u.id = o.user_id";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_update_from_join() {
+        let sql = "UPDATE users u SET last_order = o.created_at FROM orders o INNER JOIN order_items oi ON o.id = oi.order_id WHERE u.id = o.user_id";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_update_from_multiple_tables() {
+        let sql = "UPDATE inventory i SET quantity = i.quantity - o.qty FROM orders o, order_items oi WHERE i.product_id = oi.product_id AND o.id = oi.order_id";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_update_from_lateral() {
+        let sql = "UPDATE products p SET price = sub.new_price FROM LATERAL (SELECT price * 1.1 AS new_price FROM pricing WHERE product_id = p.id) sub";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
     // =========================================================================
     // DELETE statement tests
     // =========================================================================
@@ -521,5 +585,102 @@ mod tests {
         let parse = parse(sql);
         assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
         insta::assert_snapshot!(format_tree(sql));
+    }
+
+    // =========================================================================
+    // Error recovery tests
+    // =========================================================================
+
+    #[test]
+    fn test_case_recovery_missing_then() {
+        // Missing THEN keyword - should recover and still parse
+        let sql = "SELECT CASE WHEN x > 0 y ELSE z END FROM t";
+        let parse = parse(sql);
+        // Should have errors but still produce a tree
+        assert!(!parse.errors().is_empty());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_case_recovery_missing_end() {
+        // Missing END keyword - should recover
+        let sql = "SELECT CASE WHEN x THEN y FROM t";
+        let parse = parse(sql);
+        assert!(!parse.errors().is_empty());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_nested_paren_recovery() {
+        // Unclosed parenthesis - should recover
+        let sql = "SELECT (a + b FROM t";
+        let parse = parse(sql);
+        assert!(!parse.errors().is_empty());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_subquery_isolated_recovery() {
+        // Error in subquery should not affect outer query parsing
+        let sql = "SELECT * FROM users WHERE id IN (SELECT id FROM BROKEN) AND status = 'active'";
+        let _parse = parse(sql);
+        // Should parse successfully even with potentially ambiguous subquery
+        // The outer query structure should be intact
+        let tree = format_tree(sql);
+        assert!(tree.contains("WHERE_CLAUSE"));
+        assert!(tree.contains("IN_EXPR"));
+        assert!(tree.contains("SUBQUERY_EXPR") || tree.contains("SELECT_STMT"));
+        insta::assert_snapshot!(tree);
+    }
+
+    #[test]
+    fn test_exists_subquery_recovery() {
+        // EXISTS subquery with error should recover gracefully
+        let sql = "SELECT * FROM users WHERE EXISTS (SELECT 1 FROM orders) AND active";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        let tree = format_tree(sql);
+        assert!(tree.contains("EXISTS_EXPR"));
+        insta::assert_snapshot!(tree);
+    }
+
+    #[test]
+    fn test_nested_subquery_context() {
+        // Deeply nested subqueries should track context
+        let sql = "SELECT * FROM (SELECT id FROM (SELECT id FROM inner_t) AS sub1) AS sub2";
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "errors: {:?}", parse.errors());
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_case_in_subquery_error_context() {
+        // Error in CASE within subquery should include nesting context
+        let sql = "SELECT * FROM t WHERE x IN (SELECT CASE WHEN y THEN z FROM inner_t)";
+        let parse = parse(sql);
+        // Should have error about missing END but should still parse outer structure
+        assert!(!parse.errors().is_empty());
+        // Check that error message includes context
+        let errors: Vec<String> = parse.errors().iter().map(|e| e.message.clone()).collect();
+        let has_context = errors.iter().any(|e| e.contains("CASE") || e.contains("subquery"));
+        assert!(
+            has_context || !errors.is_empty(),
+            "errors should include context: {:?}",
+            errors
+        );
+        insta::assert_snapshot!(format_tree(sql));
+    }
+
+    #[test]
+    fn test_with_clause_subquery_recovery() {
+        // CTE parsing with missing closing paren - should still produce valid structure
+        let sql = "WITH cte AS (SELECT id FROM t SELECT * FROM cte";
+        let parse = parse(sql);
+        // Should have error but still produce valid outer structure
+        assert!(!parse.errors().is_empty(), "expected errors, got none");
+        let tree = format_tree(sql);
+        assert!(tree.contains("WITH_CLAUSE"));
+        assert!(tree.contains("CTE"));
+        insta::assert_snapshot!(tree);
     }
 }

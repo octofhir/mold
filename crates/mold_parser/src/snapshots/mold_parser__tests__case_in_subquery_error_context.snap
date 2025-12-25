@@ -1,0 +1,54 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..67
+  SELECT_STMT@0..67
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..9
+      SELECT_ITEM@7..9
+        STAR_EXPR@7..9
+          STAR@7..8 "*"
+          WHITESPACE@8..9 " "
+    FROM_CLAUSE@9..16
+      FROM_KW@9..13 "FROM"
+      WHITESPACE@13..14 " "
+      TABLE_REF@14..16
+        IDENT@14..15 "t"
+        WHITESPACE@15..16 " "
+    WHERE_CLAUSE@16..67
+      WHERE_KW@16..21 "WHERE"
+      WHITESPACE@21..22 " "
+      IN_EXPR@22..67
+        COLUMN_REF@22..24
+          IDENT@22..23 "x"
+          WHITESPACE@23..24 " "
+        IN_KW@24..26 "IN"
+        WHITESPACE@26..27 " "
+        L_PAREN@27..28 "("
+        SELECT_STMT@28..66
+          SELECT_KW@28..34 "SELECT"
+          WHITESPACE@34..35 " "
+          SELECT_ITEM_LIST@35..54
+            SELECT_ITEM@35..54
+              CASE_EXPR@35..54
+                CASE_KW@35..39 "CASE"
+                WHITESPACE@39..40 " "
+                CASE_WHEN@40..54
+                  WHEN_KW@40..44 "WHEN"
+                  WHITESPACE@44..45 " "
+                  COLUMN_REF@45..47
+                    IDENT@45..46 "y"
+                    WHITESPACE@46..47 " "
+                  THEN_KW@47..51 "THEN"
+                  WHITESPACE@51..52 " "
+                  COLUMN_REF@52..54
+                    IDENT@52..53 "z"
+                    WHITESPACE@53..54 " "
+          FROM_CLAUSE@54..66
+            FROM_KW@54..58 "FROM"
+            WHITESPACE@58..59 " "
+            TABLE_REF@59..66
+              IDENT@59..66 "inner_t"
+        R_PAREN@66..67 ")"

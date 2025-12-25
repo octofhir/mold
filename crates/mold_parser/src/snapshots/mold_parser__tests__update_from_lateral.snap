@@ -1,0 +1,73 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..131
+  UPDATE_STMT@0..131
+    UPDATE_KW@0..6 "UPDATE"
+    WHITESPACE@6..7 " "
+    TABLE_REF@7..16
+      IDENT@7..15 "products"
+      WHITESPACE@15..16 " "
+    IDENT@16..17 "p"
+    WHITESPACE@17..18 " "
+    SET_CLAUSE@18..44
+      SET_KW@18..21 "SET"
+      WHITESPACE@21..22 " "
+      SET_ITEM@22..44
+        IDENT@22..27 "price"
+        WHITESPACE@27..28 " "
+        EQ@28..29 "="
+        WHITESPACE@29..30 " "
+        COLUMN_REF@30..44
+          IDENT@30..33 "sub"
+          DOT@33..34 "."
+          IDENT@34..43 "new_price"
+          WHITESPACE@43..44 " "
+    FROM_CLAUSE@44..131
+      FROM_KW@44..48 "FROM"
+      WHITESPACE@48..49 " "
+      TABLE_REF@49..131
+        LATERAL_KW@49..56 "LATERAL"
+        WHITESPACE@56..57 " "
+        L_PAREN@57..58 "("
+        SELECT_STMT@58..126
+          SELECT_KW@58..64 "SELECT"
+          WHITESPACE@64..65 " "
+          SELECT_ITEM_LIST@65..90
+            SELECT_ITEM@65..90
+              BINARY_EXPR@65..77
+                COLUMN_REF@65..71
+                  IDENT@65..70 "price"
+                  WHITESPACE@70..71 " "
+                STAR@71..72 "*"
+                WHITESPACE@72..73 " "
+                LITERAL@73..77
+                  FLOAT@73..76 "1.1"
+                  WHITESPACE@76..77 " "
+              AS_KW@77..79 "AS"
+              WHITESPACE@79..80 " "
+              IDENT@80..89 "new_price"
+              WHITESPACE@89..90 " "
+          FROM_CLAUSE@90..103
+            FROM_KW@90..94 "FROM"
+            WHITESPACE@94..95 " "
+            TABLE_REF@95..103
+              IDENT@95..102 "pricing"
+              WHITESPACE@102..103 " "
+          WHERE_CLAUSE@103..126
+            WHERE_KW@103..108 "WHERE"
+            WHITESPACE@108..109 " "
+            BINARY_EXPR@109..126
+              COLUMN_REF@109..120
+                IDENT@109..119 "product_id"
+                WHITESPACE@119..120 " "
+              EQ@120..121 "="
+              WHITESPACE@121..122 " "
+              COLUMN_REF@122..126
+                IDENT@122..123 "p"
+                DOT@123..124 "."
+                IDENT@124..126 "id"
+        R_PAREN@126..127 ")"
+        WHITESPACE@127..128 " "
+        IDENT@128..131 "sub"

@@ -2,8 +2,8 @@
 source: crates/mold_format/tests/snapshots.rs
 expression: formatted
 ---
-    SELECT *
-      FROM users
+SELECT *
+  FROM users
 
-    SELECT *
-      FROM orders
+SELECT *
+  FROM orders

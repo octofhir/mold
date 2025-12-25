@@ -1,7 +1,7 @@
-use crate::parser::{CompletedMarker, Parser};
+use crate::parser::{CompletedMarker, ParseContext, Parser};
 use mold_syntax::SyntaxKind;
 
-use super::{EXPR_LIST_RECOVERY, PAREN_RECOVERY};
+use super::{CASE_RECOVERY, EXPR_LIST_RECOVERY, PAREN_RECOVERY, SUBQUERY_RECOVERY};
 
 pub fn expr(p: &mut Parser<'_>) -> Option<CompletedMarker> {
     expr_bp(p, 0)
@@ -56,11 +56,13 @@ fn expr_bp(p: &mut Parser<'_>, min_bp: u8) -> Option<CompletedMarker> {
 
             // Can be an array expression or subquery
             if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
-                super::select::select_stmt(p);
+                p.push_context(ParseContext::Subquery);
+                parse_subquery_with_recovery(p);
+                p.pop_context();
             } else {
                 expr(p);
             }
-            p.expect(SyntaxKind::R_PAREN);
+            p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
 
             // Complete with appropriate node type
             let node_kind = if quantifier == SyntaxKind::ALL_KW {
@@ -229,8 +231,10 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
                 p.bump();
                 p.expect(SyntaxKind::L_PAREN);
                 if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
-                    // subquery
-                    super::select::select_stmt(p);
+                    // subquery with isolated recovery
+                    p.push_context(ParseContext::Subquery);
+                    parse_subquery_with_recovery(p);
+                    p.pop_context();
                 } else {
                     // expression list
                     expr(p);
@@ -238,7 +242,7 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
                         expr(p);
                     }
                 }
-                p.expect(SyntaxKind::R_PAREN);
+                p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
                 m.complete(p, SyntaxKind::IN_EXPR)
             }
 
@@ -249,14 +253,17 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
                 p.bump(); // IN
                 p.expect(SyntaxKind::L_PAREN);
                 if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
-                    super::select::select_stmt(p);
+                    // subquery with isolated recovery
+                    p.push_context(ParseContext::Subquery);
+                    parse_subquery_with_recovery(p);
+                    p.pop_context();
                 } else {
                     expr(p);
                     while p.eat(SyntaxKind::COMMA) {
                         expr(p);
                     }
                 }
-                p.expect(SyntaxKind::R_PAREN);
+                p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
                 m.complete(p, SyntaxKind::IN_EXPR)
             }
 
@@ -471,7 +478,34 @@ fn frame_clause(p: &mut Parser<'_>) {
         frame_bound(p);
     }
 
+    // Optional EXCLUDE clause (PostgreSQL 11+)
+    if p.at(SyntaxKind::EXCLUDE_KW) {
+        frame_exclusion(p);
+    }
+
     m.complete(p, SyntaxKind::FRAME_CLAUSE);
+}
+
+/// Parse window frame exclusion: EXCLUDE { CURRENT ROW | GROUP | TIES | NO OTHERS }
+fn frame_exclusion(p: &mut Parser<'_>) {
+    let m = p.start();
+    p.bump(); // EXCLUDE
+
+    if p.at(SyntaxKind::CURRENT_KW) {
+        p.bump();
+        p.expect(SyntaxKind::ROW_KW);
+    } else if p.eat(SyntaxKind::GROUP_KW) {
+        // EXCLUDE GROUP
+    } else if p.eat(SyntaxKind::TIES_KW) {
+        // EXCLUDE TIES
+    } else if p.at(SyntaxKind::NO_KW) {
+        p.bump();
+        p.expect(SyntaxKind::OTHERS_KW);
+    } else {
+        p.error("expected CURRENT ROW, GROUP, TIES, or NO OTHERS after EXCLUDE");
+    }
+
+    m.complete(p, SyntaxKind::FRAME_EXCLUSION);
 }
 
 fn frame_bound(p: &mut Parser<'_>) {
@@ -505,12 +539,15 @@ fn paren_expr(p: &mut Parser<'_>) -> CompletedMarker {
 
     // Check for subquery
     if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
-        super::select::select_stmt(p);
+        p.push_context(ParseContext::Subquery);
+        parse_subquery_with_recovery(p);
+        p.pop_context();
         p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         return m.complete(p, SyntaxKind::SUBQUERY_EXPR);
     }
 
     // Regular parenthesized expression or row constructor
+    p.push_context(ParseContext::ParenExpression);
     expr(p);
 
     if p.at(SyntaxKind::COMMA) {
@@ -518,39 +555,83 @@ fn paren_expr(p: &mut Parser<'_>) -> CompletedMarker {
         while p.eat(SyntaxKind::COMMA) {
             expr(p);
         }
+        p.pop_context();
         p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         return m.complete(p, SyntaxKind::ROW_EXPR);
     }
 
+    p.pop_context();
     p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::PAREN_EXPR)
+}
+
+/// Parse a subquery with isolated error recovery.
+/// Errors within the subquery are contained and don't leak to outer context.
+fn parse_subquery_with_recovery(p: &mut Parser<'_>) {
+    // Parse the subquery, but if we hit an error, recover to SUBQUERY_RECOVERY tokens
+    // This ensures errors inside the subquery don't escape to outer queries
+    super::select::select_stmt(p);
+
+    // If we're not at R_PAREN after parsing, recover within subquery bounds
+    if !p.at(SyntaxKind::R_PAREN) && !p.at_end() {
+        // Skip tokens until we find a subquery boundary
+        if p.at_set(SUBQUERY_RECOVERY) {
+            // Already at a recovery point
+        } else {
+            let em = p.start();
+            p.error_with_context("unexpected tokens in subquery");
+            while !p.at_end() && !p.at_set(SUBQUERY_RECOVERY) && !p.at(SyntaxKind::R_PAREN) {
+                p.bump_any();
+            }
+            em.complete(p, SyntaxKind::ERROR);
+        }
+    }
 }
 
 fn case_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // CASE
+    p.push_context(ParseContext::CaseExpression);
 
     // Simple CASE: CASE expr WHEN ...
-    if !p.at(SyntaxKind::WHEN_KW) {
+    if !p.at(SyntaxKind::WHEN_KW) && !p.at(SyntaxKind::END_KW) {
         expr(p);
     }
 
+    // Parse WHEN clauses with recovery
     while p.at(SyntaxKind::WHEN_KW) {
         let wm = p.start();
         p.bump(); // WHEN
         expr(p);
-        p.expect(SyntaxKind::THEN_KW);
-        expr(p);
+        p.expect_recover(SyntaxKind::THEN_KW, CASE_RECOVERY);
+        if !p.at_set(CASE_RECOVERY) || p.at(SyntaxKind::WHEN_KW) || p.at(SyntaxKind::ELSE_KW) {
+            expr(p);
+        }
         wm.complete(p, SyntaxKind::CASE_WHEN);
     }
 
+    // Parse optional ELSE clause
     if p.eat(SyntaxKind::ELSE_KW) {
         let em = p.start();
         expr(p);
         em.complete(p, SyntaxKind::CASE_ELSE);
     }
 
-    p.expect(SyntaxKind::END_KW);
+    // Expect END with recovery (use context-aware error)
+    if !p.eat(SyntaxKind::END_KW) {
+        p.error_with_context("expected END");
+        // Try to recover
+        if !p.at_set(CASE_RECOVERY) && !p.at_end() {
+            let err = p.start();
+            while !p.at_end() && !p.at(SyntaxKind::END_KW) && !p.at_set(CASE_RECOVERY) {
+                p.bump_any();
+            }
+            err.complete(p, SyntaxKind::ERROR);
+            p.eat(SyntaxKind::END_KW);
+        }
+    }
+
+    p.pop_context();
     m.complete(p, SyntaxKind::CASE_EXPR)
 }
 
@@ -569,7 +650,9 @@ fn exists_expr(p: &mut Parser<'_>) -> CompletedMarker {
     let m = p.start();
     p.bump(); // EXISTS
     p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
-    super::select::select_stmt(p);
+    p.push_context(ParseContext::Subquery);
+    parse_subquery_with_recovery(p);
+    p.pop_context();
     p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     m.complete(p, SyntaxKind::EXISTS_EXPR)
 }
@@ -709,7 +792,9 @@ fn array_expr(p: &mut Parser<'_>) -> CompletedMarker {
     } else if p.at(SyntaxKind::L_PAREN) {
         // ARRAY(subquery)
         p.bump();
-        super::select::select_stmt(p);
+        p.push_context(ParseContext::Subquery);
+        parse_subquery_with_recovery(p);
+        p.pop_context();
         p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     }
 

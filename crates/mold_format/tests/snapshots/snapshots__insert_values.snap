@@ -3,5 +3,5 @@ source: crates/mold_format/tests/snapshots.rs
 expression: formatted
 ---
 INSERT INTO  (id,name,email)
-    VALUES (1,'Alice','alice@example.com'),
-           (2,'Bob','bob@example.com')
+     VALUES (1,'Alice','alice@example.com'),
+            (2,'Bob','bob@example.com')

@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 060e9d2eb9e068f7b411304ef85cc62ad77f572048da60799d61931811111ee5 # shrinks to sql = "SELECT status, count(*) FROM users GROUP BY status HAVING count(*) > 1"
+cc 6abfee0535098324538c5ebca6865df766d65e104f12244adf3bf5bf799c07aa # shrinks to sql = "SELECT * FROM (SELECT id FROM users) AS sub"

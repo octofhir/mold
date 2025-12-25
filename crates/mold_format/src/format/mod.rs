@@ -2,6 +2,8 @@
 //!
 //! This module contains the core formatting logic for SQL statements.
 
+#![allow(clippy::needless_borrow)]
+
 pub mod expressions;
 pub mod statements;
 
@@ -255,10 +257,10 @@ pub fn find_child(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxNode> {
 /// Finds a child token of a specific kind.
 pub fn find_token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == kind {
-                return Some(token.clone());
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == kind
+        {
+            return Some(token.clone());
         }
     }
     None

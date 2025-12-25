@@ -30,12 +30,22 @@
 
 pub mod config;
 pub mod format;
+pub mod pg_format;
+pub mod pg_formatter;
 pub mod printer;
 pub mod rules;
+pub mod validate;
 
-pub use config::{CommaStyle, FormatConfig, IdentifierCase, IndentStyle, KeywordCase};
+pub use config::{CommaStyle, FormatConfig, FormatStyle, IdentifierCase, IndentStyle, KeywordCase};
 pub use format::format;
+pub use pg_format::PgPrinter;
+pub use pg_formatter::{CaseOption, PgFormatterConfig, PgFormatterError};
 pub use printer::Printer;
+pub use validate::{
+    check_idempotent, count_tokens, format_pgformatter_validated, format_validated, normalize,
+    semantically_equal, validate_comprehensive, validate_format, FormatError, FormatResult,
+    ValidationReport,
+};
 
 /// Formats SQL using sqlstyle.guide defaults.
 #[must_use]
@@ -47,6 +57,23 @@ pub fn format_sqlstyle(source: &str) -> String {
 #[must_use]
 pub fn format_compact(source: &str) -> String {
     format::format(source, &FormatConfig::compact())
+}
+
+/// Formats SQL using pgFormatter-compatible defaults.
+///
+/// This uses the default pgFormatter configuration. For custom configuration,
+/// use `PgFormatterConfig` directly.
+#[must_use]
+pub fn format_pgformatter(source: &str) -> String {
+    pg_format::format(source, &PgFormatterConfig::default())
+}
+
+/// Formats SQL using pgFormatter configuration.
+///
+/// Allows passing a custom `PgFormatterConfig` for fine-grained control.
+#[must_use]
+pub fn format_with_pgformatter(source: &str, config: &PgFormatterConfig) -> String {
+    pg_format::format(source, config)
 }
 
 #[cfg(test)]

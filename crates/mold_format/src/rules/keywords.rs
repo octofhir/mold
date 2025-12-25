@@ -161,6 +161,19 @@ pub fn needs_space_before(kind: SyntaxKind) -> bool {
             | SyntaxKind::CROSS_KW
             | SyntaxKind::NATURAL_KW
             | SyntaxKind::OUTER_KW
+            // Clause keywords - need space before when appearing in subqueries
+            | SyntaxKind::SELECT_KW
+            | SyntaxKind::FROM_KW
+            | SyntaxKind::WHERE_KW
+            | SyntaxKind::GROUP_KW
+            | SyntaxKind::HAVING_KW
+            | SyntaxKind::ORDER_KW
+            | SyntaxKind::LIMIT_KW
+            | SyntaxKind::OFFSET_KW
+            // Direction keywords - need space before
+            | SyntaxKind::ASC_KW
+            | SyntaxKind::DESC_KW
+            | SyntaxKind::NULLS_KW
     )
 }
 

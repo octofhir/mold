@@ -1,5 +1,7 @@
 //! Statement formatting.
 
+#![allow(clippy::needless_borrow)]
+
 use mold_syntax::{SyntaxKind, SyntaxNode};
 
 use crate::config::CommaStyle;
@@ -14,91 +16,90 @@ pub fn format_select(node: &SyntaxNode, printer: &mut Printer) {
         format_with_clause(&with_clause, printer);
     }
 
-    // The SELECT keyword is a direct child token of SELECT_STMT
-    // Look for SELECT_KW token and SELECT_ITEM_LIST node
-    let has_select = node.children_with_tokens().any(
-        |e| matches!(e, cstree::util::NodeOrToken::Token(t) if t.kind() == SyntaxKind::SELECT_KW),
-    );
+    // Track state for handling UNION/INTERSECT/EXCEPT
+    // We process children in order to handle multiple SELECT clauses
+    let mut after_set_op = false;
+    let mut in_first_select = true;
 
-    if has_select {
-        // Write SELECT keyword
-        if printer.config().river_alignment {
-            printer.write_keyword_river("SELECT");
-        } else {
-            printer.write_keyword("SELECT");
-        }
-        printer.space();
-
-        // Check for DISTINCT/ALL
-        for element in node.children_with_tokens() {
-            if let cstree::util::NodeOrToken::Token(token) = element {
-                if token.kind() == SyntaxKind::DISTINCT_KW {
-                    printer.write_keyword("DISTINCT");
-                    printer.space();
-                } else if token.kind() == SyntaxKind::ALL_KW {
-                    printer.write_keyword("ALL");
-                    printer.space();
+    for element in node.children_with_tokens() {
+        match element {
+            cstree::util::NodeOrToken::Token(token) => {
+                let kind = token.kind();
+                match kind {
+                    SyntaxKind::SELECT_KW => {
+                        if !in_first_select {
+                            // This is a SELECT after UNION/INTERSECT/EXCEPT
+                            printer.newline();
+                        }
+                        if printer.config().river_alignment {
+                            printer.write_keyword_river("SELECT");
+                        } else {
+                            printer.write_keyword("SELECT");
+                        }
+                        printer.space();
+                        after_set_op = false;
+                    }
+                    SyntaxKind::DISTINCT_KW => {
+                        printer.write_keyword("DISTINCT");
+                        printer.space();
+                    }
+                    SyntaxKind::ALL_KW if !after_set_op => {
+                        // ALL after SELECT, not after UNION
+                        printer.write_keyword("ALL");
+                        printer.space();
+                    }
+                    SyntaxKind::ALL_KW if after_set_op => {
+                        // ALL after UNION/INTERSECT/EXCEPT
+                        printer.write_keyword("ALL");
+                        printer.space();
+                    }
+                    SyntaxKind::UNION_KW | SyntaxKind::INTERSECT_KW | SyntaxKind::EXCEPT_KW => {
+                        printer.newline();
+                        printer.newline();
+                        printer.write_keyword(token.text());
+                        printer.space();
+                        after_set_op = true;
+                        in_first_select = false;
+                    }
+                    _ => {}
                 }
             }
-        }
-
-        // Format select items from SELECT_ITEM_LIST
-        if let Some(items_list) = find_child(node, SyntaxKind::SELECT_ITEM_LIST) {
-            let items = children_of_kind(&items_list, SyntaxKind::SELECT_ITEM);
-            format_select_items(&items, printer);
-        }
-    }
-
-    // Also check for SELECT_CLAUSE (alternative structure)
-    if let Some(select_clause) = find_child(node, SyntaxKind::SELECT_CLAUSE) {
-        format_select_clause(&select_clause, printer);
-    }
-
-    // Format FROM clause
-    if let Some(from_clause) = find_child(node, SyntaxKind::FROM_CLAUSE) {
-        format_from_clause(&from_clause, printer);
-    }
-
-    // Format WHERE clause
-    if let Some(where_clause) = find_child(node, SyntaxKind::WHERE_CLAUSE) {
-        format_where_clause(&where_clause, printer);
-    }
-
-    // Format GROUP BY clause
-    if let Some(group_clause) = find_child(node, SyntaxKind::GROUP_BY_CLAUSE) {
-        format_group_by_clause(&group_clause, printer);
-    }
-
-    // Format HAVING clause
-    if let Some(having_clause) = find_child(node, SyntaxKind::HAVING_CLAUSE) {
-        format_having_clause(&having_clause, printer);
-    }
-
-    // Format ORDER BY clause
-    if let Some(order_clause) = find_child(node, SyntaxKind::ORDER_BY_CLAUSE) {
-        format_order_by_clause(&order_clause, printer);
-    }
-
-    // Format LIMIT clause
-    if let Some(limit_clause) = find_child(node, SyntaxKind::LIMIT_CLAUSE) {
-        format_limit_clause(&limit_clause, printer);
-    }
-
-    // Format OFFSET clause
-    if let Some(offset_clause) = find_child(node, SyntaxKind::OFFSET_CLAUSE) {
-        format_offset_clause(&offset_clause, printer);
-    }
-
-    // Handle set operations (UNION, INTERSECT, EXCEPT)
-    for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            match token.kind() {
-                SyntaxKind::UNION_KW | SyntaxKind::INTERSECT_KW | SyntaxKind::EXCEPT_KW => {
-                    printer.newline();
-                    printer.write_keyword(token.text());
-                    printer.space();
+            cstree::util::NodeOrToken::Node(child) => {
+                let kind = child.kind();
+                match kind {
+                    SyntaxKind::WITH_CLAUSE => {
+                        // Already handled above
+                    }
+                    SyntaxKind::SELECT_CLAUSE => {
+                        format_select_clause(&child, printer);
+                    }
+                    SyntaxKind::SELECT_ITEM_LIST => {
+                        let items = children_of_kind(&child, SyntaxKind::SELECT_ITEM);
+                        format_select_items(&items, printer);
+                    }
+                    SyntaxKind::FROM_CLAUSE => {
+                        format_from_clause(&child, printer);
+                    }
+                    SyntaxKind::WHERE_CLAUSE => {
+                        format_where_clause(&child, printer);
+                    }
+                    SyntaxKind::GROUP_BY_CLAUSE => {
+                        format_group_by_clause(&child, printer);
+                    }
+                    SyntaxKind::HAVING_CLAUSE => {
+                        format_having_clause(&child, printer);
+                    }
+                    SyntaxKind::ORDER_BY_CLAUSE => {
+                        format_order_by_clause(&child, printer);
+                    }
+                    SyntaxKind::LIMIT_CLAUSE => {
+                        format_limit_clause(&child, printer);
+                    }
+                    SyntaxKind::OFFSET_CLAUSE => {
+                        format_offset_clause(&child, printer);
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
     }
@@ -115,11 +116,11 @@ fn format_with_clause(node: &SyntaxNode, printer: &mut Printer) {
 
     // Check for RECURSIVE
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::RECURSIVE_KW {
-                printer.write_keyword("RECURSIVE");
-                printer.space();
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == SyntaxKind::RECURSIVE_KW
+        {
+            printer.write_keyword("RECURSIVE");
+            printer.space();
         }
     }
 
@@ -145,19 +146,26 @@ fn format_cte(node: &SyntaxNode, printer: &mut Printer) {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
                 if child.kind() == SyntaxKind::SUBQUERY || child.kind() == SyntaxKind::SELECT_STMT {
-                    printer.write("(");
+                    // The parentheses are separate tokens (L_PAREN, R_PAREN) at the CTE level,
+                    // so we just format the SELECT_STMT without adding extra parentheses.
                     printer.newline();
                     printer.indent();
                     format_select(&child, printer);
                     printer.dedent();
                     printer.newline();
-                    printer.write(")");
                 } else {
                     format_children(&child, printer);
                 }
             }
             cstree::util::NodeOrToken::Token(token) => {
-                format_token(&token, printer);
+                let kind = token.kind();
+                if kind == SyntaxKind::L_PAREN {
+                    printer.write("(");
+                } else if kind == SyntaxKind::R_PAREN {
+                    printer.write(")");
+                } else {
+                    format_token(&token, printer);
+                }
             }
         }
     }
@@ -200,14 +208,12 @@ fn format_select_items(items: &[SyntaxNode], printer: &mut Printer) {
         if i > 0 {
             match comma_style {
                 CommaStyle::Trailing => {
+                    // sqlstyle.guide: comma followed by space, keep on same line
                     printer.write(",");
-                    printer.newline();
-                    if river_alignment {
-                        // Align with first column (after SELECT)
-                        printer.spaces(river_width + 1);
-                    }
+                    printer.space();
                 }
                 CommaStyle::Leading => {
+                    // Leading comma style: newline then comma
                     printer.newline();
                     if river_alignment {
                         // Right-align comma
@@ -389,7 +395,7 @@ fn format_alias(node: &SyntaxNode, printer: &mut Printer) {
 /// The JOIN_EXPR structure is left-associative:
 /// - For multiple JOINs: JOIN_EXPR(JOIN_EXPR(table1, join, table2), join, table3)
 /// - The inner JOIN_EXPR is the left side, the outer adds another join
-fn format_join_expr(node: &SyntaxNode, printer: &mut Printer, is_first: bool) {
+fn format_join_expr(node: &SyntaxNode, printer: &mut Printer, _is_first: bool) {
     // Check if the first child is a nested JOIN_EXPR
     let first_child = node.children().next();
     let has_nested_join = first_child
@@ -399,7 +405,7 @@ fn format_join_expr(node: &SyntaxNode, printer: &mut Printer, is_first: bool) {
     if has_nested_join {
         // Recursively format the nested join first
         if let Some(nested_join) = first_child {
-            format_join_expr(&nested_join, printer, is_first);
+            format_join_expr(&nested_join, printer, _is_first);
         }
     } else {
         // No nested join - format the left table (first TABLE_REF)
@@ -936,11 +942,11 @@ pub fn format_create_table(node: &SyntaxNode, printer: &mut Printer) {
 
     // Check for TEMP/TEMPORARY
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::TEMP_KW || token.kind() == SyntaxKind::TEMPORARY_KW {
-                printer.write_keyword(token.text());
-                printer.space();
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && (token.kind() == SyntaxKind::TEMP_KW || token.kind() == SyntaxKind::TEMPORARY_KW)
+        {
+            printer.write_keyword(token.text());
+            printer.space();
         }
     }
 
@@ -949,15 +955,15 @@ pub fn format_create_table(node: &SyntaxNode, printer: &mut Printer) {
 
     // Check for IF NOT EXISTS
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::IF_KW {
-                printer.write_keyword("IF");
-                printer.space();
-                printer.write_keyword("NOT");
-                printer.space();
-                printer.write_keyword("EXISTS");
-                printer.space();
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == SyntaxKind::IF_KW
+        {
+            printer.write_keyword("IF");
+            printer.space();
+            printer.write_keyword("NOT");
+            printer.space();
+            printer.write_keyword("EXISTS");
+            printer.space();
         }
     }
 
