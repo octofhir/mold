@@ -1,0 +1,61 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..94
+  SELECT_STMT@0..94
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..88
+      SELECT_ITEM@7..88
+        FUNC_CALL@7..88
+          FUNC_CALL@7..14
+            SUM_KW@7..10 "SUM"
+            L_PAREN@10..11 "("
+            COLUMN_REF@11..12
+              IDENT@11..12 "x"
+            R_PAREN@12..13 ")"
+            WHITESPACE@13..14 " "
+          OVER_CLAUSE@14..88
+            OVER_KW@14..18 "OVER"
+            WHITESPACE@18..19 " "
+            L_PAREN@19..20 "("
+            ORDER_BY_CLAUSE@20..32
+              ORDER_KW@20..25 "ORDER"
+              WHITESPACE@25..26 " "
+              BY_KW@26..28 "BY"
+              WHITESPACE@28..29 " "
+              ORDER_BY_ITEM@29..32
+                COLUMN_REF@29..32
+                  IDENT@29..31 "id"
+                  WHITESPACE@31..32 " "
+            FRAME_CLAUSE@32..86
+              ROWS_KW@32..36 "ROWS"
+              WHITESPACE@36..37 " "
+              BETWEEN_KW@37..44 "BETWEEN"
+              WHITESPACE@44..45 " "
+              FRAME_BOUND@45..57
+                LITERAL@45..47
+                  INTEGER@45..46 "1"
+                  WHITESPACE@46..47 " "
+                PRECEDING_KW@47..56 "PRECEDING"
+                WHITESPACE@56..57 " "
+              AND_KW@57..60 "AND"
+              WHITESPACE@60..61 " "
+              FRAME_BOUND@61..73
+                LITERAL@61..63
+                  INTEGER@61..62 "1"
+                  WHITESPACE@62..63 " "
+                FOLLOWING_KW@63..72 "FOLLOWING"
+                WHITESPACE@72..73 " "
+              FRAME_EXCLUSION@73..86
+                EXCLUDE_KW@73..80 "EXCLUDE"
+                WHITESPACE@80..81 " "
+                GROUP_KW@81..86 "GROUP"
+            R_PAREN@86..87 ")"
+            WHITESPACE@87..88 " "
+    FROM_CLAUSE@88..94
+      FROM_KW@88..92 "FROM"
+      WHITESPACE@92..93 " "
+      TABLE_REF@93..94
+        IDENT@93..94 "t"

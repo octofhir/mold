@@ -9,6 +9,44 @@ pub struct Parser<'t> {
     pos: usize,
     events: Vec<Event>,
     fuel: u32,
+    /// Stack of parsing contexts for error messages
+    context_stack: Vec<ParseContext>,
+}
+
+/// Parsing context for better error messages
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParseContext {
+    Subquery,
+    CaseExpression,
+    #[allow(dead_code)]
+    FunctionCall,
+    ParenExpression,
+    JoinClause,
+    WithClause,
+}
+
+impl ParseContext {
+    /// Returns a human-readable name for this context.
+    pub fn name(self) -> &'static str {
+        match self {
+            ParseContext::Subquery => "subquery",
+            ParseContext::CaseExpression => "CASE expression",
+            ParseContext::FunctionCall => "function call",
+            ParseContext::ParenExpression => "parenthesized expression",
+            ParseContext::JoinClause => "JOIN clause",
+            ParseContext::WithClause => "WITH clause",
+        }
+    }
+}
+
+/// A checkpoint that can be used to rollback parser state.
+/// Created by `Parser::checkpoint()` and consumed by `Parser::rollback()`.
+#[derive(Debug, Clone)]
+pub struct Checkpoint {
+    event_len: usize,
+    pos: usize,
+    fuel: u32,
+    context_len: usize,
 }
 
 impl<'t> Parser<'t> {
@@ -19,6 +57,7 @@ impl<'t> Parser<'t> {
             pos: 0,
             events: Vec::new(),
             fuel: 256,
+            context_stack: Vec::new(),
         }
     }
 
@@ -82,6 +121,14 @@ impl<'t> Parser<'t> {
     pub fn expect(&mut self, kind: SyntaxKind) {
         if !self.eat(kind) {
             self.error(format!("expected {:?}", kind));
+        }
+    }
+
+    /// Expects a token, including nesting context in error messages.
+    #[allow(dead_code)]
+    pub fn expect_with_context(&mut self, kind: SyntaxKind) {
+        if !self.eat(kind) {
+            self.error_with_context(format!("expected {:?}", kind));
         }
     }
 
@@ -176,6 +223,85 @@ impl<'t> Parser<'t> {
             self.bump_any();
         }
         m.complete(self, SyntaxKind::ERROR);
+    }
+
+    /// Create a checkpoint to potentially rollback to.
+    /// Use with `rollback()` or `try_parse()` for speculative parsing.
+    pub fn checkpoint(&self) -> Checkpoint {
+        Checkpoint {
+            event_len: self.events.len(),
+            pos: self.pos,
+            fuel: self.fuel,
+            context_len: self.context_stack.len(),
+        }
+    }
+
+    /// Rollback to a previous checkpoint, discarding all events and
+    /// token consumption since the checkpoint was created.
+    pub fn rollback(&mut self, checkpoint: Checkpoint) {
+        self.events.truncate(checkpoint.event_len);
+        self.pos = checkpoint.pos;
+        self.fuel = checkpoint.fuel;
+        self.context_stack.truncate(checkpoint.context_len);
+    }
+
+    /// Push a parsing context onto the stack.
+    pub fn push_context(&mut self, ctx: ParseContext) {
+        self.context_stack.push(ctx);
+    }
+
+    /// Pop a parsing context from the stack.
+    pub fn pop_context(&mut self) {
+        self.context_stack.pop();
+    }
+
+    /// Get the current parsing context (innermost).
+    #[allow(dead_code)]
+    pub fn current_context(&self) -> Option<ParseContext> {
+        self.context_stack.last().copied()
+    }
+
+    /// Format an error message with nesting context.
+    pub fn error_with_context(&mut self, msg: impl Into<String>) {
+        let msg = msg.into();
+        let context_msg = if self.context_stack.is_empty() {
+            msg
+        } else {
+            let context_names: Vec<&str> = self.context_stack.iter().map(|c| c.name()).collect();
+            format!("{} (in {})", msg, context_names.join(" > "))
+        };
+        self.events.push(Event::Error { msg: context_msg });
+    }
+
+    /// Try parsing with a function. If the function returns None,
+    /// automatically rollback to the state before the call.
+    /// Returns the result of the parsing function.
+    #[allow(dead_code)]
+    pub fn try_parse<F, T>(&mut self, f: F) -> Option<T>
+    where
+        F: FnOnce(&mut Self) -> Option<T>,
+    {
+        let cp = self.checkpoint();
+        match f(self) {
+            Some(result) => Some(result),
+            None => {
+                self.rollback(cp);
+                None
+            }
+        }
+    }
+
+    /// Check if parsing from the current position would succeed.
+    /// Does not consume any tokens - always rolls back.
+    #[allow(dead_code)]
+    pub fn lookahead<F>(&mut self, f: F) -> bool
+    where
+        F: FnOnce(&mut Self) -> bool,
+    {
+        let cp = self.checkpoint();
+        let result = f(self);
+        self.rollback(cp);
+        result
     }
 
     #[allow(dead_code)]

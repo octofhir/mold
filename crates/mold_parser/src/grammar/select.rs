@@ -1,8 +1,26 @@
-use crate::parser::Parser;
+use crate::parser::{ParseContext, Parser};
+use crate::token_set::TokenSet;
 use mold_syntax::SyntaxKind;
 
 use super::expressions::expr;
-use super::{CLAUSE_RECOVERY, JOIN_RECOVERY, PAREN_RECOVERY};
+use super::{CLAUSE_RECOVERY, JOIN_RECOVERY, PAREN_RECOVERY, SUBQUERY_RECOVERY};
+
+/// Checks if the current token is an identifier (IDENT or QUOTED_IDENT).
+pub fn at_ident(p: &Parser<'_>) -> bool {
+    matches!(
+        p.current(),
+        SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT
+    )
+}
+
+/// Expects an identifier (IDENT or QUOTED_IDENT), with recovery on failure.
+pub fn expect_ident(p: &mut Parser<'_>, recovery: TokenSet) {
+    if at_ident(p) {
+        p.bump();
+    } else {
+        p.expect_recover(SyntaxKind::IDENT, recovery);
+    }
+}
 
 pub fn select_stmt(p: &mut Parser<'_>) {
     let m = p.start();
@@ -99,6 +117,7 @@ fn select_core(p: &mut Parser<'_>) {
 fn with_clause(p: &mut Parser<'_>) {
     let m = p.start();
     p.bump(); // WITH
+    p.push_context(ParseContext::WithClause);
     p.eat(SyntaxKind::RECURSIVE_KW);
 
     cte(p);
@@ -106,6 +125,7 @@ fn with_clause(p: &mut Parser<'_>) {
         cte(p);
     }
 
+    p.pop_context();
     m.complete(p, SyntaxKind::WITH_CLAUSE);
 }
 
@@ -196,7 +216,9 @@ fn from_clause(p: &mut Parser<'_>) {
     m.complete(p, SyntaxKind::FROM_CLAUSE);
 }
 
-fn table_ref(p: &mut Parser<'_>) {
+/// Parse a table reference (table name, subquery, or joined tables).
+/// Used in FROM clauses for SELECT, UPDATE, and DELETE statements.
+pub fn table_ref(p: &mut Parser<'_>) {
     let m = p.start();
 
     // LATERAL
@@ -209,20 +231,23 @@ fn table_ref(p: &mut Parser<'_>) {
     if p.at(SyntaxKind::L_PAREN) {
         p.bump();
         if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
-            select_stmt(p);
+            // Subquery with isolated recovery
+            p.push_context(ParseContext::Subquery);
+            parse_subquery_in_from(p);
+            p.pop_context();
         } else {
             // Joined table in parens
             table_ref(p);
         }
         p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     } else {
-        // Table name or function call
-        p.expect_recover(SyntaxKind::IDENT, JOIN_RECOVERY);
+        // Table name or function call (supports both IDENT and QUOTED_IDENT)
+        expect_ident(p, JOIN_RECOVERY);
 
         // Schema qualification
         if p.at(SyntaxKind::DOT) {
             p.bump();
-            p.expect(SyntaxKind::IDENT);
+            expect_ident(p, JOIN_RECOVERY);
         }
 
         // Function call in FROM clause
@@ -238,28 +263,25 @@ fn table_ref(p: &mut Parser<'_>) {
         }
     }
 
-    // Alias
+    // Alias (supports both IDENT and QUOTED_IDENT)
     if p.eat(SyntaxKind::AS_KW) {
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, JOIN_RECOVERY);
         // Column aliases for functions: AS alias(col1, col2)
         if p.at(SyntaxKind::L_PAREN) {
             p.bump();
-            p.expect(SyntaxKind::IDENT);
+            expect_ident(p, PAREN_RECOVERY);
             while p.eat(SyntaxKind::COMMA) {
-                p.expect(SyntaxKind::IDENT);
+                expect_ident(p, PAREN_RECOVERY);
             }
             p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         }
-    } else if p.at(SyntaxKind::IDENT)
-        && !is_join_keyword(p.current())
-        && !is_clause_keyword(p.current())
-    {
+    } else if at_ident(p) && !is_join_keyword(p.current()) && !is_clause_keyword(p.current()) {
         p.bump();
         if p.at(SyntaxKind::L_PAREN) {
             p.bump();
-            p.expect(SyntaxKind::IDENT);
+            expect_ident(p, PAREN_RECOVERY);
             while p.eat(SyntaxKind::COMMA) {
-                p.expect(SyntaxKind::IDENT);
+                expect_ident(p, PAREN_RECOVERY);
             }
             p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
         }
@@ -310,6 +332,7 @@ fn join_expr(
     lhs: crate::parser::CompletedMarker,
 ) -> crate::parser::CompletedMarker {
     let m = lhs.precede(p);
+    p.push_context(ParseContext::JoinClause);
 
     // NATURAL
     let natural = p.eat(SyntaxKind::NATURAL_KW);
@@ -361,6 +384,7 @@ fn join_expr(
         }
     }
 
+    p.pop_context();
     m.complete(p, SyntaxKind::JOIN_EXPR)
 }
 
@@ -489,9 +513,29 @@ fn for_clause(p: &mut Parser<'_>) {
     m.complete(p, SyntaxKind::FOR_CLAUSE);
 }
 
-fn is_clause_keyword(kind: SyntaxKind) -> bool {
+/// Parse a subquery in FROM clause with isolated error recovery.
+fn parse_subquery_in_from(p: &mut Parser<'_>) {
+    select_stmt(p);
+
+    // If we're not at R_PAREN after parsing, recover within subquery bounds
+    if !p.at(SyntaxKind::R_PAREN) && !p.at_end() {
+        if !p.at_set(SUBQUERY_RECOVERY) {
+            let em = p.start();
+            p.error_with_context("unexpected tokens in subquery");
+            while !p.at_end() && !p.at_set(SUBQUERY_RECOVERY) && !p.at(SyntaxKind::R_PAREN) {
+                p.bump_any();
+            }
+            em.complete(p, SyntaxKind::ERROR);
+        }
+    }
+}
+
+/// Check if a token is a clause keyword that shouldn't be treated as an alias.
+/// Includes keywords for SELECT, UPDATE, and DELETE statements.
+pub fn is_clause_keyword(kind: SyntaxKind) -> bool {
     matches!(
         kind,
+        // SELECT clause keywords
         SyntaxKind::FROM_KW
             | SyntaxKind::WHERE_KW
             | SyntaxKind::GROUP_KW
@@ -505,5 +549,9 @@ fn is_clause_keyword(kind: SyntaxKind) -> bool {
             | SyntaxKind::INTERSECT_KW
             | SyntaxKind::EXCEPT_KW
             | SyntaxKind::WINDOW_KW
+            // UPDATE/DELETE clause keywords
+            | SyntaxKind::SET_KW
+            | SyntaxKind::RETURNING_KW
+            | SyntaxKind::USING_KW
     )
 }

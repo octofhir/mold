@@ -2,6 +2,6 @@
 source: crates/mold_format/tests/snapshots.rs
 expression: formatted
 ---
-    SELECT *
-      FROM users
-     WHERE id IN (SELECT user_idFROM ordersWHERE total > 100)
+SELECT *
+  FROM users
+ WHERE id IN ( SELECT user_id FROM orders WHERE total > 100)

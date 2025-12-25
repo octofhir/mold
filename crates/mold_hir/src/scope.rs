@@ -176,10 +176,10 @@ impl Scope {
         // (This is handled by the scope structure - lateral tables are in scope)
 
         // Search parent scope if no local match
-        if matches.is_empty() {
-            if let Some(parent) = &self.parent {
-                return parent.resolve_unqualified_column(column);
-            }
+        if matches.is_empty()
+            && let Some(parent) = &self.parent
+        {
+            return parent.resolve_unqualified_column(column);
         }
 
         match matches.len() {
@@ -205,10 +205,11 @@ impl Scope {
         select_columns: &[ColumnBinding],
     ) -> Resolution<ColumnBinding> {
         // First, try as ordinal position
-        if let Ok(ordinal) = name.parse::<usize>() {
-            if ordinal >= 1 && ordinal <= select_columns.len() {
-                return Resolution::Resolved(select_columns[ordinal - 1].clone());
-            }
+        if let Ok(ordinal) = name.parse::<usize>()
+            && ordinal >= 1
+            && ordinal <= select_columns.len()
+        {
+            return Resolution::Resolved(select_columns[ordinal - 1].clone());
         }
 
         // Try as SELECT alias

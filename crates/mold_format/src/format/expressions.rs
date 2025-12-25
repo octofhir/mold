@@ -1,5 +1,7 @@
 //! Expression formatting.
 
+#![allow(clippy::needless_borrow)]
+
 use mold_syntax::{SyntaxKind, SyntaxNode};
 
 use crate::printer::Printer;
@@ -88,7 +90,14 @@ fn format_paren_expr(node: &SyntaxNode, printer: &mut Printer) {
 
 /// Formats a function call.
 fn format_func_call(node: &SyntaxNode, printer: &mut Printer) {
-    // Function name
+    // Check if there's an ARG_LIST node (if not, we need to handle parentheses manually)
+    let has_arg_list = node
+        .children()
+        .any(|c| c.kind() == SyntaxKind::ARG_LIST);
+
+    // Track if we're inside parentheses (for COUNT(*) case)
+    let mut in_parens = false;
+
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
@@ -109,10 +118,24 @@ fn format_func_call(node: &SyntaxNode, printer: &mut Printer) {
                 }
             }
             cstree::util::NodeOrToken::Token(token) => {
-                if token.kind() == SyntaxKind::IDENT {
+                let kind = token.kind();
+                if kind == SyntaxKind::IDENT {
                     printer.write_identifier(token.text());
-                } else if token.kind() != SyntaxKind::L_PAREN && token.kind() != SyntaxKind::R_PAREN
-                {
+                } else if kind == SyntaxKind::L_PAREN {
+                    // If no ARG_LIST, we need to write the parentheses ourselves
+                    if !has_arg_list {
+                        printer.write("(");
+                        in_parens = true;
+                    }
+                } else if kind == SyntaxKind::R_PAREN {
+                    if !has_arg_list {
+                        printer.write(")");
+                        in_parens = false;
+                    }
+                } else if kind == SyntaxKind::STAR && in_parens {
+                    // Special case: * inside function call like COUNT(*)
+                    printer.write("*");
+                } else if !kind.is_trivia() {
                     format_token(&token, printer);
                 }
             }
@@ -305,11 +328,11 @@ fn format_cast_expr(node: &SyntaxNode, printer: &mut Printer) {
     // Check for PostgreSQL :: cast syntax
     let mut is_double_colon = false;
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::DOUBLE_COLON {
-                is_double_colon = true;
-                break;
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == SyntaxKind::DOUBLE_COLON
+        {
+            is_double_colon = true;
+            break;
         }
     }
 
@@ -631,6 +654,11 @@ fn format_column_ref(node: &SyntaxNode, printer: &mut Printer) {
 fn format_literal(node: &SyntaxNode, printer: &mut Printer) {
     for element in node.children_with_tokens() {
         if let cstree::util::NodeOrToken::Token(token) = element {
+            let kind = token.kind();
+            // Skip whitespace/newlines - we control spacing
+            if kind == SyntaxKind::WHITESPACE || kind == SyntaxKind::NEWLINE {
+                continue;
+            }
             // Preserve literals exactly
             printer.write(token.text());
         }

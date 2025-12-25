@@ -2,7 +2,7 @@
 source: crates/mold_format/tests/snapshots.rs
 expression: formatted
 ---
-    SELECT *
-      FROM users
-     WHERE (active = true  AND role = 'admin')
-        OR (created_at > '2024-01-01'  AND status <> 'deleted')
+SELECT *
+  FROM users
+ WHERE (active = true AND role = 'admin')
+    OR (created_at > '2024-01-01' AND status <> 'deleted')

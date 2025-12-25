@@ -1,0 +1,75 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..129
+  UPDATE_STMT@0..129
+    UPDATE_KW@0..6 "UPDATE"
+    WHITESPACE@6..7 " "
+    TABLE_REF@7..13
+      IDENT@7..12 "users"
+      WHITESPACE@12..13 " "
+    IDENT@13..14 "u"
+    WHITESPACE@14..15 " "
+    SET_CLAUSE@15..45
+      SET_KW@15..18 "SET"
+      WHITESPACE@18..19 " "
+      SET_ITEM@19..45
+        IDENT@19..29 "last_order"
+        WHITESPACE@29..30 " "
+        EQ@30..31 "="
+        WHITESPACE@31..32 " "
+        COLUMN_REF@32..45
+          IDENT@32..33 "o"
+          DOT@33..34 "."
+          IDENT@34..44 "created_at"
+          WHITESPACE@44..45 " "
+    FROM_CLAUSE@45..107
+      FROM_KW@45..49 "FROM"
+      WHITESPACE@49..50 " "
+      JOIN_EXPR@50..107
+        TABLE_REF@50..59
+          IDENT@50..56 "orders"
+          WHITESPACE@56..57 " "
+          IDENT@57..58 "o"
+          WHITESPACE@58..59 " "
+        INNER_KW@59..64 "INNER"
+        WHITESPACE@64..65 " "
+        JOIN_KW@65..69 "JOIN"
+        WHITESPACE@69..70 " "
+        TABLE_REF@70..85
+          IDENT@70..81 "order_items"
+          WHITESPACE@81..82 " "
+          IDENT@82..84 "oi"
+          WHITESPACE@84..85 " "
+        ON_KW@85..87 "ON"
+        WHITESPACE@87..88 " "
+        JOIN_CONDITION@88..107
+          BINARY_EXPR@88..107
+            COLUMN_REF@88..93
+              IDENT@88..89 "o"
+              DOT@89..90 "."
+              IDENT@90..92 "id"
+              WHITESPACE@92..93 " "
+            EQ@93..94 "="
+            WHITESPACE@94..95 " "
+            COLUMN_REF@95..107
+              IDENT@95..97 "oi"
+              DOT@97..98 "."
+              IDENT@98..106 "order_id"
+              WHITESPACE@106..107 " "
+    WHERE_CLAUSE@107..129
+      WHERE_KW@107..112 "WHERE"
+      WHITESPACE@112..113 " "
+      BINARY_EXPR@113..129
+        COLUMN_REF@113..118
+          IDENT@113..114 "u"
+          DOT@114..115 "."
+          IDENT@115..117 "id"
+          WHITESPACE@117..118 " "
+        EQ@118..119 "="
+        WHITESPACE@119..120 " "
+        COLUMN_REF@120..129
+          IDENT@120..121 "o"
+          DOT@121..122 "."
+          IDENT@122..129 "user_id"

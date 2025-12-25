@@ -3,6 +3,8 @@
 //! Analyzes the cursor position in a parse tree to determine
 //! what kind of completions are appropriate.
 
+#![allow(clippy::needless_borrow)]
+
 use mold_syntax::{Parse, SyntaxKind, SyntaxNode, SyntaxToken};
 use std::collections::HashMap;
 use text_size::TextSize;
@@ -75,26 +77,26 @@ fn detect_context_from_token_and_node(
         return detect_jsonb_context(token, node);
     }
 
-    if matches!(token_kind, SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT) {
-        if let Some(ctx) = detect_table_context_from_token(token) {
-            return ctx;
-        }
+    if matches!(token_kind, SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT)
+        && let Some(ctx) = detect_table_context_from_token(token)
+    {
+        return ctx;
     }
 
-    if token_kind == SyntaxKind::DOT {
-        if let Some(table) = find_table_qualifier(token, node) {
-            return CompletionContext::ColumnRef {
-                table: Some(table),
-                tables: find_tables_in_scope(node),
-            };
-        }
+    if token_kind == SyntaxKind::DOT
+        && let Some(table) = find_table_qualifier(token, node)
+    {
+        return CompletionContext::ColumnRef {
+            table: Some(table),
+            tables: find_tables_in_scope(node),
+        };
     }
 
     // Check for function argument context
-    if node_kind == SyntaxKind::ARG_LIST || node_kind == SyntaxKind::FUNC_CALL {
-        if let Some(ctx) = detect_function_arg_context(node) {
-            return ctx;
-        }
+    if (node_kind == SyntaxKind::ARG_LIST || node_kind == SyntaxKind::FUNC_CALL)
+        && let Some(ctx) = detect_function_arg_context(node)
+    {
+        return ctx;
     }
 
     // Check by parent node type
@@ -121,16 +123,17 @@ fn is_jsonb_context(token_kind: SyntaxKind, node: &SyntaxNode) -> bool {
     if token_kind.is_jsonb_operator() {
         return true;
     }
-
     node.ancestors().any(is_jsonb_expr)
 }
 
 /// Detects JSONB completion context.
 fn detect_jsonb_context(_token: &SyntaxToken, node: &SyntaxNode) -> CompletionContext {
-    // Extract the table, column and current path from the JSONB expression
     let (table, column, path) = extract_jsonb_path_with_table(node);
-
-    CompletionContext::JsonbField { table, column, path }
+    CompletionContext::JsonbField {
+        table,
+        column,
+        path,
+    }
 }
 
 /// Extracts the table, column name and path from a JSONB access expression.
@@ -154,10 +157,10 @@ fn extract_jsonb_path_with_table(node: &SyntaxNode) -> (Option<String>, String, 
 fn extract_qualified_column(node: &SyntaxNode) -> (Option<String>, String) {
     let mut parts = Vec::new();
     for child in node.children_with_tokens() {
-        if let Some(token) = child.as_token() {
-            if token.kind() == SyntaxKind::IDENT || token.kind() == SyntaxKind::QUOTED_IDENT {
-                parts.push(token.text().to_string());
-            }
+        if let Some(token) = child.as_token()
+            && (token.kind() == SyntaxKind::IDENT || token.kind() == SyntaxKind::QUOTED_IDENT)
+        {
+            parts.push(token.text().to_string());
         }
     }
 
@@ -172,7 +175,7 @@ fn extract_qualified_column(node: &SyntaxNode) -> (Option<String>, String) {
 }
 
 /// Extracts a column name from a COLUMN_REF node (unqualified).
-#[cfg(test)]
+#[allow(dead_code)]
 fn extract_column_name(node: &SyntaxNode) -> String {
     extract_qualified_column(node).1
 }
@@ -192,6 +195,18 @@ fn has_jsonb_operator(node: &SyntaxNode) -> bool {
     node.children_with_tokens()
         .filter_map(|child| child.into_token())
         .any(|token| token.kind().is_jsonb_operator())
+}
+
+/// Checks if the node contains a #> or #>> path operator.
+fn has_path_operator(node: &SyntaxNode) -> bool {
+    node.children_with_tokens()
+        .filter_map(|child| child.into_token())
+        .any(|token| {
+            matches!(
+                token.kind(),
+                SyntaxKind::HASH_ARROW | SyntaxKind::HASH_ARROW_TEXT
+            )
+        })
 }
 
 fn collect_jsonb_chain(
@@ -227,10 +242,86 @@ fn collect_jsonb_chain(
     // Recurse into left side (base expression - either column ref or nested JSONB expr)
     collect_jsonb_chain(lhs, table, column, path);
 
-    // Right side is the accessor - extract the key or index
+    // Check if this is a #> or #>> operator with path array syntax
+    // e.g., resource #> '{name,0,family}'
+    // The parser produces BINARY_EXPR for these operators, not JSONB_PATH_EXPR
+    if node.kind() == SyntaxKind::JSONB_PATH_EXPR || has_path_operator(node) {
+        if let Some(path_segments) = extract_path_array_literal(rhs) {
+            path.extend(path_segments);
+        }
+        return;
+    }
+
+    // Right side could be a literal (simple accessor) or another BINARY_EXPR (nested chain)
     if let Some(key) = extract_accessor_key(rhs) {
         path.push(key);
+    } else if is_jsonb_expr(rhs) {
+        // Right side is a nested JSONB chain (right-associative tree)
+        // e.g., for `col->'a'->'b'->'c'`, rhs might be `'a'->'b'->'c'`
+        collect_right_chain_keys(rhs, path);
     }
+}
+
+/// Extracts path segments from a PostgreSQL text array literal.
+/// e.g., `'{name,0,family}'` -> ["name", "0", "family"]
+/// e.g., `'{name, 0, family}'` -> ["name", "0", "family"] (with spaces)
+fn extract_path_array_literal(node: &SyntaxNode) -> Option<Vec<String>> {
+    // Look for a STRING token in the node (the path array is a string literal)
+    for child in node.descendants_with_tokens() {
+        if let Some(token) = child.as_token() {
+            if token.kind() == SyntaxKind::STRING {
+                let text = token.text();
+                return Some(parse_path_array_string(text));
+            }
+        }
+    }
+    None
+}
+
+/// Parses a PostgreSQL path array string.
+/// e.g., `'{name,0,family}'` -> ["name", "0", "family"]
+fn parse_path_array_string(s: &str) -> Vec<String> {
+    // Remove surrounding quotes and braces
+    let s = s.trim();
+    let s = s.trim_matches('\'');
+    let s = s.trim_matches('{').trim_matches('}');
+
+    if s.is_empty() {
+        return Vec::new();
+    }
+
+    // Split by comma and trim whitespace
+    s.split(',')
+        .map(|part| part.trim().to_string())
+        .filter(|part| !part.is_empty())
+        .collect()
+}
+
+/// Collects all keys from a right-associative JSONB chain.
+/// For `'a'->'b'->'c'`, this collects ["a", "b", "c"].
+fn collect_right_chain_keys(node: &SyntaxNode, path: &mut Vec<String>) {
+    if !is_jsonb_expr(node) {
+        // Base case: try to extract literal key
+        if let Some(key) = extract_accessor_key(node) {
+            path.push(key);
+        }
+        return;
+    }
+
+    // Extract children
+    let children: Vec<_> = node.children().collect();
+    let (lhs, rhs) = match children.as_slice() {
+        [left, right] => (left, right),
+        _ => return,
+    };
+
+    // Extract key from left side (the current accessor)
+    if let Some(key) = extract_accessor_key(lhs) {
+        path.push(key);
+    }
+
+    // Recurse into right side for remaining keys
+    collect_right_chain_keys(rhs, path);
 }
 
 /// Extracts the accessor key from a JSONB access expression's right-hand side.
@@ -252,10 +343,10 @@ fn extract_accessor_key(node: &SyntaxNode) -> Option<String> {
 /// Extracts an integer value from a LITERAL node (for array index access).
 fn extract_literal_integer(node: &SyntaxNode) -> Option<String> {
     for child in node.children_with_tokens() {
-        if let Some(token) = child.as_token() {
-            if token.kind() == SyntaxKind::INTEGER {
-                return Some(token.text().to_string());
-            }
+        if let Some(token) = child.as_token()
+            && token.kind() == SyntaxKind::INTEGER
+        {
+            return Some(token.text().to_string());
         }
     }
     None
@@ -263,11 +354,11 @@ fn extract_literal_integer(node: &SyntaxNode) -> Option<String> {
 
 fn extract_literal_string(node: &SyntaxNode) -> Option<String> {
     for child in node.children_with_tokens() {
-        if let Some(token) = child.as_token() {
-            if token.kind() == SyntaxKind::STRING {
-                let text = token.text();
-                return Some(text.trim_matches('\'').to_string());
-            }
+        if let Some(token) = child.as_token()
+            && token.kind() == SyntaxKind::STRING
+        {
+            let text = token.text();
+            return Some(text.trim_matches('\'').to_string());
         }
     }
     None
@@ -286,11 +377,11 @@ fn detect_function_arg_context(node: &SyntaxNode) -> Option<CompletionContext> {
 
     let mut function_name = String::new();
     for child in func_call.children_with_tokens() {
-        if let Some(token) = child.as_token() {
-            if token.kind() == SyntaxKind::IDENT {
-                function_name = token.text().to_string();
-                break;
-            }
+        if let Some(token) = child.as_token()
+            && token.kind() == SyntaxKind::IDENT
+        {
+            function_name = token.text().to_string();
+            break;
         }
     }
 
@@ -306,10 +397,10 @@ fn detect_function_arg_context(node: &SyntaxNode) -> Option<CompletionContext> {
 
     let mut arg_index = 0;
     for child in arg_list.children_with_tokens() {
-        if let Some(token) = child.as_token() {
-            if token.kind() == SyntaxKind::COMMA {
-                arg_index += 1;
-            }
+        if let Some(token) = child.as_token()
+            && token.kind() == SyntaxKind::COMMA
+        {
+            arg_index += 1;
         }
     }
 
@@ -338,14 +429,12 @@ fn find_schema_prefix(token: &SyntaxToken) -> Option<String> {
     // Look for pattern: IDENT DOT <cursor>
     let mut prev = token.prev_token();
     while let Some(t) = prev {
-        if t.kind() == SyntaxKind::DOT {
-            // Look for the schema name before the dot
-            if let Some(ident) = t.prev_token() {
-                if ident.kind() == SyntaxKind::IDENT || ident.kind() == SyntaxKind::QUOTED_IDENT {
-                    return Some(ident.text().to_string());
-                }
-            }
-        } else if !t.kind().is_trivia() {
+        if t.kind() == SyntaxKind::DOT
+            && let Some(ident) = t.prev_token()
+            && (ident.kind() == SyntaxKind::IDENT || ident.kind() == SyntaxKind::QUOTED_IDENT)
+        {
+            return Some(ident.text().to_string());
+        } else if t.kind() != SyntaxKind::DOT && !t.kind().is_trivia() {
             break;
         }
         prev = t.prev_token();
@@ -376,10 +465,10 @@ fn find_join_tables(node: &SyntaxNode) -> (String, String) {
     if let Some(join) = join_expr {
         let mut tables = Vec::new();
         for child in join.children() {
-            if child.kind() == SyntaxKind::TABLE_REF || child.kind() == SyntaxKind::TABLE_NAME {
-                if let Some(name) = extract_table_name(&child) {
-                    tables.push(name);
-                }
+            if (child.kind() == SyntaxKind::TABLE_REF || child.kind() == SyntaxKind::TABLE_NAME)
+                && let Some(name) = extract_table_name(&child)
+            {
+                tables.push(name);
             }
         }
         if tables.len() >= 2 {
@@ -490,7 +579,10 @@ fn resolve_table_alias(node: &SyntaxNode, table: &str) -> String {
     };
 
     let alias_map = collect_aliases(&select);
-    alias_map.get(table).cloned().unwrap_or_else(|| table.to_string())
+    alias_map
+        .get(table)
+        .cloned()
+        .unwrap_or_else(|| table.to_string())
 }
 
 fn collect_aliases(select: &SyntaxNode) -> HashMap<String, String> {
@@ -501,8 +593,12 @@ fn collect_aliases(select: &SyntaxNode) -> HashMap<String, String> {
             continue;
         }
 
-        let table_node = node.children().find(|child| child.kind() == SyntaxKind::TABLE_NAME);
-        let alias_node = node.children().find(|child| child.kind() == SyntaxKind::ALIAS);
+        let table_node = node
+            .children()
+            .find(|child| child.kind() == SyntaxKind::TABLE_NAME);
+        let alias_node = node
+            .children()
+            .find(|child| child.kind() == SyntaxKind::ALIAS);
 
         let Some(table_node) = table_node else {
             continue;
@@ -521,7 +617,10 @@ fn collect_aliases(select: &SyntaxNode) -> HashMap<String, String> {
 
 fn extract_table_name_tokens(node: &SyntaxNode) -> Option<String> {
     let mut name = String::new();
-    for token in node.children_with_tokens().filter_map(|child| child.into_token()) {
+    for token in node
+        .children_with_tokens()
+        .filter_map(|child| child.into_token())
+    {
         match token.kind() {
             SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT => {
                 name.push_str(token.text());
@@ -533,15 +632,14 @@ fn extract_table_name_tokens(node: &SyntaxNode) -> Option<String> {
         }
     }
 
-    if name.is_empty() {
-        None
-    } else {
-        Some(name)
-    }
+    if name.is_empty() { None } else { Some(name) }
 }
 
 fn extract_ident_token(node: &SyntaxNode) -> Option<String> {
-    for token in node.children_with_tokens().filter_map(|child| child.into_token()) {
+    for token in node
+        .children_with_tokens()
+        .filter_map(|child| child.into_token())
+    {
         if token.kind() == SyntaxKind::IDENT || token.kind() == SyntaxKind::QUOTED_IDENT {
             return Some(token.text().to_string());
         }
@@ -580,12 +678,11 @@ fn find_tables_in_scope(node: &SyntaxNode) -> Vec<String> {
 /// Collects table names from a FROM clause.
 fn collect_tables_from_clause(from_clause: &SyntaxNode, tables: &mut Vec<String>) {
     for child in from_clause.descendants() {
-        if child.kind() == SyntaxKind::TABLE_REF || child.kind() == SyntaxKind::TABLE_NAME {
-            if let Some(name) = extract_table_name(&child) {
-                if !tables.contains(&name) {
-                    tables.push(name);
-                }
-            }
+        if (child.kind() == SyntaxKind::TABLE_REF || child.kind() == SyntaxKind::TABLE_NAME)
+            && let Some(name) = extract_table_name(&child)
+            && !tables.contains(&name)
+        {
+            tables.push(name);
         }
     }
 }
@@ -613,10 +710,10 @@ pub fn collect_cte_info(with_clause: &SyntaxNode) -> Vec<CteInfo> {
     let mut ctes = Vec::new();
 
     for child in with_clause.descendants() {
-        if child.kind() == SyntaxKind::CTE {
-            if let Some(info) = extract_cte_info(&child) {
-                ctes.push(info);
-            }
+        if child.kind() == SyntaxKind::CTE
+            && let Some(info) = extract_cte_info(&child)
+        {
+            ctes.push(info);
         }
     }
 
@@ -694,10 +791,10 @@ fn extract_select_output_columns(select: &SyntaxNode) -> Vec<String> {
 
     // Iterate SELECT_ITEMs
     for item in item_list.children() {
-        if item.kind() == SyntaxKind::SELECT_ITEM {
-            if let Some(col_name) = extract_select_item_name(&item) {
-                columns.push(col_name);
-            }
+        if item.kind() == SyntaxKind::SELECT_ITEM
+            && let Some(col_name) = extract_select_item_name(&item)
+        {
+            columns.push(col_name);
         }
     }
 
@@ -736,7 +833,10 @@ fn extract_select_item_name(item: &SyntaxNode) -> Option<String> {
     }
 
     // Fallback: look for any IDENT in the item
-    for token in item.descendants_with_tokens().filter_map(|c| c.into_token()) {
+    for token in item
+        .descendants_with_tokens()
+        .filter_map(|c| c.into_token())
+    {
         if token.kind() == SyntaxKind::IDENT {
             return Some(token.text().to_string());
         }
@@ -794,10 +894,11 @@ fn detect_from_token(token: &SyntaxToken, offset: TextSize) -> CompletionContext
     // If we're at the end of a token, consider what comes next
     let at_token_end = range.end() == offset;
 
-    if matches!(kind, SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT) && at_token_end {
-        if let Some(ctx) = detect_table_context_from_token(token) {
-            return ctx;
-        }
+    if matches!(kind, SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT)
+        && at_token_end
+        && let Some(ctx) = detect_table_context_from_token(token)
+    {
+        return ctx;
     }
 
     // Check for incomplete keyword
@@ -863,7 +964,10 @@ fn detect_table_context_from_token(token: &SyntaxToken) -> Option<CompletionCont
             continue;
         }
 
-        if matches!(t.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT | SyntaxKind::DOT) {
+        if matches!(
+            t.kind(),
+            SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT | SyntaxKind::DOT
+        ) {
             prev = t.prev_token();
             continue;
         }
@@ -1054,10 +1158,7 @@ fn is_after_partition_or_order_by(token: &SyntaxToken) -> bool {
                     before_by = bt.prev_token();
                     continue;
                 }
-                return matches!(
-                    bt.kind(),
-                    SyntaxKind::PARTITION_KW | SyntaxKind::ORDER_KW
-                );
+                return matches!(bt.kind(), SyntaxKind::PARTITION_KW | SyntaxKind::ORDER_KW);
             }
         }
         break;
@@ -1129,5 +1230,32 @@ mod tests {
     fn test_context_is_send_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<CompletionContext>();
+    }
+
+    #[test]
+    fn test_parse_path_array_string() {
+        // Standard path array
+        assert_eq!(
+            parse_path_array_string("'{name,0,family}'"),
+            vec!["name", "0", "family"]
+        );
+
+        // With spaces
+        assert_eq!(
+            parse_path_array_string("'{name, 0, family}'"),
+            vec!["name", "0", "family"]
+        );
+
+        // Single element
+        assert_eq!(parse_path_array_string("'{name}'"), vec!["name"]);
+
+        // Empty array
+        assert_eq!(parse_path_array_string("'{}'"), Vec::<String>::new());
+
+        // Without quotes (edge case)
+        assert_eq!(
+            parse_path_array_string("{name,given}"),
+            vec!["name", "given"]
+        );
     }
 }

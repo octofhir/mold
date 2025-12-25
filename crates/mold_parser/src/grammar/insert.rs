@@ -3,9 +3,9 @@
 use crate::parser::Parser;
 use mold_syntax::SyntaxKind;
 
+use super::PAREN_RECOVERY;
 use super::expressions::expr;
 use super::select::select_stmt;
-use super::PAREN_RECOVERY;
 
 /// Parse INSERT statement.
 ///

@@ -403,3 +403,150 @@ impl JsonPathExpr {
             .or_else(|| support::token(&self.0, SyntaxKind::AT_AT))
     }
 }
+
+// =============================================================================
+// JSONB Path Chain Extraction
+// =============================================================================
+
+/// A segment in a JSONB access chain.
+///
+/// Represents one step in a path like `data->'name'->>'given'`
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct JsonbPathSegment {
+    /// The key being accessed (e.g., "name", "given", or array index "0")
+    pub key: String,
+    /// The operator used for this access
+    pub operator: JsonbAccessOp,
+    /// Whether this access extracts as text (->>)
+    pub extracts_text: bool,
+}
+
+impl JsonbPathSegment {
+    /// Create a new path segment.
+    pub fn new(key: String, operator: JsonbAccessOp) -> Self {
+        let extracts_text = matches!(operator, JsonbAccessOp::ArrowText);
+        Self {
+            key,
+            operator,
+            extracts_text,
+        }
+    }
+}
+
+/// Result of extracting a JSONB access chain.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct JsonbChain {
+    /// The base column name (e.g., "resource", "data")
+    pub column: String,
+    /// Optional table qualifier (e.g., "p" in "p.resource")
+    pub table_qualifier: Option<String>,
+    /// The chain of path segments from left to right
+    pub segments: Vec<JsonbPathSegment>,
+}
+
+impl JsonbChain {
+    /// Returns the full path as a string (e.g., "name.given")
+    pub fn path_string(&self) -> String {
+        self.segments
+            .iter()
+            .map(|s| s.key.clone())
+            .collect::<Vec<_>>()
+            .join(".")
+    }
+
+    /// Returns true if the last segment extracts text (uses ->>)
+    pub fn extracts_text_at_end(&self) -> bool {
+        self.segments
+            .last()
+            .map(|s| s.extracts_text)
+            .unwrap_or(false)
+    }
+
+    /// Returns the path segments as a vector of keys
+    pub fn path_keys(&self) -> Vec<&str> {
+        self.segments.iter().map(|s| s.key.as_str()).collect()
+    }
+}
+
+impl JsonbAccessExpr {
+    /// Extract the full access chain from a JSONB expression.
+    ///
+    /// For an expression like `data->'name'->>'given'`, this returns:
+    /// - column: "data"
+    /// - segments: [("name", Arrow), ("given", ArrowText)]
+    ///
+    /// This traverses the nested JSONB access expressions from innermost
+    /// (the base column) to outermost (the final accessor).
+    pub fn extract_chain(&self) -> Option<JsonbChain> {
+        let mut segments = Vec::new();
+        let mut current_node = self.syntax().clone();
+
+        while let Some(access) = JsonbAccessExpr::cast(current_node.clone()) {
+            // Get the accessor key
+            if let Some(accessor) = access.accessor() {
+                let key = extract_accessor_key(&accessor)?;
+                let operator = access.operator().unwrap_or(JsonbAccessOp::Arrow);
+                segments.push(JsonbPathSegment::new(key, operator));
+            }
+
+            // Get the base and continue walking up
+            match access.base() {
+                Some(base) => current_node = base.syntax().clone(),
+                None => break,
+            }
+        }
+
+        // Now current_node should be the base column reference
+        let (column, table_qualifier) = extract_column_name(&current_node)?;
+
+        // Reverse segments since we collected them from outermost to innermost
+        segments.reverse();
+
+        Some(JsonbChain {
+            column,
+            table_qualifier,
+            segments,
+        })
+    }
+}
+
+/// Extract the key from a JSONB accessor expression.
+///
+/// The accessor can be:
+/// - A string literal: `'field'` → "field"
+/// - An integer literal: `0` → "0"
+/// - A more complex expression (which we can't statically analyze)
+fn extract_accessor_key(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Literal(lit) => {
+            let text = lit.text()?;
+            // Remove quotes from string literals
+            if text.starts_with('\'') && text.ends_with('\'') && text.len() >= 2 {
+                Some(text[1..text.len() - 1].to_string())
+            } else {
+                // Integer or other literal
+                Some(text)
+            }
+        }
+        Expr::ColumnRef(col_ref) => {
+            // Could be a variable reference - return the column name
+            col_ref.column().map(|t| t.text().to_string())
+        }
+        _ => None,
+    }
+}
+
+/// Extract the column name from a base expression.
+///
+/// Returns (column_name, optional_table_qualifier)
+fn extract_column_name(node: &SyntaxNode) -> Option<(String, Option<String>)> {
+    use super::expressions::ColumnRef;
+
+    if let Some(col_ref) = ColumnRef::cast(node.clone()) {
+        let column = col_ref.column()?.text().to_string();
+        let table = col_ref.table().map(|t| t.text().to_string());
+        Some((column, table))
+    } else {
+        None
+    }
+}

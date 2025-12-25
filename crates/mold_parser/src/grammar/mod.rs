@@ -119,3 +119,28 @@ pub const JOIN_RECOVERY: TokenSet = TokenSet::new(&[
     SyntaxKind::ORDER_KW,
     SyntaxKind::SEMICOLON,
 ]);
+
+/// Recovery set for CASE expressions.
+pub const CASE_RECOVERY: TokenSet = TokenSet::new(&[
+    SyntaxKind::WHEN_KW,
+    SyntaxKind::THEN_KW,
+    SyntaxKind::ELSE_KW,
+    SyntaxKind::END_KW,
+    SyntaxKind::R_PAREN,
+    SyntaxKind::COMMA,
+    SyntaxKind::FROM_KW,
+    SyntaxKind::WHERE_KW,
+    SyntaxKind::SEMICOLON,
+]);
+
+/// Recovery set for subquery boundaries.
+pub const SUBQUERY_RECOVERY: TokenSet = TokenSet::new(&[
+    SyntaxKind::SELECT_KW,
+    SyntaxKind::FROM_KW,
+    SyntaxKind::WHERE_KW,
+    SyntaxKind::GROUP_KW,
+    SyntaxKind::ORDER_KW,
+    SyntaxKind::UNION_KW,
+    SyntaxKind::R_PAREN,
+    SyntaxKind::SEMICOLON,
+]);

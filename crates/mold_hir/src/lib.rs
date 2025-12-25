@@ -46,15 +46,17 @@ pub mod scope;
 // Re-export main types
 pub use analyze::{
     Analysis, Analyzer, ColumnInfo, Diagnostic, NullSchemaProvider, RelatedInfo, ResolvedReference,
-    ResolvedTableRef, SchemaProvider, Severity, TableInfo, TableType,
+    ResolvedTableRef, SchemaProvider, Severity, TableInfo, TableType, analyze_query,
+    suggest_similar,
 };
 pub use binding::{
     ColumnBinding, CteBinding, DataType, Resolution, ResolvedColumn, TableBinding, TableSource,
 };
 pub use resolve::{
-    JsonbChild, JsonbColumnInfo, JsonbStructure, JsonbValueType, QualifiedResolution,
-    find_jsonb_columns, jsonb_access_result_type, resolve_column, resolve_cte, resolve_order_by,
-    resolve_table,
+    ColumnValidation, JsonbChainError, JsonbChainValidation, JsonbChild, JsonbColumnInfo,
+    JsonbStructure, JsonbValueType, QualifiedResolution, TableValidation, find_jsonb_columns,
+    jsonb_access_result_type, resolve_column, resolve_cte, resolve_order_by, resolve_table,
+    validate_column_reference, validate_jsonb_chain, validate_table_reference,
 };
 pub use scope::{Scope, ScopeBuilder};
 
@@ -210,5 +212,9 @@ mod tests {
         assert_send_sync::<JsonbStructure>();
         assert_send_sync::<JsonbValueType>();
         assert_send_sync::<JsonbChild>();
+        assert_send_sync::<TableValidation>();
+        assert_send_sync::<ColumnValidation>();
+        assert_send_sync::<JsonbChainError>();
+        assert_send_sync::<JsonbChainValidation>();
     }
 }

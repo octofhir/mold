@@ -1,0 +1,79 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..140
+  UPDATE_STMT@0..140
+    UPDATE_KW@0..6 "UPDATE"
+    WHITESPACE@6..7 " "
+    TABLE_REF@7..17
+      IDENT@7..16 "inventory"
+      WHITESPACE@16..17 " "
+    IDENT@17..18 "i"
+    WHITESPACE@18..19 " "
+    SET_CLAUSE@19..53
+      SET_KW@19..22 "SET"
+      WHITESPACE@22..23 " "
+      SET_ITEM@23..53
+        IDENT@23..31 "quantity"
+        WHITESPACE@31..32 " "
+        EQ@32..33 "="
+        WHITESPACE@33..34 " "
+        BINARY_EXPR@34..53
+          COLUMN_REF@34..45
+            IDENT@34..35 "i"
+            DOT@35..36 "."
+            IDENT@36..44 "quantity"
+            WHITESPACE@44..45 " "
+          MINUS@45..46 "-"
+          WHITESPACE@46..47 " "
+          COLUMN_REF@47..53
+            IDENT@47..48 "o"
+            DOT@48..49 "."
+            IDENT@49..52 "qty"
+            WHITESPACE@52..53 " "
+    FROM_CLAUSE@53..83
+      FROM_KW@53..57 "FROM"
+      WHITESPACE@57..58 " "
+      TABLE_REF@58..66
+        IDENT@58..64 "orders"
+        WHITESPACE@64..65 " "
+        IDENT@65..66 "o"
+      COMMA@66..67 ","
+      WHITESPACE@67..68 " "
+      TABLE_REF@68..83
+        IDENT@68..79 "order_items"
+        WHITESPACE@79..80 " "
+        IDENT@80..82 "oi"
+        WHITESPACE@82..83 " "
+    WHERE_CLAUSE@83..140
+      WHERE_KW@83..88 "WHERE"
+      WHITESPACE@88..89 " "
+      BINARY_EXPR@89..140
+        BINARY_EXPR@89..118
+          COLUMN_REF@89..102
+            IDENT@89..90 "i"
+            DOT@90..91 "."
+            IDENT@91..101 "product_id"
+            WHITESPACE@101..102 " "
+          EQ@102..103 "="
+          WHITESPACE@103..104 " "
+          COLUMN_REF@104..118
+            IDENT@104..106 "oi"
+            DOT@106..107 "."
+            IDENT@107..117 "product_id"
+            WHITESPACE@117..118 " "
+        AND_KW@118..121 "AND"
+        WHITESPACE@121..122 " "
+        BINARY_EXPR@122..140
+          COLUMN_REF@122..127
+            IDENT@122..123 "o"
+            DOT@123..124 "."
+            IDENT@124..126 "id"
+            WHITESPACE@126..127 " "
+          EQ@127..128 "="
+          WHITESPACE@128..129 " "
+          COLUMN_REF@129..140
+            IDENT@129..131 "oi"
+            DOT@131..132 "."
+            IDENT@132..140 "order_id"

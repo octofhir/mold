@@ -1,0 +1,54 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: format_tree(sql)
+---
+SOURCE_FILE@0..71
+  SELECT_STMT@0..71
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..9
+      SELECT_ITEM@7..9
+        STAR_EXPR@7..9
+          STAR@7..8 "*"
+          WHITESPACE@8..9 " "
+    FROM_CLAUSE@9..71
+      FROM_KW@9..13 "FROM"
+      WHITESPACE@13..14 " "
+      TABLE_REF@14..71
+        L_PAREN@14..15 "("
+        SELECT_STMT@15..62
+          SELECT_KW@15..21 "SELECT"
+          WHITESPACE@21..22 " "
+          SELECT_ITEM_LIST@22..25
+            SELECT_ITEM@22..25
+              COLUMN_REF@22..25
+                IDENT@22..24 "id"
+                WHITESPACE@24..25 " "
+          FROM_CLAUSE@25..62
+            FROM_KW@25..29 "FROM"
+            WHITESPACE@29..30 " "
+            TABLE_REF@30..62
+              L_PAREN@30..31 "("
+              SELECT_STMT@31..53
+                SELECT_KW@31..37 "SELECT"
+                WHITESPACE@37..38 " "
+                SELECT_ITEM_LIST@38..41
+                  SELECT_ITEM@38..41
+                    COLUMN_REF@38..41
+                      IDENT@38..40 "id"
+                      WHITESPACE@40..41 " "
+                FROM_CLAUSE@41..53
+                  FROM_KW@41..45 "FROM"
+                  WHITESPACE@45..46 " "
+                  TABLE_REF@46..53
+                    IDENT@46..53 "inner_t"
+              R_PAREN@53..54 ")"
+              WHITESPACE@54..55 " "
+              AS_KW@55..57 "AS"
+              WHITESPACE@57..58 " "
+              IDENT@58..62 "sub1"
+        R_PAREN@62..63 ")"
+        WHITESPACE@63..64 " "
+        AS_KW@64..66 "AS"
+        WHITESPACE@66..67 " "
+        IDENT@67..71 "sub2"

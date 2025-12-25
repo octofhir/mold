@@ -319,6 +319,7 @@ impl JsonbSchema {
     }
 
     /// Returns fields at a given path.
+    /// Numeric segments (array indices like "0", "1") are skipped as they don't affect field structure.
     pub fn fields_at_path(&self, path: &[String]) -> Vec<&JsonbField> {
         if path.is_empty() {
             return self.fields.iter().collect();
@@ -326,6 +327,11 @@ impl JsonbSchema {
 
         let mut current_fields = &self.fields;
         for segment in path {
+            // Skip numeric segments (array indices like "0", "1")
+            if segment.parse::<i32>().is_ok() {
+                continue;
+            }
+
             if let Some(field) = current_fields.iter().find(|f| &f.name == segment) {
                 if let Some(ref nested) = field.nested {
                     current_fields = &nested.fields;

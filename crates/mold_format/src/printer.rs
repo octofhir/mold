@@ -200,6 +200,9 @@ impl Printer {
     }
 
     /// Writes a keyword right-aligned to the river width.
+    ///
+    /// On the first line (line == 0), sets the river width to this keyword's length
+    /// and outputs without padding. Subsequent lines align to this width.
     pub fn write_keyword_river(&mut self, keyword: &str) {
         if !self.config.river_alignment {
             self.write_keyword(keyword);
@@ -208,16 +211,21 @@ impl Printer {
 
         let keyword_upper = keyword.to_uppercase();
         let keyword_len = keyword_upper.len();
+
+        // On first line, set river width to this keyword's length and skip padding
+        if self.line == 0 && self.at_line_start {
+            self.current_river_width = keyword_len;
+            self.at_line_start = false;
+            self.write_keyword(&keyword_upper);
+            return;
+        }
+
         let base_indent = self.config.indent_str().repeat(self.indent_level);
         let base_width = base_indent.len();
 
-        // Calculate padding to right-align keyword
+        // Calculate padding to right-align keyword to the river width
         let total_width = base_width + self.current_river_width;
-        let padding = if total_width > keyword_len {
-            total_width - keyword_len
-        } else {
-            0
-        };
+        let padding = total_width.saturating_sub(keyword_len);
 
         // Write spaces before keyword (skip normal indent)
         if self.at_line_start {
@@ -353,8 +361,16 @@ mod tests {
     #[test]
     fn test_river_alignment() {
         let mut printer = Printer::sqlstyle();
-        printer.set_river_width(10);
+
+        // First line sets river width to keyword length and outputs without padding
         printer.write_keyword_river("SELECT");
-        assert!(printer.output().starts_with("    SELECT"));
+        assert_eq!(printer.output(), "SELECT");
+        assert_eq!(printer.river_width(), 6); // River width set to SELECT length
+
+        // Subsequent lines should be right-aligned to river width
+        printer.newline();
+        printer.write_keyword_river("FROM");
+        // FROM (4 chars) + 2 spaces = 6 (matches SELECT length)
+        assert!(printer.output().ends_with("  FROM"));
     }
 }

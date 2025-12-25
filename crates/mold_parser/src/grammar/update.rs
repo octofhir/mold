@@ -3,10 +3,10 @@
 use crate::parser::Parser;
 use mold_syntax::SyntaxKind;
 
+use super::PAREN_RECOVERY;
 use super::expressions::expr;
 use super::insert::returning_clause;
-use super::select::select_stmt;
-use super::PAREN_RECOVERY;
+use super::select::{select_stmt, table_ref};
 
 /// Parse UPDATE statement.
 ///
@@ -115,35 +115,13 @@ fn from_clause(p: &mut Parser<'_>) {
     let m = p.start();
     p.bump(); // FROM
 
-    // Reuse select's table_ref logic would be ideal, but for simplicity:
+    // Use the full table_ref from select.rs which supports subqueries and joins
     table_ref(p);
     while p.eat(SyntaxKind::COMMA) {
         table_ref(p);
     }
 
     m.complete(p, SyntaxKind::FROM_CLAUSE);
-}
-
-fn table_ref(p: &mut Parser<'_>) {
-    let m = p.start();
-
-    // Table name
-    p.expect(SyntaxKind::IDENT);
-
-    // Schema qualification
-    if p.at(SyntaxKind::DOT) {
-        p.bump();
-        p.expect(SyntaxKind::IDENT);
-    }
-
-    // Optional alias
-    if p.eat(SyntaxKind::AS_KW) {
-        p.expect(SyntaxKind::IDENT);
-    } else if p.at(SyntaxKind::IDENT) && !is_clause_keyword(p.current()) {
-        p.bump();
-    }
-
-    m.complete(p, SyntaxKind::TABLE_REF);
 }
 
 fn where_clause(p: &mut Parser<'_>) {
@@ -172,21 +150,5 @@ fn is_update_keyword(kind: SyntaxKind) -> bool {
     matches!(
         kind,
         SyntaxKind::SET_KW | SyntaxKind::FROM_KW | SyntaxKind::WHERE_KW | SyntaxKind::RETURNING_KW
-    )
-}
-
-fn is_clause_keyword(kind: SyntaxKind) -> bool {
-    matches!(
-        kind,
-        SyntaxKind::FROM_KW
-            | SyntaxKind::WHERE_KW
-            | SyntaxKind::RETURNING_KW
-            | SyntaxKind::JOIN_KW
-            | SyntaxKind::LEFT_KW
-            | SyntaxKind::RIGHT_KW
-            | SyntaxKind::INNER_KW
-            | SyntaxKind::OUTER_KW
-            | SyntaxKind::CROSS_KW
-            | SyntaxKind::COMMA
     )
 }

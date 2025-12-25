@@ -1,0 +1,46 @@
+---
+source: crates/mold_parser/src/lib.rs
+expression: tree
+---
+SOURCE_FILE@0..66
+  SELECT_STMT@0..66
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..9
+      SELECT_ITEM@7..9
+        STAR_EXPR@7..9
+          STAR@7..8 "*"
+          WHITESPACE@8..9 " "
+    FROM_CLAUSE@9..20
+      FROM_KW@9..13 "FROM"
+      WHITESPACE@13..14 " "
+      TABLE_REF@14..20
+        IDENT@14..19 "users"
+        WHITESPACE@19..20 " "
+    WHERE_CLAUSE@20..66
+      WHERE_KW@20..25 "WHERE"
+      WHITESPACE@25..26 " "
+      BINARY_EXPR@26..66
+        EXISTS_EXPR@26..56
+          EXISTS_KW@26..32 "EXISTS"
+          WHITESPACE@32..33 " "
+          L_PAREN@33..34 "("
+          SELECT_STMT@34..54
+            SELECT_KW@34..40 "SELECT"
+            WHITESPACE@40..41 " "
+            SELECT_ITEM_LIST@41..43
+              SELECT_ITEM@41..43
+                LITERAL@41..43
+                  INTEGER@41..42 "1"
+                  WHITESPACE@42..43 " "
+            FROM_CLAUSE@43..54
+              FROM_KW@43..47 "FROM"
+              WHITESPACE@47..48 " "
+              TABLE_REF@48..54
+                IDENT@48..54 "orders"
+          R_PAREN@54..55 ")"
+          WHITESPACE@55..56 " "
+        AND_KW@56..59 "AND"
+        WHITESPACE@59..60 " "
+        COLUMN_REF@60..66
+          IDENT@60..66 "active"
