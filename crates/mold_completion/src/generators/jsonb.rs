@@ -5,6 +5,18 @@ use crate::types::{
     CompletionData, CompletionItem, CompletionItemKind, JsonbField, JsonbFieldType, JsonbSchema,
 };
 
+fn format_semantic_hint(field: &JsonbField) -> Option<String> {
+    match (
+        field.semantic_namespace.as_deref(),
+        field.semantic_type.as_deref(),
+    ) {
+        (Some(namespace), Some(semantic_type)) => Some(format!("{namespace}: {semantic_type}")),
+        (None, Some(semantic_type)) => Some(semantic_type.to_string()),
+        (Some(namespace), None) => Some(namespace.to_string()),
+        (None, None) => None,
+    }
+}
+
 /// Generates JSONB path completion items.
 pub fn complete_jsonb_paths(
     provider: Option<&dyn SchemaProvider>,
@@ -36,7 +48,12 @@ pub fn complete_jsonb_paths(
                 JsonbFieldType::Boolean => "boolean",
                 JsonbFieldType::Null => "null",
                 JsonbFieldType::Unknown => "unknown",
-            };
+            }
+            .to_string();
+
+            let detail = format_semantic_hint(field)
+                .map(|semantic_hint| format!("{type_label} | {semantic_hint}"))
+                .unwrap_or(type_label);
 
             let mut full_path = path.to_vec();
             full_path.push(field.name.clone());
@@ -45,7 +62,7 @@ pub fn complete_jsonb_paths(
             // If user is typing inside quotes (e.g., data->'nam|'), we just need the name.
             // If outside quotes (e.g., data->|), the editor should handle insertion appropriately.
             CompletionItem::new(CompletionItemKind::JsonbPath, &field.name)
-                .with_detail(type_label.to_string())
+                .with_detail(detail)
                 .with_sort_key(format!("0_{}", field.name.to_lowercase()))
                 .with_documentation(field.description.clone().unwrap_or_default())
                 .with_data(CompletionData::JsonbPath {
@@ -659,6 +676,46 @@ mod tests {
     }
 
     #[test]
+    fn test_complete_jsonb_paths_includes_semantic_hint_in_detail() {
+        let schema = JsonbSchema::new().with_field(
+            JsonbField::new("name", JsonbFieldType::Array)
+                .with_semantic_hint("FHIR", "HumanName[]"),
+        );
+
+        let provider = MemorySchemaProvider::new()
+            .add_table(TableInfo::new("patient"))
+            .add_jsonb_schema(None, "patient", "resource", schema);
+
+        let items = complete_jsonb_paths(Some(&provider), Some("patient"), "resource", &[]);
+        let name = items
+            .iter()
+            .find(|item| item.label == "name")
+            .expect("name completion");
+        let detail = name.detail.as_deref().unwrap_or_default();
+        assert!(
+            detail.contains("FHIR: HumanName[]"),
+            "expected semantic hint in detail, got: {detail}"
+        );
+    }
+
+    #[test]
+    fn test_complete_jsonb_paths_includes_type_only_semantic_hint() {
+        let schema = JsonbSchema::new()
+            .with_field(JsonbField::new("id", JsonbFieldType::String).with_semantic_type("uuid"));
+
+        let provider = MemorySchemaProvider::new()
+            .add_table(TableInfo::new("patient"))
+            .add_jsonb_schema(None, "patient", "resource", schema);
+
+        let items = complete_jsonb_paths(Some(&provider), Some("patient"), "resource", &[]);
+        let id = items
+            .iter()
+            .find(|item| item.label == "id")
+            .expect("id completion");
+        assert_eq!(id.detail.as_deref(), Some("string | uuid"));
+    }
+
+    #[test]
     fn test_complete_jsonpath() {
         let items = complete_jsonpath("");
         assert!(!items.is_empty());
@@ -768,7 +825,11 @@ mod tests {
         // Should filter by prefix
         let items = complete_common_field_names(Some("val"));
         assert!(!items.is_empty());
-        assert!(items.iter().all(|i| i.label.to_lowercase().starts_with("val")));
+        assert!(
+            items
+                .iter()
+                .all(|i| i.label.to_lowercase().starts_with("val"))
+        );
         assert!(items.iter().any(|i| i.label == "value"));
     }
 

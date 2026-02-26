@@ -16,7 +16,7 @@ const RESET: &str = "\x1b[0m";
 #[derive(Debug, Clone, Copy, Default)]
 enum Style {
     #[default]
-    SqlStyle,
+    Sql,
     PgFormatter,
     Compact,
 }
@@ -47,11 +47,14 @@ fn main() {
                     std::process::exit(1);
                 }
                 style = match args[i].to_lowercase().as_str() {
-                    "sqlstyle" | "sql" => Style::SqlStyle,
+                    "sqlstyle" | "sql" => Style::Sql,
                     "pgformatter" | "pg" => Style::PgFormatter,
                     "compact" => Style::Compact,
                     _ => {
-                        eprintln!("Unknown style: {}. Use sqlstyle, pgformatter, or compact", args[i]);
+                        eprintln!(
+                            "Unknown style: {}. Use sqlstyle, pgformatter, or compact",
+                            args[i]
+                        );
                         std::process::exit(1);
                     }
                 };
@@ -59,7 +62,9 @@ fn main() {
             "--keyword-case" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("Error: --keyword-case requires a value (upper, lower, unchanged, capitalize)");
+                    eprintln!(
+                        "Error: --keyword-case requires a value (upper, lower, unchanged, capitalize)"
+                    );
                     std::process::exit(1);
                 }
                 pg_config.keyword_case = parse_case_option(&args[i]);
@@ -196,7 +201,7 @@ fn read_stdin() -> String {
 /// Formats SQL using the specified style.
 fn format_sql(sql: &str, style: Style, pg_config: &PgFormatterConfig) -> String {
     match style {
-        Style::SqlStyle => mold_format::format_sqlstyle(sql),
+        Style::Sql => mold_format::format_sqlstyle(sql),
         Style::Compact => mold_format::format_compact(sql),
         Style::PgFormatter => mold_format::format_with_pgformatter(sql, pg_config),
     }

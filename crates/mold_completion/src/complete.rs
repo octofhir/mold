@@ -34,8 +34,8 @@ fn safe_slice_to(s: &str, offset: usize) -> &str {
 
 use crate::context::{detect_context, find_cte_columns};
 use crate::generators::{
-    complete_columns, complete_functions, complete_jsonb_paths, complete_jsonpath,
-    complete_keywords, complete_tables, get_jsonb_arg_completion, JsonbArgCompletion,
+    JsonbArgCompletion, complete_columns, complete_functions, complete_jsonb_paths,
+    complete_jsonpath, complete_keywords, complete_tables, get_jsonb_arg_completion,
 };
 use crate::providers::{FunctionProvider, SchemaProvider};
 use crate::triggers::{detect_jsonb_trigger, detect_jsonpath_in_string};
@@ -1147,8 +1147,7 @@ mod tests {
 
     #[test]
     fn test_extract_jsonb_base_nested_path() {
-        let (table, column, path) =
-            extract_jsonb_base_from_text("data->'address'->'city'->", 23);
+        let (table, column, path) = extract_jsonb_base_from_text("data->'address'->'city'->", 23);
         assert_eq!(table, None);
         assert_eq!(column, "data");
         assert_eq!(path, vec!["address", "city"]);

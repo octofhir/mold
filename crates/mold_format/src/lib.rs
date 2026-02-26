@@ -42,9 +42,9 @@ pub use pg_format::PgPrinter;
 pub use pg_formatter::{CaseOption, PgFormatterConfig, PgFormatterError};
 pub use printer::Printer;
 pub use validate::{
-    check_idempotent, count_tokens, format_pgformatter_validated, format_validated, normalize,
-    semantically_equal, validate_comprehensive, validate_format, FormatError, FormatResult,
-    ValidationReport,
+    FormatError, FormatResult, ValidationReport, check_idempotent, count_tokens,
+    format_pgformatter_validated, format_validated, normalize, semantically_equal,
+    validate_comprehensive, validate_format,
 };
 
 /// Formats SQL using sqlstyle.guide defaults.

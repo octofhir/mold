@@ -47,11 +47,6 @@ pub mod types;
 // Re-export main types
 pub use complete::{CompletionRequest, complete, get_prefix_at_offset};
 pub use context::{CteInfo, detect_context, find_cte_columns};
-pub use triggers::{
-    JsonPathTrigger, JsonbCompletionKind, JsonbTrigger, KeywordTrigger, KeywordTriggerKind,
-    detect_jsonb_trigger, detect_jsonpath_in_string, detect_keyword_trigger,
-    jsonb_trigger_chars, jsonpath_trigger_chars, keyword_trigger_chars,
-};
 pub use generators::{
     complete_columns, complete_functions, complete_jsonb_paths, complete_jsonpath,
     complete_keywords, complete_tables,
@@ -59,6 +54,11 @@ pub use generators::{
 pub use providers::{
     FunctionProvider, MemoryFunctionProvider, MemorySchemaProvider, NullFunctionProvider,
     NullSchemaProvider, SchemaProvider,
+};
+pub use triggers::{
+    JsonPathTrigger, JsonbCompletionKind, JsonbTrigger, KeywordTrigger, KeywordTriggerKind,
+    detect_jsonb_trigger, detect_jsonpath_in_string, detect_keyword_trigger, jsonb_trigger_chars,
+    jsonpath_trigger_chars, keyword_trigger_chars,
 };
 pub use types::{
     ArgMode, ColumnInfo, CompletionContext, CompletionData, CompletionItem, CompletionItemKind,

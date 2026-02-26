@@ -7,18 +7,8 @@
 /// Sorted by length descending to match longer operators first (e.g., `->>` before `->`).
 pub const JSONB_TRIGGER_SEQUENCES: &[&str] = &[
     // 3-character operators
-    "#>>",
-    // 2-character operators
-    "->>",
-    "#>",
-    "@>",
-    "<@",
-    "?|",
-    "?&",
-    "@?",
-    "@@",
-    "->",
-    // 1-character operators
+    "#>>", // 2-character operators
+    "->>", "#>", "@>", "<@", "?|", "?&", "@?", "@@", "->", // 1-character operators
     "?",
 ];
 
@@ -191,21 +181,18 @@ fn find_string_context(text: &str) -> (bool, usize) {
     let mut chars = text.char_indices().peekable();
 
     while let Some((i, c)) = chars.next() {
-        match c {
-            '\'' => {
-                if in_string {
-                    // Check for escaped quote ('')
-                    if chars.peek().map(|(_, nc)| *nc) == Some('\'') {
-                        chars.next(); // Skip the escaped quote
-                        continue;
-                    }
-                    in_string = false;
-                } else {
-                    in_string = true;
-                    string_start = i;
+        if c == '\'' {
+            if in_string {
+                // Check for escaped quote ('')
+                if chars.peek().map(|(_, nc)| *nc) == Some('\'') {
+                    chars.next(); // Skip the escaped quote
+                    continue;
                 }
+                in_string = false;
+            } else {
+                in_string = true;
+                string_start = i;
             }
-            _ => {}
         }
     }
 
@@ -341,8 +328,17 @@ pub fn detect_keyword_trigger(text: &str, offset: usize) -> Option<KeywordTrigge
         if upper.ends_with(kw) {
             // Make sure it's a word boundary (not part of another word)
             let prefix_len = upper.len() - kw.len();
-            if prefix_len == 0 || !upper.chars().nth(prefix_len - 1).is_some_and(|c| c.is_alphanumeric()) {
-                return Some(KeywordTrigger::new(*kw, KeywordTriggerKind::Table, trimmed.len()));
+            if prefix_len == 0
+                || !upper
+                    .chars()
+                    .nth(prefix_len - 1)
+                    .is_some_and(|c| c.is_alphanumeric())
+            {
+                return Some(KeywordTrigger::new(
+                    *kw,
+                    KeywordTriggerKind::Table,
+                    trimmed.len(),
+                ));
             }
         }
     }
@@ -351,7 +347,12 @@ pub fn detect_keyword_trigger(text: &str, offset: usize) -> Option<KeywordTrigge
     for kw in COLUMN_KEYWORDS {
         if upper.ends_with(kw) {
             let prefix_len = upper.len() - kw.len();
-            if prefix_len == 0 || !upper.chars().nth(prefix_len - 1).is_some_and(|c| c.is_alphanumeric()) {
+            if prefix_len == 0
+                || !upper
+                    .chars()
+                    .nth(prefix_len - 1)
+                    .is_some_and(|c| c.is_alphanumeric())
+            {
                 let kind = match *kw {
                     "ON" => KeywordTriggerKind::JoinCondition,
                     "SET" => KeywordTriggerKind::SetColumn,

@@ -13,7 +13,7 @@
 //! let config = PgFormatterConfig::default();
 //!
 //! // Parse from string (always available)
-//! let config = PgFormatterConfig::from_str("spaces = 2")?;
+//! let config = PgFormatterConfig::parse_config("spaces = 2")?;
 //!
 //! // Load from file (requires "config-file" feature)
 //! #[cfg(feature = "config-file")]
@@ -93,7 +93,11 @@ pub enum PgFormatterError {
     /// Unknown configuration key.
     UnknownKey { line: usize, key: String },
     /// Invalid value for a configuration option.
-    InvalidValue { line: usize, key: String, value: String },
+    InvalidValue {
+        line: usize,
+        key: String,
+        value: String,
+    },
 }
 
 impl std::fmt::Display for PgFormatterError {
@@ -107,7 +111,11 @@ impl std::fmt::Display for PgFormatterError {
                 write!(f, "Unknown key '{}' on line {}", key, line)
             }
             PgFormatterError::InvalidValue { line, key, value } => {
-                write!(f, "Invalid value '{}' for key '{}' on line {}", value, key, line)
+                write!(
+                    f,
+                    "Invalid value '{}' for key '{}' on line {}",
+                    value, key, line
+                )
             }
         }
     }
@@ -241,11 +249,11 @@ impl PgFormatterConfig {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, PgFormatterError> {
         let content = fs::read_to_string(path.as_ref())
             .map_err(|e| PgFormatterError::IoError(e.to_string()))?;
-        Self::from_str(&content)
+        Self::parse_config(&content)
     }
 
     /// Parses configuration from a string.
-    pub fn from_str(content: &str) -> Result<Self, PgFormatterError> {
+    pub fn parse_config(content: &str) -> Result<Self, PgFormatterError> {
         let mut config = Self::default();
 
         for (line_num, line) in content.lines().enumerate() {
@@ -587,7 +595,7 @@ spaces = 2
 comma-start = 1
 wrap-limit = 100
 "#;
-        let config = PgFormatterConfig::from_str(content).unwrap();
+        let config = PgFormatterConfig::parse_config(content).unwrap();
         assert_eq!(config.keyword_case, CaseOption::Upper);
         assert_eq!(config.spaces, 2);
         assert!(config.comma_start);
@@ -610,7 +618,10 @@ wrap-limit = 100
     fn test_to_format_config() {
         let pg_config = PgFormatterConfig::default().with_comma_start(true);
         let format_config = pg_config.to_format_config();
-        assert_eq!(format_config.comma_style, crate::config::CommaStyle::Leading);
+        assert_eq!(
+            format_config.comma_style,
+            crate::config::CommaStyle::Leading
+        );
     }
 
     #[test]
@@ -631,14 +642,14 @@ wrap-limit = 100
     #[test]
     fn test_unknown_key_error() {
         let content = "unknown_option = 1";
-        let result = PgFormatterConfig::from_str(content);
+        let result = PgFormatterConfig::parse_config(content);
         assert!(matches!(result, Err(PgFormatterError::UnknownKey { .. })));
     }
 
     #[test]
     fn test_invalid_value_error() {
         let content = "spaces = not_a_number";
-        let result = PgFormatterConfig::from_str(content);
+        let result = PgFormatterConfig::parse_config(content);
         assert!(matches!(result, Err(PgFormatterError::InvalidValue { .. })));
     }
 }

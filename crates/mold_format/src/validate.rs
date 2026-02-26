@@ -154,7 +154,9 @@ pub fn validate_format(original: &str, formatted: &str) -> Result<(), FormatErro
     // Parse formatted output
     let fmt_parse = mold_parser::parse(formatted);
     if !fmt_parse.errors().is_empty() {
-        return Err(FormatError::FormatterBrokeQuery(fmt_parse.errors().to_vec()));
+        return Err(FormatError::FormatterBrokeQuery(
+            fmt_parse.errors().to_vec(),
+        ));
     }
 
     // Compare semantic content
@@ -184,16 +186,16 @@ pub fn semantically_equal(a: &Parse, b: &Parse) -> bool {
 pub fn normalize(parse: &Parse) -> String {
     let mut tokens = Vec::new();
     for element in parse.syntax().descendants_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if !token.kind().is_trivia() {
-                // Normalize case for keywords, preserve case for identifiers/strings
-                let text = if is_keyword_kind(token.kind()) {
-                    token.text().to_uppercase()
-                } else {
-                    token.text().to_string()
-                };
-                tokens.push(text);
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && !token.kind().is_trivia()
+        {
+            // Normalize case for keywords, preserve case for identifiers/strings
+            let text = if is_keyword_kind(token.kind()) {
+                token.text().to_uppercase()
+            } else {
+                token.text().to_string()
+            };
+            tokens.push(text);
         }
     }
     tokens.join(" ")
@@ -341,7 +343,9 @@ pub fn validate_comprehensive(source: &str, config: &FormatConfig) -> Validation
         errors.push(FormatError::InvalidInput(orig_parse.errors().to_vec()));
     }
     if !fmt_ok {
-        errors.push(FormatError::FormatterBrokeQuery(fmt_parse.errors().to_vec()));
+        errors.push(FormatError::FormatterBrokeQuery(
+            fmt_parse.errors().to_vec(),
+        ));
     }
 
     // Check semantic equality (only if both parse)
@@ -362,10 +366,7 @@ pub fn validate_comprehensive(source: &str, config: &FormatConfig) -> Validation
     };
 
     // Check idempotency
-    let is_idempotent = match check_idempotent(source, config) {
-        Ok(_) => true,
-        Err(_) => false,
-    };
+    let is_idempotent = check_idempotent(source, config).is_ok();
 
     // Count tokens
     let original_tokens = count_tokens(source);
@@ -403,16 +404,14 @@ mod tests {
 
     #[test]
     fn test_validate_join() {
-        let original =
-            "SELECT u.id, o.amount FROM users u LEFT JOIN orders o ON u.id = o.user_id";
+        let original = "SELECT u.id, o.amount FROM users u LEFT JOIN orders o ON u.id = o.user_id";
         let formatted = crate::format_sqlstyle(original);
         assert!(validate_format(original, &formatted).is_ok());
     }
 
     #[test]
     fn test_validate_cte() {
-        let original =
-            "WITH active AS (SELECT * FROM users WHERE active) SELECT * FROM active";
+        let original = "WITH active AS (SELECT * FROM users WHERE active) SELECT * FROM active";
         let formatted = crate::format_sqlstyle(original);
         assert!(validate_format(original, &formatted).is_ok());
     }

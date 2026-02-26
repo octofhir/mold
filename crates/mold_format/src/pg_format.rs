@@ -258,7 +258,7 @@ fn format_source_file(node: &SyntaxNode, printer: &mut PgPrinter) {
             printer.ensure_newline();
         }
 
-        format_node(&child, printer);
+        format_node(child, printer);
         first_stmt = false;
     }
 
@@ -270,10 +270,10 @@ fn format_children(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_node(&child, printer);
+                format_node(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
-                format_token(&token, printer);
+                format_token(token, printer);
             }
         }
     }
@@ -386,7 +386,7 @@ fn format_error_node(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_error_node(&child, printer);
+                format_error_node(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
                 printer.write_raw(token.text());
@@ -494,19 +494,20 @@ fn format_with_clause(node: &SyntaxNode, printer: &mut PgPrinter) {
 
     // Check for RECURSIVE
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::RECURSIVE_KW {
-                printer.space();
-                printer.write_keyword("RECURSIVE");
-                break;
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == SyntaxKind::RECURSIVE_KW
+        {
+            printer.space();
+            printer.write_keyword("RECURSIVE");
+            break;
         }
     }
 
     printer.newline();
     printer.indent();
 
-    let ctes: Vec<_> = node.children()
+    let ctes: Vec<_> = node
+        .children()
         .filter(|c| c.kind() == SyntaxKind::CTE)
         .cloned()
         .collect();
@@ -526,11 +527,11 @@ fn format_with_clause(node: &SyntaxNode, printer: &mut PgPrinter) {
 fn format_cte(node: &SyntaxNode, printer: &mut PgPrinter) {
     // CTE name
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::IDENT {
-                printer.write_identifier(token.text());
-                break;
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == SyntaxKind::IDENT
+        {
+            printer.write_identifier(token.text());
+            break;
         }
     }
 
@@ -553,7 +554,8 @@ fn format_cte(node: &SyntaxNode, printer: &mut PgPrinter) {
 
 /// Formats a select list.
 fn format_select_list(node: &SyntaxNode, printer: &mut PgPrinter) {
-    let items: Vec<_> = node.children()
+    let items: Vec<_> = node
+        .children()
         .filter(|c| c.kind() == SyntaxKind::SELECT_ITEM)
         .cloned()
         .collect();
@@ -583,7 +585,7 @@ fn format_select_item(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_expression(&child, printer);
+                format_expression(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
                 if token.kind() == SyntaxKind::AS_KW {
@@ -595,8 +597,10 @@ fn format_select_item(node: &SyntaxNode, printer: &mut PgPrinter) {
                     printer.write_identifier(token.text());
                 } else if token.kind() == SyntaxKind::QUOTED_IDENT && saw_as {
                     printer.write(token.text());
-                } else if token.kind() != SyntaxKind::WHITESPACE && token.kind() != SyntaxKind::NEWLINE {
-                    format_token(&token, printer);
+                } else if token.kind() != SyntaxKind::WHITESPACE
+                    && token.kind() != SyntaxKind::NEWLINE
+                {
+                    format_token(token, printer);
                 }
             }
         }
@@ -612,11 +616,11 @@ fn format_from_clause(node: &SyntaxNode, printer: &mut PgPrinter) {
                 printer.write(",");
                 printer.space();
             }
-            format_table_ref(&child, printer);
+            format_table_ref(child, printer);
             first = false;
         } else if child.kind() == SyntaxKind::JOIN_EXPR {
             printer.newline();
-            format_join_expr(&child, printer);
+            format_join_expr(child, printer);
         }
     }
 }
@@ -627,12 +631,12 @@ fn format_table_ref(node: &SyntaxNode, printer: &mut PgPrinter) {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
                 if child.kind() == SyntaxKind::SUBQUERY {
-                    format_subquery(&child, printer);
+                    format_subquery(child, printer);
                 } else if child.kind() == SyntaxKind::ALIAS {
                     printer.space();
-                    format_alias(&child, printer);
+                    format_alias(child, printer);
                 } else {
-                    format_expression(&child, printer);
+                    format_expression(child, printer);
                 }
             }
             cstree::util::NodeOrToken::Token(token) => {
@@ -675,13 +679,13 @@ fn format_join_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
     if has_nested_join {
         // Recursively format the nested join first
         if let Some(nested_join) = first_child {
-            format_join_expr(&nested_join, printer);
+            format_join_expr(nested_join, printer);
         }
     } else {
         // No nested join - format the left table (first TABLE_REF)
         let left_table = node.children().find(|c| c.kind() == SyntaxKind::TABLE_REF);
         if let Some(table) = left_table {
-            format_table_ref(&table, printer);
+            format_table_ref(table, printer);
         }
     }
 
@@ -754,14 +758,15 @@ fn format_group_by(node: &SyntaxNode, printer: &mut PgPrinter) {
             printer.write(",");
             printer.space();
         }
-        format_expression(&child, printer);
+        format_expression(child, printer);
         first = false;
     }
 }
 
 /// Formats an ORDER BY clause.
 fn format_order_by(node: &SyntaxNode, printer: &mut PgPrinter) {
-    let items: Vec<_> = node.children()
+    let items: Vec<_> = node
+        .children()
         .filter(|c| c.kind() == SyntaxKind::ORDER_BY_ITEM)
         .cloned()
         .collect();
@@ -780,7 +785,7 @@ fn format_order_by_item(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_expression(&child, printer);
+                format_expression(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
                 if token.kind() == SyntaxKind::ASC_KW {
@@ -809,7 +814,7 @@ fn format_limit_clause(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_expression(&child, printer);
+                format_expression(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
                 if token.kind() == SyntaxKind::LIMIT_KW {
@@ -834,11 +839,11 @@ fn format_insert(node: &SyntaxNode, printer: &mut PgPrinter) {
 
     // Table name
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::IDENT {
-                printer.write_identifier(token.text());
-                break;
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == SyntaxKind::IDENT
+        {
+            printer.write_identifier(token.text());
+            break;
         }
     }
 
@@ -880,22 +885,23 @@ fn format_insert(node: &SyntaxNode, printer: &mut PgPrinter) {
 fn format_column_list(node: &SyntaxNode, printer: &mut PgPrinter) {
     let mut first = true;
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::IDENT {
-                if !first {
-                    printer.write(",");
-                    printer.space();
-                }
-                printer.write_identifier(token.text());
-                first = false;
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == SyntaxKind::IDENT
+        {
+            if !first {
+                printer.write(",");
+                printer.space();
             }
+            printer.write_identifier(token.text());
+            first = false;
         }
     }
 }
 
 /// Formats a VALUES clause.
 fn format_values_clause(node: &SyntaxNode, printer: &mut PgPrinter) {
-    let rows: Vec<_> = node.children()
+    let rows: Vec<_> = node
+        .children()
         .filter(|c| c.kind() == SyntaxKind::VALUES_ROW)
         .cloned()
         .collect();
@@ -918,7 +924,7 @@ fn format_values_row(node: &SyntaxNode, printer: &mut PgPrinter) {
             printer.write(",");
             printer.space();
         }
-        format_expression(&child, printer);
+        format_expression(child, printer);
         first = false;
     }
     printer.write(")");
@@ -932,7 +938,7 @@ fn format_returning_clause(node: &SyntaxNode, printer: &mut PgPrinter) {
             printer.write(",");
             printer.space();
         }
-        format_expression(&child, printer);
+        format_expression(child, printer);
         first = false;
     }
 }
@@ -944,11 +950,11 @@ fn format_update(node: &SyntaxNode, printer: &mut PgPrinter) {
 
     // Table name
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::IDENT {
-                printer.write_identifier(token.text());
-                break;
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == SyntaxKind::IDENT
+        {
+            printer.write_identifier(token.text());
+            break;
         }
     }
 
@@ -991,7 +997,8 @@ fn format_update(node: &SyntaxNode, printer: &mut PgPrinter) {
 
 /// Formats a SET clause.
 fn format_set_clause(node: &SyntaxNode, printer: &mut PgPrinter) {
-    let assignments: Vec<_> = node.children()
+    let assignments: Vec<_> = node
+        .children()
         .filter(|c| c.kind() == SyntaxKind::SET_ITEM)
         .cloned()
         .collect();
@@ -1012,7 +1019,7 @@ fn format_set_item(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_expression(&child, printer);
+                format_expression(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
                 if token.kind() == SyntaxKind::IDENT && !saw_eq {
@@ -1037,11 +1044,11 @@ fn format_delete(node: &SyntaxNode, printer: &mut PgPrinter) {
 
     // Table name
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::IDENT {
-                printer.write_identifier(token.text());
-                break;
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == SyntaxKind::IDENT
+        {
+            printer.write_identifier(token.text());
+            break;
         }
     }
 
@@ -1079,7 +1086,7 @@ fn format_delete(node: &SyntaxNode, printer: &mut PgPrinter) {
 /// Formats expression children of a node.
 fn format_expression_children(node: &SyntaxNode, printer: &mut PgPrinter) {
     for child in node.children() {
-        format_expression(&child, printer);
+        format_expression(child, printer);
     }
 }
 
@@ -1099,7 +1106,9 @@ fn format_expression(node: &SyntaxNode, printer: &mut PgPrinter) {
         SyntaxKind::EXISTS_EXPR => format_exists_expr(node, printer),
         SyntaxKind::SUBQUERY_EXPR | SyntaxKind::SUBQUERY => format_subquery(node, printer),
         SyntaxKind::ARRAY_EXPR => format_array_expr(node, printer),
-        SyntaxKind::JSONB_ACCESS_EXPR | SyntaxKind::JSONB_PATH_EXPR => format_jsonb_access(node, printer),
+        SyntaxKind::JSONB_ACCESS_EXPR | SyntaxKind::JSONB_PATH_EXPR => {
+            format_jsonb_access(node, printer)
+        }
         SyntaxKind::COALESCE_EXPR => format_coalesce(node, printer),
         SyntaxKind::NULLIF_EXPR => format_nullif(node, printer),
         SyntaxKind::GREATEST_EXPR | SyntaxKind::LEAST_EXPR => format_greatest_least(node, printer),
@@ -1116,10 +1125,10 @@ fn format_binary_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_expression(&child, printer);
+                format_expression(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
-                format_token(&token, printer);
+                format_token(token, printer);
             }
         }
     }
@@ -1130,14 +1139,14 @@ fn format_unary_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_expression(&child, printer);
+                format_expression(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
                 let kind = token.kind();
                 if kind == SyntaxKind::MINUS || kind == SyntaxKind::PLUS {
                     printer.write(token.text());
                 } else {
-                    format_token(&token, printer);
+                    format_token(token, printer);
                 }
             }
         }
@@ -1148,7 +1157,7 @@ fn format_unary_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
 fn format_paren_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
     printer.write("(");
     for child in node.children() {
-        format_expression(&child, printer);
+        format_expression(child, printer);
     }
     printer.write(")");
 }
@@ -1163,25 +1172,26 @@ fn format_func_call(node: &SyntaxNode, printer: &mut PgPrinter) {
                         // pgFormatter default: no space before (
                     }
                     printer.write("(");
-                    format_arg_list(&child, printer);
+                    format_arg_list(child, printer);
                     printer.write(")");
                 } else if child.kind() == SyntaxKind::OVER_CLAUSE {
                     printer.space();
-                    format_over_clause(&child, printer);
+                    format_over_clause(child, printer);
                 } else if child.kind() == SyntaxKind::FILTER_CLAUSE {
                     printer.space();
-                    format_filter_clause(&child, printer);
+                    format_filter_clause(child, printer);
                 } else if child.kind() == SyntaxKind::QUALIFIED_NAME {
-                    format_column_ref(&child, printer);
+                    format_column_ref(child, printer);
                 } else {
-                    format_expression(&child, printer);
+                    format_expression(child, printer);
                 }
             }
             cstree::util::NodeOrToken::Token(token) => {
                 if token.kind() == SyntaxKind::IDENT {
                     printer.write_function(token.text());
-                } else if token.kind() != SyntaxKind::L_PAREN && token.kind() != SyntaxKind::R_PAREN {
-                    format_token(&token, printer);
+                } else if token.kind() != SyntaxKind::L_PAREN && token.kind() != SyntaxKind::R_PAREN
+                {
+                    format_token(token, printer);
                 }
             }
         }
@@ -1198,7 +1208,7 @@ fn format_arg_list(node: &SyntaxNode, printer: &mut PgPrinter) {
                     printer.write(",");
                     printer.space();
                 }
-                format_expression(&child, printer);
+                format_expression(child, printer);
                 first = false;
             }
             cstree::util::NodeOrToken::Token(token) => {
@@ -1253,7 +1263,7 @@ fn format_partition_by(node: &SyntaxNode, printer: &mut PgPrinter) {
             printer.write(",");
             printer.space();
         }
-        format_expression(&child, printer);
+        format_expression(child, printer);
         first = false;
     }
 }
@@ -1266,7 +1276,7 @@ fn format_filter_clause(node: &SyntaxNode, printer: &mut PgPrinter) {
     printer.write_keyword("WHERE");
     printer.space();
     for child in node.children() {
-        format_expression(&child, printer);
+        format_expression(child, printer);
     }
     printer.write(")");
 }
@@ -1282,17 +1292,17 @@ fn format_case_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
                 if child.kind() == SyntaxKind::CASE_WHEN {
                     printer.newline();
                     printer.indent();
-                    format_case_when(&child, printer);
+                    format_case_when(child, printer);
                     printer.dedent();
                     saw_when = true;
                 } else if child.kind() == SyntaxKind::CASE_ELSE {
                     printer.newline();
                     printer.indent();
-                    format_case_else(&child, printer);
+                    format_case_else(child, printer);
                     printer.dedent();
                 } else if !saw_when {
                     printer.space();
-                    format_expression(&child, printer);
+                    format_expression(child, printer);
                 }
             }
             cstree::util::NodeOrToken::Token(token) => {
@@ -1313,7 +1323,7 @@ fn format_case_when(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_expression(&child, printer);
+                format_expression(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
                 if token.kind() == SyntaxKind::THEN_KW {
@@ -1331,7 +1341,7 @@ fn format_case_else(node: &SyntaxNode, printer: &mut PgPrinter) {
     printer.write_keyword("ELSE");
     printer.space();
     for child in node.children() {
-        format_expression(&child, printer);
+        format_expression(child, printer);
     }
 }
 
@@ -1339,11 +1349,11 @@ fn format_case_else(node: &SyntaxNode, printer: &mut PgPrinter) {
 fn format_cast_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
     let mut is_double_colon = false;
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == SyntaxKind::DOUBLE_COLON {
-                is_double_colon = true;
-                break;
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == SyntaxKind::DOUBLE_COLON
+        {
+            is_double_colon = true;
+            break;
         }
     }
 
@@ -1352,7 +1362,7 @@ fn format_cast_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
         for element in node.children_with_tokens() {
             match element {
                 cstree::util::NodeOrToken::Node(child) => {
-                    format_expression(&child, printer);
+                    format_expression(child, printer);
                 }
                 cstree::util::NodeOrToken::Token(token) => {
                     if token.kind() == SyntaxKind::DOUBLE_COLON {
@@ -1361,7 +1371,7 @@ fn format_cast_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
                     } else if saw_colon && token.kind().is_keyword() {
                         printer.write_type(token.text());
                     } else {
-                        format_token(&token, printer);
+                        format_token(token, printer);
                     }
                 }
             }
@@ -1374,7 +1384,7 @@ fn format_cast_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
         for element in node.children_with_tokens() {
             match element {
                 cstree::util::NodeOrToken::Node(child) => {
-                    format_expression(&child, printer);
+                    format_expression(child, printer);
                 }
                 cstree::util::NodeOrToken::Token(token) => {
                     if token.kind() == SyntaxKind::AS_KW {
@@ -1389,7 +1399,7 @@ fn format_cast_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
                         if saw_as && token.kind().is_keyword() {
                             printer.write_type(token.text());
                         } else {
-                            format_token(&token, printer);
+                            format_token(token, printer);
                         }
                     }
                 }
@@ -1404,15 +1414,15 @@ fn format_cast_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
 fn format_between_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
     let children: Vec<_> = node.children().collect();
     if children.len() >= 3 {
-        format_expression(&children[0], printer);
+        format_expression(children[0], printer);
         printer.space();
         printer.write_keyword("BETWEEN");
         printer.space();
-        format_expression(&children[1], printer);
+        format_expression(children[1], printer);
         printer.space();
         printer.write_keyword("AND");
         printer.space();
-        format_expression(&children[2], printer);
+        format_expression(children[2], printer);
     } else {
         format_children(node, printer);
     }
@@ -1424,9 +1434,9 @@ fn format_in_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
                 if child.kind() == SyntaxKind::SUBQUERY {
-                    format_subquery(&child, printer);
+                    format_subquery(child, printer);
                 } else {
-                    format_expression(&child, printer);
+                    format_expression(child, printer);
                 }
             }
             cstree::util::NodeOrToken::Token(token) => {
@@ -1445,7 +1455,7 @@ fn format_in_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
                     printer.write(",");
                     printer.space();
                 } else {
-                    format_token(&token, printer);
+                    format_token(token, printer);
                 }
             }
         }
@@ -1457,10 +1467,10 @@ fn format_like_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_expression(&child, printer);
+                format_expression(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
-                format_token(&token, printer);
+                format_token(token, printer);
             }
         }
     }
@@ -1471,10 +1481,10 @@ fn format_is_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_expression(&child, printer);
+                format_expression(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
-                format_token(&token, printer);
+                format_token(token, printer);
             }
         }
     }
@@ -1485,7 +1495,7 @@ fn format_exists_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
     printer.write_keyword("EXISTS");
     printer.space();
     for child in node.children() {
-        format_subquery(&child, printer);
+        format_subquery(child, printer);
     }
 }
 
@@ -1497,9 +1507,9 @@ fn format_subquery(node: &SyntaxNode, printer: &mut PgPrinter) {
 
     for child in node.children() {
         if child.kind() == SyntaxKind::SELECT_STMT {
-            format_select(&child, printer);
+            format_select(child, printer);
         } else {
-            format_expression(&child, printer);
+            format_expression(child, printer);
         }
     }
 
@@ -1521,7 +1531,7 @@ fn format_array_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
                     printer.write(",");
                     printer.space();
                 }
-                format_expression(&child, printer);
+                format_expression(child, printer);
                 first = false;
             }
             cstree::util::NodeOrToken::Token(_) => {}
@@ -1536,7 +1546,7 @@ fn format_jsonb_access(node: &SyntaxNode, printer: &mut PgPrinter) {
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
-                format_expression(&child, printer);
+                format_expression(child, printer);
             }
             cstree::util::NodeOrToken::Token(token) => {
                 printer.write(token.text());
@@ -1556,7 +1566,7 @@ fn format_coalesce(node: &SyntaxNode, printer: &mut PgPrinter) {
             printer.write(",");
             printer.space();
         }
-        format_expression(&child, printer);
+        format_expression(child, printer);
         first = false;
     }
 
@@ -1570,10 +1580,10 @@ fn format_nullif(node: &SyntaxNode, printer: &mut PgPrinter) {
 
     let children: Vec<_> = node.children().collect();
     if children.len() >= 2 {
-        format_expression(&children[0], printer);
+        format_expression(children[0], printer);
         printer.write(",");
         printer.space();
-        format_expression(&children[1], printer);
+        format_expression(children[1], printer);
     }
 
     printer.write(")");
@@ -1596,7 +1606,7 @@ fn format_greatest_least(node: &SyntaxNode, printer: &mut PgPrinter) {
             printer.write(",");
             printer.space();
         }
-        format_expression(&child, printer);
+        format_expression(child, printer);
         first = false;
     }
 
@@ -1612,7 +1622,7 @@ fn format_column_ref(node: &SyntaxNode, printer: &mut PgPrinter) {
                 if !first {
                     printer.write(".");
                 }
-                format_expression(&child, printer);
+                format_expression(child, printer);
                 first = false;
             }
             cstree::util::NodeOrToken::Token(token) => {
@@ -1637,7 +1647,7 @@ fn format_column_ref(node: &SyntaxNode, printer: &mut PgPrinter) {
                     printer.write("*");
                     first = false;
                 } else {
-                    format_token(&token, printer);
+                    format_token(token, printer);
                 }
             }
         }
@@ -1666,10 +1676,10 @@ fn find_child(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxNode> {
 /// Checks if a node has a token of a specific kind.
 fn has_token(node: &SyntaxNode, kind: SyntaxKind) -> bool {
     for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element {
-            if token.kind() == kind {
-                return true;
-            }
+        if let cstree::util::NodeOrToken::Token(token) = element
+            && token.kind() == kind
+        {
+            return true;
         }
     }
     false

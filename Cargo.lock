@@ -535,6 +535,7 @@ name = "mold_hir"
 version = "0.1.0"
 dependencies = [
  "insta",
+ "mold_parser",
  "mold_syntax",
  "text-size",
 ]

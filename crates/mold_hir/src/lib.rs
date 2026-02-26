@@ -45,9 +45,9 @@ pub mod scope;
 
 // Re-export main types
 pub use analyze::{
-    Analysis, Analyzer, ColumnInfo, Diagnostic, NullSchemaProvider, RelatedInfo, ResolvedReference,
-    ResolvedTableRef, SchemaProvider, Severity, TableInfo, TableType, analyze_query,
-    suggest_similar,
+    Analysis, AnalysisOptions, Analyzer, BuiltinLintPack, ColumnInfo, Diagnostic, LintRulePack,
+    NullSchemaProvider, RelatedInfo, ResolvedReference, ResolvedTableRef, SchemaProvider, Severity,
+    TableInfo, TableType, analyze_query, analyze_query_with_options, suggest_similar,
 };
 pub use binding::{
     ColumnBinding, CteBinding, DataType, Resolution, ResolvedColumn, TableBinding, TableSource,

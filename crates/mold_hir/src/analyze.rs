@@ -158,6 +158,86 @@ pub enum Severity {
     Hint,
 }
 
+/// Built-in lint packs that can be enabled for analysis.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum BuiltinLintPack {
+    /// General SQL quality and safety checks.
+    Core,
+    /// JSONB-specific checks.
+    Jsonb,
+}
+
+/// External lint pack hook.
+///
+/// Consumers can implement this trait and pass instances in [`AnalysisOptions`]
+/// to add domain-specific lint rules without coupling them to the parser core.
+pub trait LintRulePack: Send + Sync {
+    /// Applies diagnostics for this pack.
+    fn apply(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>);
+}
+
+/// Options controlling semantic analysis behavior.
+pub struct AnalysisOptions {
+    /// Enabled built-in lint packs.
+    pub builtin_lint_packs: Vec<BuiltinLintPack>,
+    /// Additional external lint packs.
+    pub external_lint_packs: Vec<Arc<dyn LintRulePack>>,
+}
+
+impl AnalysisOptions {
+    /// Creates options with default built-in lint packs enabled.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Replaces enabled built-in lint packs.
+    pub fn with_builtin_lint_packs(
+        mut self,
+        packs: impl IntoIterator<Item = BuiltinLintPack>,
+    ) -> Self {
+        self.builtin_lint_packs = packs.into_iter().collect();
+        self
+    }
+
+    /// Appends an external lint pack.
+    pub fn with_external_lint_pack(mut self, pack: Arc<dyn LintRulePack>) -> Self {
+        self.external_lint_packs.push(pack);
+        self
+    }
+
+    fn has_builtin_pack(&self, pack: BuiltinLintPack) -> bool {
+        self.builtin_lint_packs.contains(&pack)
+    }
+}
+
+impl std::fmt::Debug for AnalysisOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AnalysisOptions")
+            .field("builtin_lint_packs", &self.builtin_lint_packs)
+            .field("external_lint_packs_len", &self.external_lint_packs.len())
+            .finish()
+    }
+}
+
+impl Clone for AnalysisOptions {
+    fn clone(&self) -> Self {
+        Self {
+            builtin_lint_packs: self.builtin_lint_packs.clone(),
+            external_lint_packs: self.external_lint_packs.clone(),
+        }
+    }
+}
+
+impl Default for AnalysisOptions {
+    fn default() -> Self {
+        Self {
+            builtin_lint_packs: vec![BuiltinLintPack::Core, BuiltinLintPack::Jsonb],
+            external_lint_packs: Vec::new(),
+        }
+    }
+}
+
 /// Related information for a diagnostic.
 #[derive(Clone, Debug)]
 pub struct RelatedInfo {
@@ -616,11 +696,15 @@ pub fn expand_table_star(
 // =============================================================================
 
 use mold_syntax::Parse;
-use mold_syntax::ast::{AstNode, ColumnRef, JsonbAccessExpr, TableName};
+use mold_syntax::SyntaxKind;
+use mold_syntax::ast::{
+    AstNode, BinaryExpr, ColumnRef, DeleteStmt, Expr, JsonbAccessExpr, LiteralKind, SelectItem,
+    SelectStmt, TableName, UpdateStmt,
+};
 
 use crate::resolve::{validate_column_reference, validate_table_reference};
 
-/// Analyzes a parsed SQL query for semantic errors.
+/// Analyzes a parsed SQL query for semantic errors using default options.
 ///
 /// This function walks the AST and validates:
 /// - Table references (checks if tables exist)
@@ -629,6 +713,16 @@ use crate::resolve::{validate_column_reference, validate_table_reference};
 ///
 /// Returns an Analysis containing diagnostics for any errors found.
 pub fn analyze_query(parse: &Parse, provider: &dyn SchemaProvider) -> Analysis {
+    let options = AnalysisOptions::default();
+    analyze_query_with_options(parse, provider, &options)
+}
+
+/// Analyzes a parsed SQL query for semantic errors with explicit options.
+pub fn analyze_query_with_options(
+    parse: &Parse,
+    provider: &dyn SchemaProvider,
+    options: &AnalysisOptions,
+) -> Analysis {
     let mut analyzer = Analyzer::new(provider);
 
     // Walk the syntax tree to find table and column references
@@ -818,18 +912,17 @@ pub fn analyze_query(parse: &Parse, provider: &dyn SchemaProvider) -> Analysis {
                 analyzer.error(error.error_message(), Some(range));
             }
 
-            // Validate JSONB path segments against FHIR schema (if available)
+            // Validate JSONB path segments against schema metadata (if available)
             // Get the table name for JSONB field lookup
-            let table_name = scope
-                .resolve_column(column_name, table_qualifier)
-                .ok()
-                .and_then(|(table_binding, _)| {
+            let table_name = scope.resolve_column(column_name, table_qualifier).ok().map(
+                |(table_binding, _)| {
                     // Get the original table name (not alias)
                     match &table_binding.source {
-                        TableSource::Table { name, .. } => Some(name.clone()),
-                        _ => Some(table_binding.original_name.clone()),
+                        TableSource::Table { name, .. } => name.clone(),
+                        _ => table_binding.original_name.clone(),
                     }
-                });
+                },
+            );
 
             if let Some(ref table) = table_name {
                 let path_keys: Vec<&str> = chain.path_keys();
@@ -882,12 +975,232 @@ pub fn analyze_query(parse: &Parse, provider: &dyn SchemaProvider) -> Analysis {
         }
     }
 
+    // Final pass: lint rules (non-fatal quality/safety diagnostics)
+    apply_lints(&root, &mut analyzer, options);
+
     analyzer.finish(scope, Vec::new())
+}
+
+fn apply_lints(
+    root: &mold_syntax::SyntaxNode,
+    analyzer: &mut Analyzer<'_>,
+    options: &AnalysisOptions,
+) {
+    if options.has_builtin_pack(BuiltinLintPack::Core) {
+        apply_core_lints(root, analyzer);
+    }
+    if options.has_builtin_pack(BuiltinLintPack::Jsonb) {
+        apply_jsonb_lints(root, analyzer);
+    }
+    for pack in &options.external_lint_packs {
+        pack.apply(root, analyzer);
+    }
+}
+
+fn apply_core_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    for node in root.descendants() {
+        if let Some(select) = SelectStmt::cast(node.clone()) {
+            lint_select_star(&select, analyzer);
+        }
+        if let Some(update) = UpdateStmt::cast(node.clone()) {
+            lint_update_without_where(&update, analyzer);
+        }
+        if let Some(delete) = DeleteStmt::cast(node.clone()) {
+            lint_delete_without_where(&delete, analyzer);
+        }
+    }
+}
+
+fn apply_jsonb_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    for node in root.descendants() {
+        if let Some(binary) = BinaryExpr::cast(node.clone()) {
+            lint_jsonb_text_comparison_binary(&binary, analyzer);
+        }
+    }
+}
+
+fn lint_select_star(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
+    for node in stmt.syntax().descendants() {
+        if let Some(item) = SelectItem::cast(node.clone())
+            && select_item_has_star(&item)
+        {
+            analyzer.warning(
+                "Avoid SELECT *; list columns explicitly",
+                Some(item.syntax().text_range()),
+            );
+        }
+    }
+}
+
+fn lint_update_without_where(stmt: &UpdateStmt, analyzer: &mut Analyzer<'_>) {
+    if stmt.where_clause().is_none() {
+        analyzer.warning(
+            "UPDATE without WHERE affects all rows",
+            Some(stmt.syntax().text_range()),
+        );
+    }
+}
+
+fn lint_delete_without_where(stmt: &DeleteStmt, analyzer: &mut Analyzer<'_>) {
+    if stmt.where_clause().is_none() {
+        analyzer.warning(
+            "DELETE without WHERE affects all rows",
+            Some(stmt.syntax().text_range()),
+        );
+    }
+}
+
+fn lint_jsonb_text_comparison_binary(expr: &BinaryExpr, analyzer: &mut Analyzer<'_>) {
+    let is_like = binary_has_operator(expr, &[SyntaxKind::LIKE_KW, SyntaxKind::ILIKE_KW]);
+    let is_text_comparison = is_like
+        || binary_has_operator(
+            expr,
+            &[
+                SyntaxKind::EQ,
+                SyntaxKind::NE,
+                SyntaxKind::LT,
+                SyntaxKind::LE,
+                SyntaxKind::GT,
+                SyntaxKind::GE,
+            ],
+        );
+
+    if !is_text_comparison {
+        return;
+    }
+
+    let Some(lhs) = expr.lhs() else {
+        return;
+    };
+    let Some(rhs) = expr.rhs() else {
+        return;
+    };
+
+    let needs_arrow_text = (is_jsonb_non_text_expr(&lhs) && is_string_literal_expr(&rhs))
+        || (is_jsonb_non_text_expr(&rhs) && is_string_literal_expr(&lhs));
+
+    if needs_arrow_text {
+        let message = if is_like {
+            "Use ->> when matching JSONB scalar against text pattern"
+        } else {
+            "Use ->> when comparing JSONB scalar to text literal"
+        };
+        analyzer.warning(message, Some(expr.syntax().text_range()));
+    }
+}
+
+fn is_jsonb_non_text_expr(expr: &Expr) -> bool {
+    let mut has_non_text = false;
+    let mut has_text = false;
+
+    for child in expr.syntax().descendants_with_tokens() {
+        if let Some(token) = child.as_token() {
+            match token.kind() {
+                SyntaxKind::ARROW | SyntaxKind::HASH_ARROW => has_non_text = true,
+                SyntaxKind::ARROW_TEXT | SyntaxKind::HASH_ARROW_TEXT => has_text = true,
+                _ => {}
+            }
+        }
+    }
+
+    has_non_text && !has_text
+}
+
+fn is_string_literal_expr(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Literal(lit)
+            if matches!(lit.kind(), Some(LiteralKind::String | LiteralKind::DollarString))
+    )
+}
+
+fn select_item_has_star(item: &SelectItem) -> bool {
+    for child in item.syntax().descendants_with_tokens() {
+        if let Some(token) = child.into_token()
+            && token.kind() == SyntaxKind::STAR
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn binary_has_operator(expr: &BinaryExpr, kinds: &[SyntaxKind]) -> bool {
+    expr.syntax()
+        .children_with_tokens()
+        .filter_map(|child| child.into_token())
+        .any(|token| kinds.contains(&token.kind()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
+    struct TestProvider {
+        tables: HashMap<String, Vec<ColumnInfo>>,
+    }
+
+    impl TestProvider {
+        fn with_patient_table() -> Self {
+            let mut tables = HashMap::new();
+            tables.insert(
+                "patient".to_string(),
+                vec![
+                    ColumnInfo {
+                        name: "id".to_string(),
+                        data_type: DataType::Text,
+                        nullable: false,
+                        ordinal: 0,
+                    },
+                    ColumnInfo {
+                        name: "resource".to_string(),
+                        data_type: DataType::Jsonb,
+                        nullable: false,
+                        ordinal: 1,
+                    },
+                ],
+            );
+            Self { tables }
+        }
+    }
+
+    impl SchemaProvider for TestProvider {
+        fn lookup_table(&self, _schema: Option<&str>, name: &str) -> Option<TableInfo> {
+            if self.tables.contains_key(&name.to_lowercase()) {
+                Some(TableInfo {
+                    schema: None,
+                    name: name.to_string(),
+                    table_type: TableType::Table,
+                })
+            } else {
+                None
+            }
+        }
+
+        fn lookup_columns(&self, _schema: Option<&str>, table: &str) -> Vec<ColumnInfo> {
+            self.tables
+                .get(&table.to_lowercase())
+                .cloned()
+                .unwrap_or_default()
+        }
+
+        fn all_table_names(&self) -> Vec<String> {
+            self.tables.keys().cloned().collect()
+        }
+    }
+
+    fn analyze_with_test_provider(sql: &str) -> Analysis {
+        let parse = mold_parser::parse(sql);
+        let provider = TestProvider::with_patient_table();
+        analyze_query(&parse, &provider)
+    }
+
+    fn analyze_with_test_provider_options(sql: &str, options: &AnalysisOptions) -> Analysis {
+        let parse = mold_parser::parse(sql);
+        let provider = TestProvider::with_patient_table();
+        analyze_query_with_options(&parse, &provider, options)
+    }
 
     #[test]
     fn test_empty_analysis() {
@@ -1030,5 +1343,120 @@ mod tests {
         let suggestions = suggest_similar("pa", &tables, 3);
 
         assert_eq!(suggestions.first(), Some(&"Patient".to_string()));
+    }
+
+    #[test]
+    fn test_lint_select_star() {
+        let analysis = analyze_with_test_provider("SELECT * FROM patient");
+        assert!(
+            analysis
+                .warnings()
+                .any(|d| d.message.contains("Avoid SELECT *")),
+            "expected SELECT * warning, got: {:?}",
+            analysis.diagnostics
+        );
+    }
+
+    #[test]
+    fn test_lint_update_without_where() {
+        let analysis = analyze_with_test_provider("UPDATE patient SET id = '1'");
+        assert!(
+            analysis
+                .warnings()
+                .any(|d| d.message.contains("UPDATE without WHERE")),
+            "expected UPDATE without WHERE warning, got: {:?}",
+            analysis.diagnostics
+        );
+    }
+
+    #[test]
+    fn test_lint_delete_without_where() {
+        let analysis = analyze_with_test_provider("DELETE FROM patient");
+        assert!(
+            analysis
+                .warnings()
+                .any(|d| d.message.contains("DELETE without WHERE")),
+            "expected DELETE without WHERE warning, got: {:?}",
+            analysis.diagnostics
+        );
+    }
+
+    #[test]
+    fn test_lint_jsonb_text_compare() {
+        let analysis = analyze_with_test_provider(
+            "SELECT resource->'id' FROM patient WHERE resource->'id' = 'abc'",
+        );
+        assert!(
+            analysis
+                .warnings()
+                .any(|d| d.message.contains("Use ->> when comparing JSONB scalar")),
+            "expected JSONB text compare warning, got: {:?}",
+            analysis.diagnostics
+        );
+    }
+
+    #[test]
+    fn test_lint_jsonb_text_compare_not_triggered_for_arrow_text() {
+        let analysis = analyze_with_test_provider(
+            "SELECT resource->>'id' FROM patient WHERE resource->>'id' = 'abc'",
+        );
+        assert!(
+            analysis
+                .warnings()
+                .all(|d| !d.message.contains("Use ->> when comparing JSONB scalar")),
+            "did not expect JSONB text compare warning, got: {:?}",
+            analysis.diagnostics
+        );
+    }
+
+    #[test]
+    fn test_lint_pack_core_without_jsonb() {
+        let options = AnalysisOptions::new().with_builtin_lint_packs([BuiltinLintPack::Core]);
+        let analysis = analyze_with_test_provider_options(
+            "SELECT resource->'id' FROM patient WHERE resource->'id' = 'abc'",
+            &options,
+        );
+        assert!(
+            analysis
+                .warnings()
+                .all(|d| !d.message.contains("Use ->> when comparing JSONB scalar")),
+            "did not expect JSONB lint from core pack, got: {:?}",
+            analysis.diagnostics
+        );
+    }
+
+    #[test]
+    fn test_lint_pack_jsonb_without_core() {
+        let options = AnalysisOptions::new().with_builtin_lint_packs([BuiltinLintPack::Jsonb]);
+        let analysis = analyze_with_test_provider_options("SELECT * FROM patient", &options);
+        assert!(
+            analysis
+                .warnings()
+                .all(|d| !d.message.contains("Avoid SELECT *")),
+            "did not expect core lint from jsonb pack, got: {:?}",
+            analysis.diagnostics
+        );
+    }
+
+    #[test]
+    fn test_external_lint_pack_hook() {
+        struct ExternalPack;
+        impl LintRulePack for ExternalPack {
+            fn apply(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+                analyzer.warning("External lint pack executed", Some(root.text_range()));
+            }
+        }
+
+        let options = AnalysisOptions::new()
+            .with_builtin_lint_packs(std::iter::empty())
+            .with_external_lint_pack(Arc::new(ExternalPack));
+        let analysis = analyze_with_test_provider_options("SELECT id FROM patient", &options);
+        assert!(
+            analysis
+                .warnings()
+                .any(|d| d.message.contains("External lint pack executed")),
+            "expected warning from external lint pack, got: {:?}",
+            analysis.diagnostics
+        );
     }
 }

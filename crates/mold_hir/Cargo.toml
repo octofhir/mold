@@ -10,3 +10,4 @@ text-size.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+mold_parser.workspace = true
