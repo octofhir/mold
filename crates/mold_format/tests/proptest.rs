@@ -1,5 +1,5 @@
 use mold_format::{
-    check_idempotent, count_tokens, normalize, semantically_equal, validate_format, FormatConfig,
+    FormatConfig, check_idempotent, count_tokens, normalize, semantically_equal, validate_format,
 };
 use proptest::prelude::*;
 

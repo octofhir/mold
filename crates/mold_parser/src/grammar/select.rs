@@ -7,10 +7,7 @@ use super::{CLAUSE_RECOVERY, JOIN_RECOVERY, PAREN_RECOVERY, SUBQUERY_RECOVERY};
 
 /// Checks if the current token is an identifier (IDENT or QUOTED_IDENT).
 pub fn at_ident(p: &Parser<'_>) -> bool {
-    matches!(
-        p.current(),
-        SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT
-    )
+    matches!(p.current(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT)
 }
 
 /// Expects an identifier (IDENT or QUOTED_IDENT), with recovery on failure.
@@ -518,15 +515,13 @@ fn parse_subquery_in_from(p: &mut Parser<'_>) {
     select_stmt(p);
 
     // If we're not at R_PAREN after parsing, recover within subquery bounds
-    if !p.at(SyntaxKind::R_PAREN) && !p.at_end() {
-        if !p.at_set(SUBQUERY_RECOVERY) {
-            let em = p.start();
-            p.error_with_context("unexpected tokens in subquery");
-            while !p.at_end() && !p.at_set(SUBQUERY_RECOVERY) && !p.at(SyntaxKind::R_PAREN) {
-                p.bump_any();
-            }
-            em.complete(p, SyntaxKind::ERROR);
+    if !p.at(SyntaxKind::R_PAREN) && !p.at_end() && !p.at_set(SUBQUERY_RECOVERY) {
+        let em = p.start();
+        p.error_with_context("unexpected tokens in subquery");
+        while !p.at_end() && !p.at_set(SUBQUERY_RECOVERY) && !p.at(SyntaxKind::R_PAREN) {
+            p.bump_any();
         }
+        em.complete(p, SyntaxKind::ERROR);
     }
 }
 

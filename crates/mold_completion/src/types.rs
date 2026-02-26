@@ -362,6 +362,12 @@ pub struct JsonbField {
     /// The expected type of this field.
     pub field_type: JsonbFieldType,
 
+    /// Optional semantic/domain namespace for editor hints (e.g. "FHIR").
+    pub semantic_namespace: Option<String>,
+
+    /// Optional semantic/domain type for editor hints (e.g. "HumanName[]").
+    pub semantic_type: Option<String>,
+
     /// Nested schema for object fields.
     pub nested: Option<Box<JsonbSchema>>,
 
@@ -375,9 +381,34 @@ impl JsonbField {
         Self {
             name: name.into(),
             field_type,
+            semantic_namespace: None,
+            semantic_type: None,
             nested: None,
             description: None,
         }
+    }
+
+    /// Sets semantic/domain namespace metadata.
+    pub fn with_semantic_namespace(mut self, semantic_namespace: impl Into<String>) -> Self {
+        self.semantic_namespace = Some(semantic_namespace.into());
+        self
+    }
+
+    /// Sets semantic/domain type metadata.
+    pub fn with_semantic_type(mut self, semantic_type: impl Into<String>) -> Self {
+        self.semantic_type = Some(semantic_type.into());
+        self
+    }
+
+    /// Sets semantic/domain namespace and type metadata together.
+    pub fn with_semantic_hint(
+        mut self,
+        semantic_namespace: impl Into<String>,
+        semantic_type: impl Into<String>,
+    ) -> Self {
+        self.semantic_namespace = Some(semantic_namespace.into());
+        self.semantic_type = Some(semantic_type.into());
+        self
     }
 
     /// Sets nested schema for object fields.

@@ -708,8 +708,11 @@ pub fn get_jsonb_arg_completion(function: &str, arg_index: usize) -> Option<Json
             _ => Some(JsonbArgCompletion::PathKeys),
         },
         // Functions with JSONPath argument
-        "jsonb_path_exists" | "jsonb_path_match" | "jsonb_path_query"
-        | "jsonb_path_query_array" | "jsonb_path_query_first" => match arg_index {
+        "jsonb_path_exists"
+        | "jsonb_path_match"
+        | "jsonb_path_query"
+        | "jsonb_path_query_array"
+        | "jsonb_path_query_first" => match arg_index {
             0 => Some(JsonbArgCompletion::JsonbColumn),
             1 => Some(JsonbArgCompletion::JsonPath),
             _ => Some(JsonbArgCompletion::None),

@@ -268,11 +268,11 @@ fn collect_jsonb_chain(
 fn extract_path_array_literal(node: &SyntaxNode) -> Option<Vec<String>> {
     // Look for a STRING token in the node (the path array is a string literal)
     for child in node.descendants_with_tokens() {
-        if let Some(token) = child.as_token() {
-            if token.kind() == SyntaxKind::STRING {
-                let text = token.text();
-                return Some(parse_path_array_string(text));
-            }
+        if let Some(token) = child.as_token()
+            && token.kind() == SyntaxKind::STRING
+        {
+            let text = token.text();
+            return Some(parse_path_array_string(text));
         }
     }
     None

@@ -21,13 +21,12 @@ pub use mold_syntax::SyntaxKind;
 pub use token_set::TokenSet;
 
 // Re-export JSONPath parser for standalone JSONPath analysis
-pub use grammar::jsonpath::{parse_jsonpath, JpParse, JpParseError};
-pub use grammar::jsonpath_lexer::{tokenize_jsonpath, JpToken};
+pub use grammar::jsonpath::{JpParse, JpParseError, parse_jsonpath};
+pub use grammar::jsonpath_lexer::{JpToken, tokenize_jsonpath};
 
 use mold_lexer::tokenize;
 use mold_syntax::Parse;
 
-#[must_use]
 pub fn parse(source: &str) -> Parse {
     let tokens = tokenize(source);
     let mut parser = parser::Parser::new(&tokens, source);
@@ -662,7 +661,9 @@ mod tests {
         assert!(!parse.errors().is_empty());
         // Check that error message includes context
         let errors: Vec<String> = parse.errors().iter().map(|e| e.message.clone()).collect();
-        let has_context = errors.iter().any(|e| e.contains("CASE") || e.contains("subquery"));
+        let has_context = errors
+            .iter()
+            .any(|e| e.contains("CASE") || e.contains("subquery"));
         assert!(
             has_context || !errors.is_empty(),
             "errors should include context: {:?}",

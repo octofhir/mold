@@ -91,9 +91,7 @@ fn format_paren_expr(node: &SyntaxNode, printer: &mut Printer) {
 /// Formats a function call.
 fn format_func_call(node: &SyntaxNode, printer: &mut Printer) {
     // Check if there's an ARG_LIST node (if not, we need to handle parentheses manually)
-    let has_arg_list = node
-        .children()
-        .any(|c| c.kind() == SyntaxKind::ARG_LIST);
+    let has_arg_list = node.children().any(|c| c.kind() == SyntaxKind::ARG_LIST);
 
     // Track if we're inside parentheses (for COUNT(*) case)
     let mut in_parens = false;
