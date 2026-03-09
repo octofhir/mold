@@ -1,0 +1,27 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..47
+  SELECT_STMT@0..47
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..19
+      SELECT_ITEM@7..19
+        COLUMN_REF@7..19
+          QUOTED_IDENT@7..13 "\"User\""
+          DOT@13..14 "."
+          QUOTED_IDENT@14..18 "\"id\""
+          WHITESPACE@18..19 " "
+    FROM_CLAUSE@19..47
+      FROM_KW@19..23 "FROM"
+      WHITESPACE@23..24 " "
+      TABLE_REF@24..47
+        QUOTED_IDENT@24..30 "\"User\""
+        WHITESPACE@30..31 " "
+        AS_KW@31..33 "AS"
+        WHITESPACE@33..34 " "
+        QUOTED_IDENT@34..47 "\"AccountUser\""

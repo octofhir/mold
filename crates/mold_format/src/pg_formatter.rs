@@ -394,29 +394,29 @@ impl PgFormatterConfig {
     pub fn discover() -> Option<Self> {
         // 1. Current directory
         let cwd_config = PathBuf::from(".pg_format");
-        if cwd_config.exists() {
-            if let Ok(config) = Self::from_file(&cwd_config) {
-                return Some(config);
-            }
+        if cwd_config.exists()
+            && let Ok(config) = Self::from_file(&cwd_config)
+        {
+            return Some(config);
         }
 
         // 2. Home directory
         if let Some(home) = dirs::home_dir() {
             let home_config = home.join(".pg_format");
-            if home_config.exists() {
-                if let Ok(config) = Self::from_file(&home_config) {
-                    return Some(config);
-                }
+            if home_config.exists()
+                && let Ok(config) = Self::from_file(&home_config)
+            {
+                return Some(config);
             }
         }
 
         // 3. XDG config directory
         if let Some(config_dir) = dirs::config_dir() {
             let xdg_config = config_dir.join("pg_format").join("pg_format.conf");
-            if xdg_config.exists() {
-                if let Ok(config) = Self::from_file(&xdg_config) {
-                    return Some(config);
-                }
+            if xdg_config.exists()
+                && let Ok(config) = Self::from_file(&xdg_config)
+            {
+                return Some(config);
             }
         }
 

@@ -5,7 +5,7 @@ use mold_syntax::SyntaxKind;
 
 use super::PAREN_RECOVERY;
 use super::expressions::expr;
-use super::select::select_stmt;
+use super::select::{at_ident, expect_ident, select_stmt, with_clause};
 
 /// Parse INSERT statement.
 ///
@@ -19,6 +19,10 @@ use super::select::select_stmt;
 pub fn insert_stmt(p: &mut Parser<'_>) {
     let m = p.start();
 
+    if p.at(SyntaxKind::WITH_KW) {
+        with_clause(p);
+    }
+
     p.expect(SyntaxKind::INSERT_KW);
     p.expect(SyntaxKind::INTO_KW);
 
@@ -27,8 +31,8 @@ pub fn insert_stmt(p: &mut Parser<'_>) {
 
     // Optional alias
     if p.eat(SyntaxKind::AS_KW) {
-        p.expect(SyntaxKind::IDENT);
-    } else if p.at(SyntaxKind::IDENT)
+        expect_ident(p, PAREN_RECOVERY);
+    } else if at_ident(p)
         && !matches!(
             p.current(),
             SyntaxKind::L_PAREN
@@ -81,12 +85,12 @@ pub fn insert_stmt(p: &mut Parser<'_>) {
 
 fn table_name(p: &mut Parser<'_>) {
     let m = p.start();
-    p.expect(SyntaxKind::IDENT);
+    expect_ident(p, PAREN_RECOVERY);
 
     // Schema qualification
     if p.at(SyntaxKind::DOT) {
         p.bump();
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
     }
 
     m.complete(p, SyntaxKind::TABLE_REF);
@@ -97,9 +101,9 @@ fn column_list(p: &mut Parser<'_>) {
     p.bump(); // (
 
     if !p.at(SyntaxKind::R_PAREN) {
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
         while p.eat(SyntaxKind::COMMA) {
-            p.expect(SyntaxKind::IDENT);
+            expect_ident(p, PAREN_RECOVERY);
         }
     }
 
@@ -153,7 +157,7 @@ fn on_conflict_clause(p: &mut Parser<'_>) {
     } else if p.eat(SyntaxKind::ON_KW) {
         // ON CONSTRAINT constraint_name
         p.expect(SyntaxKind::CONSTRAINT_KW);
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
     }
 
     // Conflict action
@@ -214,13 +218,13 @@ fn set_item(p: &mut Parser<'_>) {
     // Column name or (col1, col2, ...)
     if p.at(SyntaxKind::L_PAREN) {
         p.bump();
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
         while p.eat(SyntaxKind::COMMA) {
-            p.expect(SyntaxKind::IDENT);
+            expect_ident(p, PAREN_RECOVERY);
         }
         p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     } else {
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
     }
 
     p.expect(SyntaxKind::EQ);
@@ -247,16 +251,16 @@ pub fn returning_clause(p: &mut Parser<'_>) {
     expr(p);
     // Optional alias
     if p.eat(SyntaxKind::AS_KW) {
-        p.expect(SyntaxKind::IDENT);
-    } else if p.at(SyntaxKind::IDENT) && !is_clause_end(p.current()) {
+        expect_ident(p, PAREN_RECOVERY);
+    } else if at_ident(p) && !is_clause_end(p.current()) {
         p.bump();
     }
 
     while p.eat(SyntaxKind::COMMA) {
         expr(p);
         if p.eat(SyntaxKind::AS_KW) {
-            p.expect(SyntaxKind::IDENT);
-        } else if p.at(SyntaxKind::IDENT) && !is_clause_end(p.current()) {
+            expect_ident(p, PAREN_RECOVERY);
+        } else if at_ident(p) && !is_clause_end(p.current()) {
             p.bump();
         }
     }

@@ -64,16 +64,16 @@ mod tests {
         let prefix = "  ".repeat(indent);
 
         result.push_str(&format!(
-            "{}{}@{:?}\n",
+            "{}{:?}@{:?}\n",
             prefix,
-            format!("{:?}", node.kind()),
+            node.kind(),
             node.text_range()
         ));
 
         for child in node.children_with_tokens() {
             match child {
                 NodeOrToken::Node(n) => {
-                    result.push_str(&format_node(&n, indent + 1));
+                    result.push_str(&format_node(n, indent + 1));
                 }
                 NodeOrToken::Token(t) => {
                     result.push_str(&format!(

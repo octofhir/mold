@@ -33,6 +33,7 @@ pub fn detect_context(parse: &Parse, offset: TextSize) -> CompletionContext {
 fn find_token_at_offset(root: &SyntaxNode, offset: TextSize) -> Option<SyntaxToken> {
     // Try to find a token that contains the offset
     let mut best_token: Option<SyntaxToken> = None;
+    let mut best_non_trivia: Option<SyntaxToken> = None;
 
     for token in root
         .descendants_with_tokens()
@@ -40,14 +41,22 @@ fn find_token_at_offset(root: &SyntaxNode, offset: TextSize) -> Option<SyntaxTok
     {
         let range = token.text_range();
         if range.contains(offset) || range.end() == offset {
+            if token.kind().is_trivia() {
+                return best_non_trivia
+                    .or(best_token)
+                    .or_else(|| Some(token.clone()));
+            }
             return Some(token.clone());
         }
         if range.end() <= offset {
             best_token = Some(token.clone());
+            if !token.kind().is_trivia() {
+                best_non_trivia = Some(token.clone());
+            }
         }
     }
 
-    best_token
+    best_non_trivia.or(best_token)
 }
 
 /// Finds the deepest node containing the offset.
@@ -481,6 +490,14 @@ fn find_join_tables(node: &SyntaxNode) -> (String, String) {
 
 /// Extracts a table name from a TABLE_REF or TABLE_NAME node.
 fn extract_table_name(node: &SyntaxNode) -> Option<String> {
+    if node.kind() == SyntaxKind::TABLE_NAME {
+        return extract_table_name_tokens(node);
+    }
+
+    if node.kind() == SyntaxKind::TABLE_REF {
+        return extract_table_ref_parts(node).0;
+    }
+
     // Prefer the actual table name over aliases for scope resolution.
     for token in node.children_with_tokens().filter_map(|c| c.into_token()) {
         if token.kind() == SyntaxKind::IDENT || token.kind() == SyntaxKind::QUOTED_IDENT {
@@ -498,15 +515,43 @@ fn extract_table_name(node: &SyntaxNode) -> Option<String> {
             }
         }
     }
+    None
+}
 
-    // Check nested TABLE_NAME
-    for child in node.children() {
-        if child.kind() == SyntaxKind::TABLE_NAME {
-            return extract_table_name(&child);
+fn extract_table_ref_parts(node: &SyntaxNode) -> (Option<String>, Option<String>) {
+    let mut name = String::new();
+    let mut alias = None;
+    let mut saw_name = false;
+    let mut in_alias = false;
+
+    for element in node.children_with_tokens() {
+        if let Some(token) = element.as_token() {
+            match token.kind() {
+                SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT => {
+                    if in_alias {
+                        alias = Some(token.text().to_string());
+                        break;
+                    }
+                    saw_name = true;
+                    name.push_str(token.text());
+                }
+                SyntaxKind::DOT if !in_alias => {
+                    saw_name = true;
+                    name.push('.');
+                }
+                SyntaxKind::AS_KW if saw_name => {
+                    in_alias = true;
+                }
+                _ if token.kind().is_trivia() && saw_name => {
+                    in_alias = true;
+                }
+                _ => {}
+            }
         }
     }
 
-    None
+    let name = if name.is_empty() { None } else { Some(name) };
+    (name, alias)
 }
 
 /// Detects ORDER BY context.
@@ -570,43 +615,57 @@ fn resolve_table_alias(node: &SyntaxNode, table: &str) -> String {
         return table.to_string();
     }
 
-    let select = node
-        .ancestors()
-        .find(|n| n.kind() == SyntaxKind::SELECT_STMT);
+    let statement = nearest_statement_scope(node);
 
-    let Some(select) = select else {
+    let Some(statement) = statement else {
         return table.to_string();
     };
 
-    let alias_map = collect_aliases(&select);
+    let alias_map = collect_aliases(&statement);
     alias_map
         .get(table)
         .cloned()
         .unwrap_or_else(|| table.to_string())
 }
 
-fn collect_aliases(select: &SyntaxNode) -> HashMap<String, String> {
+fn nearest_statement_scope(node: &SyntaxNode) -> Option<SyntaxNode> {
+    node.ancestors()
+        .find(|n| {
+            matches!(
+                n.kind(),
+                SyntaxKind::SELECT_STMT
+                    | SyntaxKind::UPDATE_STMT
+                    | SyntaxKind::DELETE_STMT
+                    | SyntaxKind::INSERT_STMT
+            )
+        })
+        .cloned()
+}
+
+fn statement_ancestors(node: &SyntaxNode) -> Vec<SyntaxNode> {
+    node.ancestors()
+        .filter(|n| {
+            matches!(
+                n.kind(),
+                SyntaxKind::SELECT_STMT
+                    | SyntaxKind::UPDATE_STMT
+                    | SyntaxKind::DELETE_STMT
+                    | SyntaxKind::INSERT_STMT
+            )
+        })
+        .cloned()
+        .collect()
+}
+
+fn collect_aliases(statement: &SyntaxNode) -> HashMap<String, String> {
     let mut map = HashMap::new();
 
-    for node in select.descendants() {
-        if node.kind() != SyntaxKind::TABLE_REF {
-            continue;
-        }
+    if let (Some(table_name), Some(alias)) = extract_statement_target_parts(statement) {
+        map.insert(alias, table_name);
+    }
 
-        let table_node = node
-            .children()
-            .find(|child| child.kind() == SyntaxKind::TABLE_NAME);
-        let alias_node = node
-            .children()
-            .find(|child| child.kind() == SyntaxKind::ALIAS);
-
-        let Some(table_node) = table_node else {
-            continue;
-        };
-
-        let table_name = extract_table_name_tokens(&table_node);
-        let alias = alias_node.and_then(|node| extract_ident_token(&node));
-
+    for table_ref in scoped_table_refs(statement) {
+        let (table_name, alias) = extract_table_ref_parts(&table_ref);
         if let (Some(alias), Some(table_name)) = (alias, table_name) {
             map.insert(alias, table_name);
         }
@@ -635,37 +694,22 @@ fn extract_table_name_tokens(node: &SyntaxNode) -> Option<String> {
     if name.is_empty() { None } else { Some(name) }
 }
 
-fn extract_ident_token(node: &SyntaxNode) -> Option<String> {
-    for token in node
-        .children_with_tokens()
-        .filter_map(|child| child.into_token())
-    {
-        if token.kind() == SyntaxKind::IDENT || token.kind() == SyntaxKind::QUOTED_IDENT {
-            return Some(token.text().to_string());
-        }
-    }
-    None
-}
-
 /// Finds all tables in scope for the given node.
 fn find_tables_in_scope(node: &SyntaxNode) -> Vec<String> {
     let mut tables = Vec::new();
 
-    // Find the nearest SELECT statement
-    let select = node
-        .ancestors()
-        .find(|n| n.kind() == SyntaxKind::SELECT_STMT);
-
-    if let Some(select) = select {
-        // Find FROM clause
-        for child in select.children() {
-            if child.kind() == SyntaxKind::FROM_CLAUSE {
-                collect_tables_from_clause(&child, &mut tables);
+    if let Some(statement) = nearest_statement_scope(node) {
+        for table_ref in scoped_table_refs(&statement) {
+            if let Some(name) = extract_table_name(&table_ref)
+                && !tables.contains(&name)
+            {
+                tables.push(name);
             }
         }
+    }
 
-        // Also check for CTEs in WITH clause
-        for child in select.children() {
+    for statement in statement_ancestors(node) {
+        for child in statement.children() {
             if child.kind() == SyntaxKind::WITH_CLAUSE {
                 collect_ctes(&child, &mut tables);
             }
@@ -675,16 +719,139 @@ fn find_tables_in_scope(node: &SyntaxNode) -> Vec<String> {
     tables
 }
 
-/// Collects table names from a FROM clause.
-fn collect_tables_from_clause(from_clause: &SyntaxNode, tables: &mut Vec<String>) {
-    for child in from_clause.descendants() {
-        if (child.kind() == SyntaxKind::TABLE_REF || child.kind() == SyntaxKind::TABLE_NAME)
-            && let Some(name) = extract_table_name(&child)
-            && !tables.contains(&name)
-        {
-            tables.push(name);
+fn scoped_table_refs(statement: &SyntaxNode) -> Vec<SyntaxNode> {
+    match statement.kind() {
+        SyntaxKind::SELECT_STMT => direct_clause_table_refs(statement, &[SyntaxKind::FROM_CLAUSE]),
+        SyntaxKind::UPDATE_STMT => {
+            let mut refs = statement_target_table_ref(statement);
+            refs.extend(direct_clause_table_refs(
+                statement,
+                &[SyntaxKind::FROM_CLAUSE],
+            ));
+            refs
+        }
+        SyntaxKind::DELETE_STMT => {
+            let mut refs = statement_target_table_ref(statement);
+            refs.extend(direct_clause_table_refs(
+                statement,
+                &[SyntaxKind::USING_CLAUSE],
+            ));
+            refs
+        }
+        SyntaxKind::INSERT_STMT => statement_target_table_ref(statement),
+        _ => Vec::new(),
+    }
+}
+
+fn statement_target_table_ref(statement: &SyntaxNode) -> Vec<SyntaxNode> {
+    statement
+        .children()
+        .filter(|child| child.kind() == SyntaxKind::TABLE_REF)
+        .take(1)
+        .cloned()
+        .collect()
+}
+
+fn direct_clause_table_refs(
+    statement: &SyntaxNode,
+    clause_kinds: &[SyntaxKind],
+) -> Vec<SyntaxNode> {
+    let mut refs = Vec::new();
+
+    for child in statement.children() {
+        if clause_kinds.contains(&child.kind()) {
+            refs.extend(
+                child
+                    .descendants()
+                    .filter(|n| n.kind() == SyntaxKind::TABLE_REF)
+                    .cloned(),
+            );
         }
     }
+
+    refs
+}
+
+fn extract_statement_target_parts(statement: &SyntaxNode) -> (Option<String>, Option<String>) {
+    let Some(target) = statement_target_table_ref(statement).into_iter().next() else {
+        return (None, None);
+    };
+
+    let table_name = extract_table_name(&target);
+    let mut after_target = false;
+    let mut saw_as = false;
+
+    for element in statement.children_with_tokens() {
+        if let Some(node) = element.as_node() {
+            if !after_target {
+                after_target =
+                    node.kind() == target.kind() && node.text_range() == target.text_range();
+                continue;
+            }
+
+            if matches!(
+                node.kind(),
+                SyntaxKind::SET_CLAUSE
+                    | SyntaxKind::FROM_CLAUSE
+                    | SyntaxKind::USING_CLAUSE
+                    | SyntaxKind::WHERE_CLAUSE
+                    | SyntaxKind::RETURNING_CLAUSE
+                    | SyntaxKind::INSERT_COLUMNS
+                    | SyntaxKind::VALUES_CLAUSE
+                    | SyntaxKind::SELECT_STMT
+                    | SyntaxKind::ON_CONFLICT_CLAUSE
+            ) {
+                break;
+            }
+
+            continue;
+        }
+
+        let Some(token) = element.as_token() else {
+            continue;
+        };
+
+        if !after_target || token.kind().is_trivia() {
+            continue;
+        }
+
+        match token.kind() {
+            SyntaxKind::AS_KW => saw_as = true,
+            SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT => {
+                if saw_as || can_have_implicit_target_alias(statement, token.kind()) {
+                    return (table_name, Some(token.text().to_string()));
+                }
+                break;
+            }
+            _ if is_target_alias_stop_token(token.kind()) => break,
+            _ => break,
+        }
+    }
+
+    (table_name, None)
+}
+
+fn can_have_implicit_target_alias(statement: &SyntaxNode, kind: SyntaxKind) -> bool {
+    matches!(
+        statement.kind(),
+        SyntaxKind::UPDATE_STMT | SyntaxKind::DELETE_STMT | SyntaxKind::INSERT_STMT
+    ) && matches!(kind, SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT)
+}
+
+fn is_target_alias_stop_token(kind: SyntaxKind) -> bool {
+    matches!(
+        kind,
+        SyntaxKind::L_PAREN
+            | SyntaxKind::VALUES_KW
+            | SyntaxKind::SELECT_KW
+            | SyntaxKind::DEFAULT_KW
+            | SyntaxKind::SET_KW
+            | SyntaxKind::FROM_KW
+            | SyntaxKind::USING_KW
+            | SyntaxKind::WHERE_KW
+            | SyntaxKind::RETURNING_KW
+            | SyntaxKind::ON_KW
+    )
 }
 
 /// Collects CTE names from a WITH clause.
@@ -752,12 +919,11 @@ fn extract_cte_info(cte: &SyntaxNode) -> Option<CteInfo> {
                 }
                 _ => {}
             }
-        } else if let Some(node) = child.as_node() {
-            // After AS, we might find a SELECT_STMT
-            if found_as && node.kind() == SyntaxKind::SELECT_STMT && explicit_columns.is_empty() {
-                // Infer columns from SELECT clause
-                explicit_columns = extract_select_output_columns(node);
-            }
+        } else if let Some(node) = child.as_node()
+            && found_as
+            && explicit_columns.is_empty()
+        {
+            explicit_columns = infer_cte_output_columns(&node);
         }
     }
 
@@ -767,38 +933,65 @@ fn extract_cte_info(cte: &SyntaxNode) -> Option<CteInfo> {
     })
 }
 
+fn infer_cte_output_columns(statement: &SyntaxNode) -> Vec<String> {
+    match statement.kind() {
+        SyntaxKind::SELECT_STMT => extract_select_output_columns(statement),
+        SyntaxKind::INSERT_STMT | SyntaxKind::UPDATE_STMT | SyntaxKind::DELETE_STMT => {
+            extract_returning_output_columns(statement)
+        }
+        _ => Vec::new(),
+    }
+}
+
 /// Extracts output column names from a SELECT statement.
 fn extract_select_output_columns(select: &SyntaxNode) -> Vec<String> {
-    let mut columns = Vec::new();
-
-    // Find SELECT_CLAUSE
-    let select_clause = select
+    let item_list = select
         .children()
-        .find(|c| c.kind() == SyntaxKind::SELECT_CLAUSE);
-
-    let Some(select_clause) = select_clause else {
-        return columns;
-    };
-
-    // Find SELECT_ITEM_LIST
-    let item_list = select_clause
-        .children()
-        .find(|c| c.kind() == SyntaxKind::SELECT_ITEM_LIST);
+        .find(|c| c.kind() == SyntaxKind::SELECT_ITEM_LIST)
+        .or_else(|| {
+            select
+                .children()
+                .find(|c| c.kind() == SyntaxKind::SELECT_CLAUSE)
+                .and_then(|clause| {
+                    clause
+                        .children()
+                        .find(|child| child.kind() == SyntaxKind::SELECT_ITEM_LIST)
+                })
+        });
 
     let Some(item_list) = item_list else {
-        return columns;
+        return Vec::new();
     };
 
-    // Iterate SELECT_ITEMs
-    for item in item_list.children() {
-        if item.kind() == SyntaxKind::SELECT_ITEM
-            && let Some(col_name) = extract_select_item_name(&item)
-        {
-            columns.push(col_name);
-        }
+    item_list
+        .children()
+        .filter(|item| item.kind() == SyntaxKind::SELECT_ITEM)
+        .filter_map(extract_select_item_name)
+        .collect()
+}
+
+fn extract_returning_output_columns(statement: &SyntaxNode) -> Vec<String> {
+    let Some(returning_clause) = statement
+        .children()
+        .find(|c| c.kind() == SyntaxKind::RETURNING_CLAUSE)
+    else {
+        return Vec::new();
+    };
+
+    let direct_items: Vec<_> = returning_clause
+        .children()
+        .filter(|child| child.kind() == SyntaxKind::SELECT_ITEM)
+        .filter_map(extract_select_item_name)
+        .collect();
+
+    if !direct_items.is_empty() {
+        return direct_items;
     }
 
-    columns
+    returning_clause
+        .children()
+        .filter_map(extract_select_item_name)
+        .collect()
 }
 
 /// Extracts the output name from a SELECT item.
@@ -837,7 +1030,7 @@ fn extract_select_item_name(item: &SyntaxNode) -> Option<String> {
         .descendants_with_tokens()
         .filter_map(|c| c.into_token())
     {
-        if token.kind() == SyntaxKind::IDENT {
+        if matches!(token.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT) {
             return Some(token.text().to_string());
         }
     }
@@ -847,27 +1040,28 @@ fn extract_select_item_name(item: &SyntaxNode) -> Option<String> {
 
 /// Finds CTE columns for a given CTE name in scope.
 pub fn find_cte_columns(node: &SyntaxNode, cte_name: &str) -> Vec<String> {
-    // Find the nearest SELECT statement
-    let select = node
-        .ancestors()
-        .find(|n| n.kind() == SyntaxKind::SELECT_STMT);
-
-    let Some(select) = select else {
-        return Vec::new();
-    };
-
-    // Find WITH clause
-    for child in select.children() {
-        if child.kind() == SyntaxKind::WITH_CLAUSE {
-            for cte_info in collect_cte_info(&child) {
-                if cte_info.name == cte_name {
-                    return cte_info.columns;
+    for statement in statement_ancestors(node) {
+        for child in statement.children() {
+            if child.kind() == SyntaxKind::WITH_CLAUSE {
+                for cte_info in collect_cte_info(&child) {
+                    if cte_info.name == cte_name {
+                        return cte_info.columns;
+                    }
                 }
             }
         }
     }
 
     Vec::new()
+}
+
+/// Finds CTE columns for the statement scope at the given offset.
+pub fn find_cte_columns_at_offset(parse: &Parse, offset: TextSize, cte_name: &str) -> Vec<String> {
+    let root = parse.syntax();
+    let node = find_node_at_offset(&root, offset)
+        .or_else(|| find_token_at_offset(&root, offset).map(|token| token.parent().clone()))
+        .unwrap_or(root);
+    find_cte_columns(&node, cte_name)
 }
 
 /// Detects context from token alone.
@@ -932,7 +1126,13 @@ fn detect_from_token(token: &SyntaxToken, offset: TextSize) -> CompletionContext
         },
         SyntaxKind::DOT => {
             // After a dot, we need column completion
-            if let Some(table) = find_table_qualifier_from_token(token) {
+            let parent = token.parent();
+            if let Some(table) = find_table_qualifier(token, parent) {
+                CompletionContext::ColumnRef {
+                    table: Some(table),
+                    tables: find_tables_in_scope(parent),
+                }
+            } else if let Some(table) = find_table_qualifier_from_token(token) {
                 CompletionContext::ColumnRef {
                     table: Some(table),
                     tables: Vec::new(),
@@ -1257,5 +1457,85 @@ mod tests {
             parse_path_array_string("{name,given}"),
             vec!["name", "given"]
         );
+    }
+
+    #[test]
+    fn test_detect_context_resolves_join_alias() {
+        let source = "SELECT u. FROM users u JOIN orders o ON u.id = o.user_id";
+        let offset = source.find(" FROM").unwrap() as u32;
+        let parse = mold_parser::parse(source);
+        let context = detect_context(&parse, TextSize::new(offset));
+
+        assert!(matches!(
+            context,
+            CompletionContext::ColumnRef {
+                table: Some(ref table),
+                ref tables,
+            } if table == "users" && tables == &vec!["users".to_string(), "orders".to_string()]
+        ));
+    }
+
+    #[test]
+    fn test_detect_context_schema_qualified_table_scope() {
+        let source = "SELECT public.users. FROM public.users";
+        let offset = source.find(" FROM").unwrap() as u32;
+        let parse = mold_parser::parse(source);
+        let context = detect_context(&parse, TextSize::new(offset));
+
+        assert!(matches!(
+            context,
+            CompletionContext::ColumnRef {
+                table: Some(ref table),
+                ref tables,
+            } if table == "public.users" && tables == &vec!["public.users".to_string()]
+        ));
+    }
+
+    #[test]
+    fn test_detect_context_update_from_alias_scope() {
+        let source = "UPDATE users u SET name = o. FROM orders o WHERE u.id = o.user_id";
+        let offset = source.find(" FROM").unwrap() as u32;
+        let parse = mold_parser::parse(source);
+        let context = detect_context(&parse, TextSize::new(offset));
+
+        assert!(matches!(
+            context,
+            CompletionContext::ColumnRef {
+                table: Some(ref table),
+                ref tables,
+            } if table == "orders" && tables == &vec!["users".to_string(), "orders".to_string()]
+        ));
+    }
+
+    #[test]
+    fn test_detect_context_delete_using_alias_scope() {
+        let source = "DELETE FROM users u USING orders o WHERE o.";
+        let offset = source.len() as u32;
+        let parse = mold_parser::parse(source);
+        let context = detect_context(&parse, TextSize::new(offset));
+
+        assert!(matches!(
+            context,
+            CompletionContext::ColumnRef {
+                table: Some(ref table),
+                ref tables,
+            } if table == "orders" && tables == &vec!["users".to_string(), "orders".to_string()]
+        ));
+    }
+
+    #[test]
+    fn test_detect_context_insert_returning_alias_scope() {
+        let source = "INSERT INTO users u (name) VALUES ('alice') RETURNING u.";
+        let offset = source.len() as u32;
+        let parse = mold_parser::parse(source);
+        let context = detect_context(&parse, TextSize::new(offset));
+
+        assert!(matches!(
+            context,
+            CompletionContext::ColumnRef {
+                table: Some(ref table),
+                ref tables,
+            } if table == "users" && tables == &vec!["users".to_string()]
+        ));
     }
 }

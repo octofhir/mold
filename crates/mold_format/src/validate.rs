@@ -451,7 +451,7 @@ mod tests {
         let sql = "SELECT id, name FROM users";
         let count = count_tokens(sql);
         // SELECT, id, COMMA, name, FROM, users = 6 tokens
-        assert!(count >= 5 && count <= 7);
+        assert!((5..=7).contains(&count));
     }
 
     #[test]

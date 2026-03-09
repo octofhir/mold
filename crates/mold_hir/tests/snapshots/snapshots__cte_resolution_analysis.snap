@@ -1,0 +1,12 @@
+---
+source: crates/mold_hir/tests/snapshots.rs
+expression: render_analysis(&analysis)
+---
+diagnostics:
+- <none>
+tables:
+- <none>
+columns:
+- <none>
+output_columns:
+- <none>

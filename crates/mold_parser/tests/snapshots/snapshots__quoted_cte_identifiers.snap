@@ -1,0 +1,52 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..113
+  SELECT_STMT@0..113
+    WITH_CLAUSE@0..65
+      WITH_KW@0..4 "WITH"
+      WHITESPACE@4..5 " "
+      CTE@5..65
+        QUOTED_IDENT@5..18 "\"RecentUsers\""
+        L_PAREN@18..19 "("
+        QUOTED_IDENT@19..27 "\"UserId\""
+        R_PAREN@27..28 ")"
+        WHITESPACE@28..29 " "
+        AS_KW@29..31 "AS"
+        WHITESPACE@31..32 " "
+        L_PAREN@32..33 "("
+        SELECT_STMT@33..63
+          SELECT_KW@33..39 "SELECT"
+          WHITESPACE@39..40 " "
+          SELECT_ITEM_LIST@40..52
+            SELECT_ITEM@40..52
+              COLUMN_REF@40..52
+                QUOTED_IDENT@40..46 "\"User\""
+                DOT@46..47 "."
+                QUOTED_IDENT@47..51 "\"id\""
+                WHITESPACE@51..52 " "
+          FROM_CLAUSE@52..63
+            FROM_KW@52..56 "FROM"
+            WHITESPACE@56..57 " "
+            TABLE_REF@57..63
+              QUOTED_IDENT@57..63 "\"User\""
+        R_PAREN@63..64 ")"
+        WHITESPACE@64..65 " "
+    SELECT_KW@65..71 "SELECT"
+    WHITESPACE@71..72 " "
+    SELECT_ITEM_LIST@72..95
+      SELECT_ITEM@72..95
+        COLUMN_REF@72..95
+          QUOTED_IDENT@72..85 "\"RecentUsers\""
+          DOT@85..86 "."
+          QUOTED_IDENT@86..94 "\"UserId\""
+          WHITESPACE@94..95 " "
+    FROM_CLAUSE@95..113
+      FROM_KW@95..99 "FROM"
+      WHITESPACE@99..100 " "
+      TABLE_REF@100..113
+        QUOTED_IDENT@100..113 "\"RecentUsers\""

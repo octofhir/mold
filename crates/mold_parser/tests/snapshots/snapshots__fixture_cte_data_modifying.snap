@@ -1,0 +1,64 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(&sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..101
+  SELECT_STMT@0..99
+    WITH_CLAUSE@0..77
+      WITH_KW@0..4 "WITH"
+      WHITESPACE@4..5 " "
+      CTE@5..77
+        IDENT@5..13 "inserted"
+        WHITESPACE@13..14 " "
+        AS_KW@14..16 "AS"
+        WHITESPACE@16..17 " "
+        L_PAREN@17..18 "("
+        NEWLINE@18..19 "\n"
+        WHITESPACE@19..23 "    "
+        INSERT_STMT@23..75
+          INSERT_KW@23..29 "INSERT"
+          WHITESPACE@29..30 " "
+          INTO_KW@30..34 "INTO"
+          WHITESPACE@34..35 " "
+          TABLE_REF@35..40
+            IDENT@35..39 "logs"
+            WHITESPACE@39..40 " "
+          INSERT_COLUMNS@40..46
+            L_PAREN@40..41 "("
+            IDENT@41..44 "msg"
+            R_PAREN@44..45 ")"
+            WHITESPACE@45..46 " "
+          VALUES_CLAUSE@46..62
+            VALUES_KW@46..52 "VALUES"
+            WHITESPACE@52..53 " "
+            VALUES_ROW@53..62
+              L_PAREN@53..54 "("
+              LITERAL@54..60
+                STRING@54..60 "'test'"
+              R_PAREN@60..61 ")"
+              WHITESPACE@61..62 " "
+          RETURNING_CLAUSE@62..75
+            RETURNING_KW@62..71 "RETURNING"
+            WHITESPACE@71..72 " "
+            COLUMN_REF@72..75
+              IDENT@72..74 "id"
+              NEWLINE@74..75 "\n"
+        R_PAREN@75..76 ")"
+        NEWLINE@76..77 "\n"
+    SELECT_KW@77..83 "SELECT"
+    WHITESPACE@83..84 " "
+    SELECT_ITEM_LIST@84..86
+      SELECT_ITEM@84..86
+        STAR_EXPR@84..86
+          STAR@84..85 "*"
+          WHITESPACE@85..86 " "
+    FROM_CLAUSE@86..99
+      FROM_KW@86..90 "FROM"
+      WHITESPACE@90..91 " "
+      TABLE_REF@91..99
+        IDENT@91..99 "inserted"
+  SEMICOLON@99..100 ";"
+  NEWLINE@100..101 "\n"

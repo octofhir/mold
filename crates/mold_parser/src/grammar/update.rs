@@ -6,7 +6,7 @@ use mold_syntax::SyntaxKind;
 use super::PAREN_RECOVERY;
 use super::expressions::expr;
 use super::insert::returning_clause;
-use super::select::{select_stmt, table_ref};
+use super::select::{at_ident, expect_ident, select_stmt, table_ref, with_clause};
 
 /// Parse UPDATE statement.
 ///
@@ -18,6 +18,10 @@ use super::select::{select_stmt, table_ref};
 pub fn update_stmt(p: &mut Parser<'_>) {
     let m = p.start();
 
+    if p.at(SyntaxKind::WITH_KW) {
+        with_clause(p);
+    }
+
     p.expect(SyntaxKind::UPDATE_KW);
 
     // Optional ONLY
@@ -28,8 +32,8 @@ pub fn update_stmt(p: &mut Parser<'_>) {
 
     // Optional alias
     if p.eat(SyntaxKind::AS_KW) {
-        p.expect(SyntaxKind::IDENT);
-    } else if p.at(SyntaxKind::IDENT) && !is_update_keyword(p.current()) {
+        expect_ident(p, PAREN_RECOVERY);
+    } else if at_ident(p) && !is_update_keyword(p.current()) {
         p.bump();
     }
 
@@ -56,12 +60,12 @@ pub fn update_stmt(p: &mut Parser<'_>) {
 
 fn table_name(p: &mut Parser<'_>) {
     let m = p.start();
-    p.expect(SyntaxKind::IDENT);
+    expect_ident(p, PAREN_RECOVERY);
 
     // Schema qualification
     if p.at(SyntaxKind::DOT) {
         p.bump();
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
     }
 
     m.complete(p, SyntaxKind::TABLE_REF);
@@ -85,13 +89,13 @@ fn set_item(p: &mut Parser<'_>) {
     // Column name or (col1, col2, ...)
     if p.at(SyntaxKind::L_PAREN) {
         p.bump();
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
         while p.eat(SyntaxKind::COMMA) {
-            p.expect(SyntaxKind::IDENT);
+            expect_ident(p, PAREN_RECOVERY);
         }
         p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     } else {
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
     }
 
     p.expect(SyntaxKind::EQ);
@@ -131,7 +135,7 @@ fn where_clause(p: &mut Parser<'_>) {
     // WHERE CURRENT OF cursor_name (for cursor-based updates)
     if p.eat(SyntaxKind::CURRENT_KW) {
         p.expect(SyntaxKind::OF_KW);
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
     } else {
         expr(p);
     }

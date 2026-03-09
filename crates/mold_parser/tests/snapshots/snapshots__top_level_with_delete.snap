@@ -1,0 +1,61 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..110
+  DELETE_STMT@0..110
+    WITH_CLAUSE@0..43
+      WITH_KW@0..4 "WITH"
+      WHITESPACE@4..5 " "
+      CTE@5..43
+        QUOTED_IDENT@5..12 "\"stale\""
+        WHITESPACE@12..13 " "
+        AS_KW@13..15 "AS"
+        WHITESPACE@15..16 " "
+        L_PAREN@16..17 "("
+        SELECT_STMT@17..41
+          SELECT_KW@17..23 "SELECT"
+          WHITESPACE@23..24 " "
+          SELECT_ITEM_LIST@24..29
+            SELECT_ITEM@24..29
+              COLUMN_REF@24..29
+                QUOTED_IDENT@24..28 "\"id\""
+                WHITESPACE@28..29 " "
+          FROM_CLAUSE@29..41
+            FROM_KW@29..33 "FROM"
+            WHITESPACE@33..34 " "
+            TABLE_REF@34..41
+              QUOTED_IDENT@34..41 "\"users\""
+        R_PAREN@41..42 ")"
+        WHITESPACE@42..43 " "
+    DELETE_KW@43..49 "DELETE"
+    WHITESPACE@49..50 " "
+    FROM_KW@50..54 "FROM"
+    WHITESPACE@54..55 " "
+    TABLE_REF@55..63
+      QUOTED_IDENT@55..62 "\"users\""
+      WHITESPACE@62..63 " "
+    USING_CLAUSE@63..77
+      USING_KW@63..68 "USING"
+      WHITESPACE@68..69 " "
+      TABLE_REF@69..77
+        QUOTED_IDENT@69..76 "\"stale\""
+        WHITESPACE@76..77 " "
+    WHERE_CLAUSE@77..110
+      WHERE_KW@77..82 "WHERE"
+      WHITESPACE@82..83 " "
+      BINARY_EXPR@83..110
+        COLUMN_REF@83..96
+          QUOTED_IDENT@83..90 "\"users\""
+          DOT@90..91 "."
+          QUOTED_IDENT@91..95 "\"id\""
+          WHITESPACE@95..96 " "
+        EQ@96..97 "="
+        WHITESPACE@97..98 " "
+        COLUMN_REF@98..110
+          QUOTED_IDENT@98..105 "\"stale\""
+          DOT@105..106 "."
+          QUOTED_IDENT@106..110 "\"id\""

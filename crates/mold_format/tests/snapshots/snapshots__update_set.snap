@@ -2,7 +2,7 @@
 source: crates/mold_format/tests/snapshots.rs
 expression: formatted
 ---
-UPDATE 
+UPDATE users
    SET name = 'New Name',
        updated_at = now()
  WHERE id = 1

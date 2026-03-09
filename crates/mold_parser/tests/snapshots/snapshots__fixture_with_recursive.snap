@@ -1,0 +1,87 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(&sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..112
+  SELECT_STMT@0..110
+    WITH_CLAUSE@0..95
+      WITH_KW@0..4 "WITH"
+      WHITESPACE@4..5 " "
+      RECURSIVE_KW@5..14 "RECURSIVE"
+      WHITESPACE@14..15 " "
+      CTE@15..95
+        IDENT@15..16 "t"
+        WHITESPACE@16..17 " "
+        AS_KW@17..19 "AS"
+        WHITESPACE@19..20 " "
+        L_PAREN@20..21 "("
+        NEWLINE@21..22 "\n"
+        WHITESPACE@22..26 "    "
+        SELECT_STMT@26..93
+          SELECT_KW@26..32 "SELECT"
+          WHITESPACE@32..33 " "
+          SELECT_ITEM_LIST@33..45
+            SELECT_ITEM@33..45
+              LITERAL@33..35
+                INTEGER@33..34 "1"
+                WHITESPACE@34..35 " "
+              AS_KW@35..37 "AS"
+              WHITESPACE@37..38 " "
+              IDENT@38..40 "id"
+              NEWLINE@40..41 "\n"
+              WHITESPACE@41..45 "    "
+          UNION_KW@45..50 "UNION"
+          WHITESPACE@50..51 " "
+          ALL_KW@51..54 "ALL"
+          NEWLINE@54..55 "\n"
+          WHITESPACE@55..59 "    "
+          SELECT_KW@59..65 "SELECT"
+          WHITESPACE@65..66 " "
+          SELECT_ITEM_LIST@66..73
+            SELECT_ITEM@66..73
+              BINARY_EXPR@66..73
+                COLUMN_REF@66..69
+                  IDENT@66..68 "id"
+                  WHITESPACE@68..69 " "
+                PLUS@69..70 "+"
+                WHITESPACE@70..71 " "
+                LITERAL@71..73
+                  INTEGER@71..72 "1"
+                  WHITESPACE@72..73 " "
+          FROM_CLAUSE@73..80
+            FROM_KW@73..77 "FROM"
+            WHITESPACE@77..78 " "
+            TABLE_REF@78..80
+              IDENT@78..79 "t"
+              WHITESPACE@79..80 " "
+          WHERE_CLAUSE@80..93
+            WHERE_KW@80..85 "WHERE"
+            WHITESPACE@85..86 " "
+            BINARY_EXPR@86..93
+              COLUMN_REF@86..89
+                IDENT@86..88 "id"
+                WHITESPACE@88..89 " "
+              LT@89..90 "<"
+              WHITESPACE@90..91 " "
+              LITERAL@91..93
+                INTEGER@91..92 "5"
+                NEWLINE@92..93 "\n"
+        R_PAREN@93..94 ")"
+        NEWLINE@94..95 "\n"
+    SELECT_KW@95..101 "SELECT"
+    WHITESPACE@101..102 " "
+    SELECT_ITEM_LIST@102..104
+      SELECT_ITEM@102..104
+        STAR_EXPR@102..104
+          STAR@102..103 "*"
+          WHITESPACE@103..104 " "
+    FROM_CLAUSE@104..110
+      FROM_KW@104..108 "FROM"
+      WHITESPACE@108..109 " "
+      TABLE_REF@109..110
+        IDENT@109..110 "t"
+  SEMICOLON@110..111 ";"
+  NEWLINE@111..112 "\n"

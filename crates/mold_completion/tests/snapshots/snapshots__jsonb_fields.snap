@@ -1,0 +1,7 @@
+---
+source: crates/mold_completion/tests/snapshots.rs
+assertion_line: 98
+expression: render_items(&result)
+---
+email | JsonbPath | detail=string | insert=-
+preferences | JsonbPath | detail=object | insert=-

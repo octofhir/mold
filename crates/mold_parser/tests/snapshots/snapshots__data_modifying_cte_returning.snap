@@ -1,0 +1,73 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..133
+  SELECT_STMT@0..133
+    WITH_CLAUSE@0..82
+      WITH_KW@0..4 "WITH"
+      WHITESPACE@4..5 " "
+      CTE@5..82
+        IDENT@5..12 "changed"
+        WHITESPACE@12..13 " "
+        AS_KW@13..15 "AS"
+        WHITESPACE@15..16 " "
+        L_PAREN@16..17 "("
+        UPDATE_STMT@17..80
+          UPDATE_KW@17..23 "UPDATE"
+          WHITESPACE@23..24 " "
+          TABLE_REF@24..31
+            IDENT@24..30 "orders"
+            WHITESPACE@30..31 " "
+          SET_CLAUSE@31..55
+            SET_KW@31..34 "SET"
+            WHITESPACE@34..35 " "
+            SET_ITEM@35..55
+              IDENT@35..41 "amount"
+              WHITESPACE@41..42 " "
+              EQ@42..43 "="
+              WHITESPACE@43..44 " "
+              BINARY_EXPR@44..55
+                COLUMN_REF@44..51
+                  IDENT@44..50 "amount"
+                  WHITESPACE@50..51 " "
+                PLUS@51..52 "+"
+                WHITESPACE@52..53 " "
+                LITERAL@53..55
+                  INTEGER@53..54 "1"
+                  WHITESPACE@54..55 " "
+          RETURNING_CLAUSE@55..80
+            RETURNING_KW@55..64 "RETURNING"
+            WHITESPACE@64..65 " "
+            COLUMN_REF@65..72
+              IDENT@65..72 "user_id"
+            COMMA@72..73 ","
+            WHITESPACE@73..74 " "
+            COLUMN_REF@74..80
+              IDENT@74..80 "amount"
+        R_PAREN@80..81 ")"
+        WHITESPACE@81..82 " "
+    SELECT_KW@82..88 "SELECT"
+    WHITESPACE@88..89 " "
+    SELECT_ITEM_LIST@89..121
+      SELECT_ITEM@89..104
+        COLUMN_REF@89..104
+          IDENT@89..96 "changed"
+          DOT@96..97 "."
+          IDENT@97..104 "user_id"
+      COMMA@104..105 ","
+      WHITESPACE@105..106 " "
+      SELECT_ITEM@106..121
+        COLUMN_REF@106..121
+          IDENT@106..113 "changed"
+          DOT@113..114 "."
+          IDENT@114..120 "amount"
+          WHITESPACE@120..121 " "
+    FROM_CLAUSE@121..133
+      FROM_KW@121..125 "FROM"
+      WHITESPACE@125..126 " "
+      TABLE_REF@126..133
+        IDENT@126..133 "changed"

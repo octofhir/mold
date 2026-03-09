@@ -2,6 +2,7 @@
 //!
 //! This module provides the main entry point for semantic analysis of SQL queries.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use text_size::TextRange;
@@ -699,7 +700,7 @@ use mold_syntax::Parse;
 use mold_syntax::SyntaxKind;
 use mold_syntax::ast::{
     AstNode, BinaryExpr, ColumnRef, DeleteStmt, Expr, JsonbAccessExpr, LiteralKind, SelectItem,
-    SelectStmt, TableName, UpdateStmt,
+    SelectStmt, UpdateStmt, WithClause,
 };
 
 use crate::resolve::{validate_column_reference, validate_table_reference};
@@ -728,52 +729,50 @@ pub fn analyze_query_with_options(
     // Walk the syntax tree to find table and column references
     let root = parse.syntax();
 
-    // First pass: collect table bindings from FROM clauses
-    let mut scope_builder = ScopeBuilder::new();
-
     for node in root.descendants() {
-        // Find table names in FROM clauses
-        if let Some(table_name) = TableName::cast(node.clone()) {
-            let name = table_name.name().map(|t| t.text().to_string());
-            let schema = table_name.schema().map(|t| t.text().to_string());
-            let alias = table_name
-                .alias()
-                .and_then(|a| a.name())
-                .map(|t| t.text().to_string());
-            let range = table_name.syntax().text_range();
+        if node.kind() != SyntaxKind::TABLE_REF {
+            continue;
+        }
 
-            if let Some(ref name) = name {
-                // Validate the table exists
-                let validation =
-                    validate_table_reference(schema.as_deref(), name, provider, Some(range));
+        let Some((name, _)) = extract_table_ref_name_and_alias(node) else {
+            continue;
+        };
 
-                if !validation.exists {
-                    let message = if !validation.schema_exists {
-                        format!(
-                            "Schema '{}' does not exist",
-                            schema.as_deref().unwrap_or("")
-                        )
-                    } else if !validation.suggestions.is_empty() {
-                        format!(
-                            "Table '{}' does not exist. Did you mean: {}?",
-                            name,
-                            validation.suggestions.join(", ")
-                        )
-                    } else {
-                        format!("Table '{}' does not exist", name)
-                    };
-                    analyzer.error(message, Some(range));
-                } else {
-                    // Build table binding for scope
-                    let binding =
-                        analyzer.build_table_binding(schema.as_deref(), name, alias.as_deref());
-                    scope_builder = scope_builder.add_table(binding);
-                }
-            }
+        let (schema, name_only) = split_qualified_table_name(&name);
+        let range = node.text_range();
+        let visible_ctes = visible_ctes_for_node(node, &analyzer);
+
+        if schema.is_none()
+            && visible_ctes
+                .iter()
+                .any(|cte| cte.name.eq_ignore_ascii_case(&name_only))
+        {
+            continue;
+        }
+
+        let validation =
+            validate_table_reference(schema.as_deref(), &name_only, provider, Some(range));
+
+        if !validation.exists {
+            let message = if !validation.schema_exists {
+                format!(
+                    "Schema '{}' does not exist",
+                    schema.as_deref().unwrap_or("")
+                )
+            } else if !validation.suggestions.is_empty() {
+                format!(
+                    "Table '{}' does not exist. Did you mean: {}?",
+                    name_only,
+                    validation.suggestions.join(", ")
+                )
+            } else {
+                format!("Table '{}' does not exist", name_only)
+            };
+            analyzer.error(message, Some(range));
         }
     }
 
-    let scope = scope_builder.build();
+    let scope = build_root_scope(&root, provider, &analyzer);
 
     // Second pass: validate column references
     for node in root.descendants() {
@@ -781,12 +780,13 @@ pub fn analyze_query_with_options(
             let column = col_ref.column().map(|t| t.text().to_string());
             let table_qualifier = col_ref.table().map(|t| t.text().to_string());
             let range = col_ref.syntax().text_range();
+            let local_scope = build_scope_for_node(col_ref.syntax(), provider, &analyzer);
 
             if let Some(ref column) = column {
                 let validation = validate_column_reference(
                     table_qualifier.as_deref(),
                     column,
-                    &scope,
+                    &local_scope,
                     provider,
                     Some(range),
                 );
@@ -861,13 +861,14 @@ pub fn analyze_query_with_options(
             && let Some(chain) = jsonb_access.extract_chain()
         {
             let range = jsonb_access.syntax().text_range();
+            let local_scope = build_scope_for_node(jsonb_access.syntax(), provider, &analyzer);
 
             // Validate that the base column is of type JSONB/JSON
             let table_qualifier = chain.table_qualifier.as_deref();
             let column_name = &chain.column;
 
             // Try to find the column type in scope
-            let column_type = scope
+            let column_type = local_scope
                 .resolve_column(column_name, table_qualifier)
                 .ok()
                 .and_then(|(_, col)| col.data_type.clone());
@@ -914,15 +915,16 @@ pub fn analyze_query_with_options(
 
             // Validate JSONB path segments against schema metadata (if available)
             // Get the table name for JSONB field lookup
-            let table_name = scope.resolve_column(column_name, table_qualifier).ok().map(
-                |(table_binding, _)| {
+            let table_name = local_scope
+                .resolve_column(column_name, table_qualifier)
+                .ok()
+                .map(|(table_binding, _)| {
                     // Get the original table name (not alias)
                     match &table_binding.source {
                         TableSource::Table { name, .. } => name.clone(),
                         _ => table_binding.original_name.clone(),
                     }
-                },
-            );
+                });
 
             if let Some(ref table) = table_name {
                 let path_keys: Vec<&str> = chain.path_keys();
@@ -979,6 +981,464 @@ pub fn analyze_query_with_options(
     apply_lints(&root, &mut analyzer, options);
 
     analyzer.finish(scope, Vec::new())
+}
+
+fn build_root_scope(
+    root: &mold_syntax::SyntaxNode,
+    provider: &dyn SchemaProvider,
+    analyzer: &Analyzer<'_>,
+) -> Arc<Scope> {
+    root.children()
+        .find(|child| is_statement_kind(child.kind()))
+        .map(|statement| build_scope_for_statement(statement, statement, provider, analyzer))
+        .unwrap_or_else(|| ScopeBuilder::new().build())
+}
+
+fn build_scope_for_node(
+    node: &mold_syntax::SyntaxNode,
+    provider: &dyn SchemaProvider,
+    analyzer: &Analyzer<'_>,
+) -> Arc<Scope> {
+    nearest_statement(node)
+        .map(|statement| build_scope_for_statement(&statement, node, provider, analyzer))
+        .unwrap_or_else(|| ScopeBuilder::new().build())
+}
+
+fn build_scope_for_statement(
+    statement: &mold_syntax::SyntaxNode,
+    context_node: &mold_syntax::SyntaxNode,
+    provider: &dyn SchemaProvider,
+    analyzer: &Analyzer<'_>,
+) -> Arc<Scope> {
+    let visible_ctes = visible_ctes_for_node(context_node, analyzer);
+    let cte_map: HashMap<String, CteBinding> = visible_ctes
+        .iter()
+        .cloned()
+        .map(|cte| (cte.name.to_lowercase(), cte))
+        .collect();
+
+    let mut builder = ScopeBuilder::new();
+    for cte in visible_ctes {
+        builder = builder.add_cte_declaration(cte);
+    }
+
+    for table_ref in statement.descendants() {
+        if table_ref.kind() != SyntaxKind::TABLE_REF {
+            continue;
+        }
+        if nearest_statement(table_ref)
+            .as_ref()
+            .is_none_or(|owner| owner.text_range() != statement.text_range())
+        {
+            continue;
+        }
+
+        let Some((name, inline_alias)) = extract_table_ref_name_and_alias(table_ref) else {
+            continue;
+        };
+
+        let (schema, name_only) = split_qualified_table_name(&name);
+        let alias = inline_alias.or_else(|| extract_statement_target_alias(table_ref));
+        let range = table_ref.text_range();
+
+        if schema.is_none()
+            && let Some(cte) = cte_map.get(&name_only.to_lowercase())
+        {
+            let columns = cte
+                .columns
+                .iter()
+                .enumerate()
+                .map(|(ordinal, column)| ColumnBinding::new(column.clone(), ordinal))
+                .collect();
+            let mut binding = TableBinding::cte(cte.name.clone())
+                .with_columns(columns)
+                .with_range(range);
+            if let Some(alias) = alias {
+                binding = binding.with_alias(alias);
+            }
+            builder = builder.add_table(binding);
+            continue;
+        }
+
+        if provider.table_exists(schema.as_deref(), &name_only) {
+            let binding =
+                analyzer.build_table_binding(schema.as_deref(), &name_only, alias.as_deref());
+            builder = builder.add_table(binding.with_range(range));
+        }
+    }
+
+    builder.build()
+}
+
+fn visible_ctes_for_node(
+    node: &mold_syntax::SyntaxNode,
+    analyzer: &Analyzer<'_>,
+) -> Vec<CteBinding> {
+    let statements: Vec<_> = node
+        .ancestors()
+        .filter(|ancestor| is_statement_kind(ancestor.kind()))
+        .cloned()
+        .collect();
+    let mut bindings = Vec::new();
+
+    for statement in statements.iter().rev() {
+        let Some(with_clause) = statement
+            .children()
+            .find_map(|child| WithClause::cast(child.clone()))
+        else {
+            continue;
+        };
+
+        bindings.extend(visible_ctes_in_with_clause(&with_clause, node, analyzer));
+    }
+
+    bindings
+}
+
+fn visible_ctes_in_with_clause(
+    with_clause: &WithClause,
+    node: &mold_syntax::SyntaxNode,
+    analyzer: &Analyzer<'_>,
+) -> Vec<CteBinding> {
+    let mut bindings = Vec::new();
+    let recursive = with_clause.is_recursive();
+    let current_cte = node.ancestors().find(|ancestor| {
+        ancestor.kind() == SyntaxKind::CTE
+            && ancestor
+                .ancestors()
+                .any(|parent| parent.text_range() == with_clause.syntax().text_range())
+    });
+
+    for cte in with_clause.ctes() {
+        let is_current = current_cte
+            .as_ref()
+            .is_some_and(|current| current.text_range() == cte.syntax().text_range());
+
+        if is_current {
+            if recursive && let Some(binding) = extract_cte_binding(&cte, recursive, analyzer) {
+                bindings.push(binding);
+            }
+            break;
+        }
+
+        if let Some(binding) = extract_cte_binding(&cte, recursive, analyzer) {
+            bindings.push(binding);
+        }
+    }
+
+    if current_cte.is_none() {
+        bindings.clear();
+        for cte in with_clause.ctes() {
+            if let Some(binding) = extract_cte_binding(&cte, recursive, analyzer) {
+                bindings.push(binding);
+            }
+        }
+    }
+
+    bindings
+}
+
+fn nearest_statement(node: &mold_syntax::SyntaxNode) -> Option<mold_syntax::SyntaxNode> {
+    node.ancestors()
+        .find(|ancestor| is_statement_kind(ancestor.kind()))
+        .cloned()
+}
+
+fn is_statement_kind(kind: SyntaxKind) -> bool {
+    matches!(
+        kind,
+        SyntaxKind::SELECT_STMT
+            | SyntaxKind::UPDATE_STMT
+            | SyntaxKind::DELETE_STMT
+            | SyntaxKind::INSERT_STMT
+    )
+}
+
+fn extract_cte_binding(
+    cte: &mold_syntax::ast::Cte,
+    is_recursive: bool,
+    analyzer: &Analyzer<'_>,
+) -> Option<CteBinding> {
+    let name = cte.name()?.text().to_string();
+    let columns = extract_cte_columns(cte.syntax());
+
+    Some(
+        analyzer
+            .build_cte_binding(&name, columns, is_recursive)
+            .with_range(cte.syntax().text_range()),
+    )
+}
+
+fn extract_cte_columns(cte: &mold_syntax::SyntaxNode) -> Vec<String> {
+    let mut name_seen = false;
+    let mut explicit_columns = Vec::new();
+    let mut in_column_list = false;
+    let mut found_as = false;
+
+    for child in cte.children_with_tokens() {
+        if let Some(token) = child.as_token() {
+            match token.kind() {
+                SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT => {
+                    if !name_seen {
+                        name_seen = true;
+                    } else if in_column_list && !found_as {
+                        explicit_columns.push(token.text().to_string());
+                    }
+                }
+                SyntaxKind::L_PAREN if name_seen && !found_as => {
+                    in_column_list = true;
+                }
+                SyntaxKind::R_PAREN if in_column_list && !found_as => {
+                    in_column_list = false;
+                }
+                SyntaxKind::AS_KW => {
+                    found_as = true;
+                    in_column_list = false;
+                }
+                _ => {}
+            }
+        } else if let Some(node) = child.as_node()
+            && found_as
+            && explicit_columns.is_empty()
+        {
+            explicit_columns = infer_cte_output_columns(node);
+        }
+    }
+
+    explicit_columns
+}
+
+fn infer_cte_output_columns(statement: &mold_syntax::SyntaxNode) -> Vec<String> {
+    match statement.kind() {
+        SyntaxKind::SELECT_STMT => extract_select_output_columns(statement),
+        SyntaxKind::INSERT_STMT | SyntaxKind::UPDATE_STMT | SyntaxKind::DELETE_STMT => {
+            extract_returning_output_columns(statement)
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn extract_select_output_columns(select: &mold_syntax::SyntaxNode) -> Vec<String> {
+    let item_list = select
+        .children()
+        .find(|child| child.kind() == SyntaxKind::SELECT_ITEM_LIST)
+        .or_else(|| {
+            select
+                .children()
+                .find(|child| child.kind() == SyntaxKind::SELECT_CLAUSE)
+                .and_then(|clause| {
+                    clause
+                        .children()
+                        .find(|child| child.kind() == SyntaxKind::SELECT_ITEM_LIST)
+                })
+        });
+    let Some(item_list) = item_list else {
+        return Vec::new();
+    };
+
+    item_list
+        .children()
+        .filter(|child| child.kind() == SyntaxKind::SELECT_ITEM)
+        .filter_map(extract_select_item_name)
+        .collect()
+}
+
+fn extract_returning_output_columns(statement: &mold_syntax::SyntaxNode) -> Vec<String> {
+    let Some(returning_clause) = statement
+        .children()
+        .find(|child| child.kind() == SyntaxKind::RETURNING_CLAUSE)
+    else {
+        return Vec::new();
+    };
+
+    let direct_items: Vec<_> = returning_clause
+        .children()
+        .filter(|child| child.kind() == SyntaxKind::SELECT_ITEM)
+        .filter_map(extract_select_item_name)
+        .collect();
+
+    if !direct_items.is_empty() {
+        return direct_items;
+    }
+
+    returning_clause
+        .children()
+        .filter_map(extract_select_item_name)
+        .collect()
+}
+
+fn extract_select_item_name(item: &mold_syntax::SyntaxNode) -> Option<String> {
+    for child in item.children() {
+        if child.kind() == SyntaxKind::ALIAS {
+            for token in child
+                .children_with_tokens()
+                .filter_map(|part| part.into_token())
+            {
+                if matches!(token.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT) {
+                    return Some(token.text().to_string());
+                }
+            }
+        }
+    }
+
+    for child in item.descendants() {
+        if child.kind() == SyntaxKind::COLUMN_REF {
+            let mut last_ident = None;
+            for token in child
+                .children_with_tokens()
+                .filter_map(|part| part.into_token())
+            {
+                if matches!(token.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT) {
+                    last_ident = Some(token.text().to_string());
+                }
+            }
+            if last_ident.is_some() {
+                return last_ident;
+            }
+        }
+    }
+
+    for token in item
+        .descendants_with_tokens()
+        .filter_map(|part| part.into_token())
+    {
+        if matches!(token.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT) {
+            return Some(token.text().to_string());
+        }
+    }
+
+    None
+}
+
+fn extract_table_ref_name_and_alias(
+    node: &mold_syntax::SyntaxNode,
+) -> Option<(String, Option<String>)> {
+    let mut name = String::new();
+    let mut alias = None;
+    let mut saw_name = false;
+    let mut in_alias = false;
+
+    for element in node.children_with_tokens() {
+        let token = element.as_token()?;
+
+        match token.kind() {
+            SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT => {
+                if in_alias {
+                    alias = Some(token.text().to_string());
+                    break;
+                }
+                saw_name = true;
+                name.push_str(token.text());
+            }
+            SyntaxKind::DOT if !in_alias => {
+                saw_name = true;
+                name.push('.');
+            }
+            SyntaxKind::AS_KW if saw_name => in_alias = true,
+            _ if token.kind().is_trivia() && saw_name => in_alias = true,
+            _ => {}
+        }
+    }
+
+    (!name.is_empty()).then_some((name, alias))
+}
+
+fn split_qualified_table_name(name: &str) -> (Option<String>, String) {
+    let mut parts = name
+        .split('.')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+
+    if parts.is_empty() {
+        return (None, name.to_string());
+    }
+
+    let table = parts.pop().unwrap_or(name).to_string();
+    let schema = parts.pop().map(str::to_string);
+    (schema, table)
+}
+
+fn extract_statement_target_alias(node: &mold_syntax::SyntaxNode) -> Option<String> {
+    let parent = node.parent()?;
+    if !matches!(
+        parent.kind(),
+        SyntaxKind::UPDATE_STMT | SyntaxKind::DELETE_STMT | SyntaxKind::INSERT_STMT
+    ) {
+        return None;
+    }
+
+    let is_target = parent
+        .children()
+        .find(|child| child.kind() == SyntaxKind::TABLE_REF)
+        .is_some_and(|target| target.text_range() == node.text_range());
+    if !is_target {
+        return None;
+    }
+
+    let mut after_target = false;
+    let mut saw_as = false;
+
+    for element in parent.children_with_tokens() {
+        if let Some(child) = element.as_node() {
+            if !after_target {
+                after_target = child.text_range() == node.text_range();
+                continue;
+            }
+
+            if matches!(
+                child.kind(),
+                SyntaxKind::SET_CLAUSE
+                    | SyntaxKind::FROM_CLAUSE
+                    | SyntaxKind::USING_CLAUSE
+                    | SyntaxKind::WHERE_CLAUSE
+                    | SyntaxKind::RETURNING_CLAUSE
+                    | SyntaxKind::INSERT_COLUMNS
+                    | SyntaxKind::VALUES_CLAUSE
+                    | SyntaxKind::SELECT_STMT
+                    | SyntaxKind::ON_CONFLICT_CLAUSE
+            ) {
+                break;
+            }
+
+            continue;
+        }
+
+        let Some(token) = element.as_token() else {
+            continue;
+        };
+
+        if !after_target || token.kind().is_trivia() {
+            continue;
+        }
+
+        match token.kind() {
+            SyntaxKind::AS_KW => saw_as = true,
+            SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT => {
+                if saw_as
+                    || matches!(
+                        parent.kind(),
+                        SyntaxKind::UPDATE_STMT | SyntaxKind::DELETE_STMT | SyntaxKind::INSERT_STMT
+                    )
+                {
+                    return Some(token.text().to_string());
+                }
+                break;
+            }
+            SyntaxKind::L_PAREN
+            | SyntaxKind::VALUES_KW
+            | SyntaxKind::SELECT_KW
+            | SyntaxKind::DEFAULT_KW
+            | SyntaxKind::SET_KW
+            | SyntaxKind::FROM_KW
+            | SyntaxKind::USING_KW
+            | SyntaxKind::WHERE_KW
+            | SyntaxKind::RETURNING_KW
+            | SyntaxKind::ON_KW => break,
+            _ => break,
+        }
+    }
+
+    None
 }
 
 fn apply_lints(

@@ -153,27 +153,21 @@ mod tests {
     fn test_format_insert() {
         let sql = "INSERT INTO users (id, name) VALUES (1, 'test')";
         let formatted = format_compact(sql);
-        assert!(formatted.contains("INSERT"));
-        assert!(formatted.contains("INTO"));
-        assert!(formatted.contains("VALUES"));
+        assert!(validate_format(sql, &formatted).is_ok(), "{formatted}");
     }
 
     #[test]
     fn test_format_update() {
         let sql = "UPDATE users SET name = 'test' WHERE id = 1";
         let formatted = format_compact(sql);
-        assert!(formatted.contains("UPDATE"));
-        assert!(formatted.contains("SET"));
-        assert!(formatted.contains("WHERE"));
+        assert!(validate_format(sql, &formatted).is_ok(), "{formatted}");
     }
 
     #[test]
     fn test_format_delete() {
         let sql = "DELETE FROM users WHERE id = 1";
         let formatted = format_compact(sql);
-        assert!(formatted.contains("DELETE"));
-        assert!(formatted.contains("FROM"));
-        assert!(formatted.contains("WHERE"));
+        assert!(validate_format(sql, &formatted).is_ok(), "{formatted}");
     }
 
     #[test]

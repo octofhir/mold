@@ -1,0 +1,13 @@
+---
+source: crates/mold_hir/tests/snapshots.rs
+assertion_line: 167
+expression: render_analysis(&analysis)
+---
+diagnostics:
+- Warning | UPDATE without WHERE affects all rows | 0..30
+tables:
+- <none>
+columns:
+- <none>
+output_columns:
+- <none>

@@ -1,0 +1,43 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..71
+  SELECT_STMT@0..71
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..9
+      SELECT_ITEM@7..9
+        STAR_EXPR@7..9
+          STAR@7..8 "*"
+          WHITESPACE@8..9 " "
+    FROM_CLAUSE@9..30
+      FROM_KW@9..13 "FROM"
+      WHITESPACE@13..14 " "
+      TABLE_REF@14..30
+        IDENT@14..20 "public"
+        DOT@20..21 "."
+        IDENT@21..27 "orders"
+        WHITESPACE@27..28 " "
+        IDENT@28..29 "o"
+        WHITESPACE@29..30 " "
+    FOR_CLAUSE@30..71
+      FOR_KW@30..33 "FOR"
+      WHITESPACE@33..34 " "
+      KEY_KW@34..37 "KEY"
+      WHITESPACE@37..38 " "
+      SHARE_KW@38..43 "SHARE"
+      WHITESPACE@43..44 " "
+      OF_KW@44..46 "OF"
+      WHITESPACE@46..47 " "
+      IDENT@47..48 "o"
+      COMMA@48..49 ","
+      WHITESPACE@49..50 " "
+      IDENT@50..56 "public"
+      DOT@56..57 "."
+      QUOTED_IDENT@57..64 "\"users\""
+      WHITESPACE@64..65 " "
+      NOWAIT_KW@65..71 "NOWAIT"

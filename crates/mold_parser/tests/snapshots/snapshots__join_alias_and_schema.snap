@@ -1,0 +1,60 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..77
+  SELECT_STMT@0..77
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..21
+      SELECT_ITEM@7..11
+        COLUMN_REF@7..11
+          IDENT@7..8 "u"
+          DOT@8..9 "."
+          IDENT@9..11 "id"
+      COMMA@11..12 ","
+      WHITESPACE@12..13 " "
+      SELECT_ITEM@13..21
+        COLUMN_REF@13..21
+          IDENT@13..14 "o"
+          DOT@14..15 "."
+          IDENT@15..20 "total"
+          WHITESPACE@20..21 " "
+    FROM_CLAUSE@21..77
+      FROM_KW@21..25 "FROM"
+      WHITESPACE@25..26 " "
+      JOIN_EXPR@26..77
+        TABLE_REF@26..44
+          IDENT@26..32 "public"
+          DOT@32..33 "."
+          IDENT@33..38 "users"
+          WHITESPACE@38..39 " "
+          AS_KW@39..41 "AS"
+          WHITESPACE@41..42 " "
+          IDENT@42..43 "u"
+          WHITESPACE@43..44 " "
+        JOIN_KW@44..48 "JOIN"
+        WHITESPACE@48..49 " "
+        TABLE_REF@49..58
+          IDENT@49..55 "orders"
+          WHITESPACE@55..56 " "
+          IDENT@56..57 "o"
+          WHITESPACE@57..58 " "
+        ON_KW@58..60 "ON"
+        WHITESPACE@60..61 " "
+        JOIN_CONDITION@61..77
+          BINARY_EXPR@61..77
+            COLUMN_REF@61..66
+              IDENT@61..62 "u"
+              DOT@62..63 "."
+              IDENT@63..65 "id"
+              WHITESPACE@65..66 " "
+            EQ@66..67 "="
+            WHITESPACE@67..68 " "
+            COLUMN_REF@68..77
+              IDENT@68..69 "o"
+              DOT@69..70 "."
+              IDENT@70..77 "user_id"

@@ -1,0 +1,40 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..61
+  SELECT_STMT@0..61
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..9
+      SELECT_ITEM@7..9
+        STAR_EXPR@7..9
+          STAR@7..8 "*"
+          WHITESPACE@8..9 " "
+    FROM_CLAUSE@9..25
+      FROM_KW@9..13 "FROM"
+      WHITESPACE@13..14 " "
+      TABLE_REF@14..25
+        QUOTED_IDENT@14..20 "\"User\""
+        WHITESPACE@20..21 " "
+        QUOTED_IDENT@21..24 "\"u\""
+        WHITESPACE@24..25 " "
+    FOR_CLAUSE@25..61
+      FOR_KW@25..28 "FOR"
+      WHITESPACE@28..29 " "
+      NO_KW@29..31 "NO"
+      WHITESPACE@31..32 " "
+      KEY_KW@32..35 "KEY"
+      WHITESPACE@35..36 " "
+      UPDATE_KW@36..42 "UPDATE"
+      WHITESPACE@42..43 " "
+      OF_KW@43..45 "OF"
+      WHITESPACE@45..46 " "
+      QUOTED_IDENT@46..49 "\"u\""
+      WHITESPACE@49..50 " "
+      SKIP_KW@50..54 "SKIP"
+      WHITESPACE@54..55 " "
+      LOCKED_KW@55..61 "LOCKED"

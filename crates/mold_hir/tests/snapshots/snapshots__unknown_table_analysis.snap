@@ -1,0 +1,14 @@
+---
+source: crates/mold_hir/tests/snapshots.rs
+assertion_line: 176
+expression: render_analysis(&analysis)
+---
+diagnostics:
+- Error | Table 'missing_table' does not exist | 14..27
+- Warning | Avoid SELECT *; list columns explicitly | 7..9
+tables:
+- <none>
+columns:
+- <none>
+output_columns:
+- <none>
