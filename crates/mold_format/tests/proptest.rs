@@ -105,6 +105,10 @@ fn valid_sql_strategy() -> impl Strategy<Value = String> {
         Just("SELECT id FROM users WHERE id = 1".to_string()),
         Just("SELECT * FROM users WHERE active = true".to_string()),
         Just("SELECT id FROM users WHERE id > 10 AND active = true".to_string()),
+        // Basic DML statements
+        Just("INSERT INTO users (id, name) VALUES (1, 'Alice')".to_string()),
+        Just("UPDATE users SET active = true WHERE id = 1".to_string()),
+        Just("DELETE FROM users WHERE id = 1".to_string()),
         // CTE (verified to work after the fix)
         Just("WITH active AS (SELECT * FROM users WHERE active) SELECT * FROM active".to_string()),
     ]

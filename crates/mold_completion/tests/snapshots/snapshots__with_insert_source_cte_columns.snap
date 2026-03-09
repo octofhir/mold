@@ -1,0 +1,8 @@
+---
+source: crates/mold_completion/tests/snapshots.rs
+expression: render_completion(&result)
+---
+context: ColumnRef { table: Some("recent"), tables: ["recent"] }
+is_incomplete: false
+amount | Column | detail=- | insert=-
+user_id | Column | detail=- | insert=-

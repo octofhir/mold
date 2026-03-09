@@ -3,6 +3,7 @@ use crate::token_set::TokenSet;
 use mold_syntax::SyntaxKind;
 
 use super::expressions::expr;
+use super::expressions::frame_clause;
 use super::{CLAUSE_RECOVERY, JOIN_RECOVERY, PAREN_RECOVERY, SUBQUERY_RECOVERY};
 
 /// Checks if the current token is an identifier (IDENT or QUOTED_IDENT).
@@ -111,7 +112,7 @@ fn select_core(p: &mut Parser<'_>) {
     }
 }
 
-fn with_clause(p: &mut Parser<'_>) {
+pub(super) fn with_clause(p: &mut Parser<'_>) {
     let m = p.start();
     p.bump(); // WITH
     p.push_context(ParseContext::WithClause);
@@ -128,14 +129,14 @@ fn with_clause(p: &mut Parser<'_>) {
 
 fn cte(p: &mut Parser<'_>) {
     let m = p.start();
-    p.expect(SyntaxKind::IDENT);
+    expect_ident(p, PAREN_RECOVERY);
 
     // Optional column list
     if p.at(SyntaxKind::L_PAREN) {
         p.bump();
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
         while p.eat(SyntaxKind::COMMA) {
-            p.expect(SyntaxKind::IDENT);
+            expect_ident(p, PAREN_RECOVERY);
         }
         p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
     }
@@ -193,8 +194,8 @@ fn select_item(p: &mut Parser<'_>) {
 
     // Optional alias
     if p.eat(SyntaxKind::AS_KW) {
-        p.expect(SyntaxKind::IDENT);
-    } else if p.at(SyntaxKind::IDENT) && !is_clause_keyword(p.current()) {
+        expect_ident(p, CLAUSE_RECOVERY);
+    } else if at_ident(p) && !is_clause_keyword(p.current()) {
         p.bump();
     }
 
@@ -372,9 +373,9 @@ fn join_expr(
         } else if p.eat(SyntaxKind::USING_KW) {
             let cm = p.start();
             p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
-            p.expect(SyntaxKind::IDENT);
+            expect_ident(p, PAREN_RECOVERY);
             while p.eat(SyntaxKind::COMMA) {
-                p.expect(SyntaxKind::IDENT);
+                expect_ident(p, PAREN_RECOVERY);
             }
             p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
             cm.complete(p, SyntaxKind::JOIN_CONDITION);
@@ -417,20 +418,53 @@ fn window_clause(p: &mut Parser<'_>) {
     p.bump(); // WINDOW
 
     // window_name AS (window_definition)
-    p.expect(SyntaxKind::IDENT);
+    expect_ident(p, PAREN_RECOVERY);
     p.expect(SyntaxKind::AS_KW);
-    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
-    // Window specification parsed in expressions.rs
-    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+    window_definition(p);
 
     while p.eat(SyntaxKind::COMMA) {
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, PAREN_RECOVERY);
         p.expect(SyntaxKind::AS_KW);
-        p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
-        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+        window_definition(p);
     }
 
     m.complete(p, SyntaxKind::WINDOW_SPEC);
+}
+
+fn window_definition(p: &mut Parser<'_>) {
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
+
+    if at_ident(p) {
+        p.bump();
+    }
+
+    if p.at(SyntaxKind::PARTITION_KW) {
+        let pm = p.start();
+        p.bump();
+        p.expect(SyntaxKind::BY_KW);
+        expr(p);
+        while p.eat(SyntaxKind::COMMA) {
+            expr(p);
+        }
+        pm.complete(p, SyntaxKind::PARTITION_BY);
+    }
+
+    if p.at(SyntaxKind::ORDER_KW) {
+        let om = p.start();
+        p.bump();
+        p.expect(SyntaxKind::BY_KW);
+        order_by_item(p);
+        while p.eat(SyntaxKind::COMMA) {
+            order_by_item(p);
+        }
+        om.complete(p, SyntaxKind::ORDER_BY_CLAUSE);
+    }
+
+    if p.at(SyntaxKind::ROWS_KW) || p.at(SyntaxKind::RANGE_KW) || p.at(SyntaxKind::GROUPS_KW) {
+        frame_clause(p);
+    }
+
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
 }
 
 fn order_by_clause(p: &mut Parser<'_>) {
@@ -493,21 +527,55 @@ fn fetch_clause(p: &mut Parser<'_>) {
 fn for_clause(p: &mut Parser<'_>) {
     let m = p.start();
     p.bump(); // FOR
-    p.bump_any(); // UPDATE/SHARE/etc.
+    lock_strength(p);
     // Optional OF table_name
     if p.eat(SyntaxKind::OF_KW) {
-        p.expect(SyntaxKind::IDENT);
+        lock_relation(p);
         while p.eat(SyntaxKind::COMMA) {
-            p.expect(SyntaxKind::IDENT);
+            lock_relation(p);
         }
     }
     // Optional NOWAIT/SKIP LOCKED
-    p.eat(SyntaxKind::NOWAIT_KW);
-    if p.eat(SyntaxKind::SKIP_KW) {
-        // SKIP LOCKED - need to add LOCKED_KW if not present
-        p.bump_any();
-    }
+    wait_policy(p);
     m.complete(p, SyntaxKind::FOR_CLAUSE);
+}
+
+fn lock_strength(p: &mut Parser<'_>) {
+    if p.eat(SyntaxKind::UPDATE_KW) || p.eat(SyntaxKind::SHARE_KW) {
+        return;
+    }
+
+    if p.eat(SyntaxKind::NO_KW) {
+        p.expect(SyntaxKind::KEY_KW);
+        p.expect(SyntaxKind::UPDATE_KW);
+        return;
+    }
+
+    if p.eat(SyntaxKind::KEY_KW) {
+        p.expect(SyntaxKind::SHARE_KW);
+        return;
+    }
+
+    p.error("expected UPDATE, SHARE, NO KEY UPDATE, or KEY SHARE after FOR");
+}
+
+fn lock_relation(p: &mut Parser<'_>) {
+    expect_ident(p, CLAUSE_RECOVERY);
+
+    if p.at(SyntaxKind::DOT) {
+        p.bump();
+        expect_ident(p, CLAUSE_RECOVERY);
+    }
+}
+
+fn wait_policy(p: &mut Parser<'_>) {
+    if p.eat(SyntaxKind::NOWAIT_KW) {
+        return;
+    }
+
+    if p.eat(SyntaxKind::SKIP_KW) {
+        p.expect(SyntaxKind::LOCKED_KW);
+    }
 }
 
 /// Parse a subquery in FROM clause with isolated error recovery.

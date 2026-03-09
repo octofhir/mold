@@ -1,5 +1,6 @@
 //! Column completion generator.
 
+use super::resolve_table_lookup;
 use crate::providers::SchemaProvider;
 use crate::types::{CompletionData, CompletionItem, CompletionItemKind};
 
@@ -20,23 +21,21 @@ pub fn complete_columns(
     let mut items = Vec::new();
 
     if let Some(table_name) = table {
-        // Columns for a specific table
-        let columns = match prefix {
-            Some(p) => provider.columns_by_prefix(None, table_name, p),
-            None => provider.columns(None, table_name),
-        };
+        let (schema, table_name) = resolve_table_lookup(provider, table_name);
+        let columns = lookup_columns(provider, schema.as_deref(), &table_name, prefix);
 
         for col in columns {
             items.push(create_column_item(
                 &col.name,
                 &col.data_type,
-                Some(table_name),
+                Some(&table_name),
             ));
         }
     } else {
         // Columns from all tables in scope
         for table_name in tables_in_scope {
-            let columns = provider.columns(None, table_name);
+            let (schema, table_name) = resolve_table_lookup(provider, table_name);
+            let columns = lookup_columns(provider, schema.as_deref(), &table_name, None);
             for col in columns {
                 let matches_prefix = match prefix {
                     Some(p) => col.name.to_lowercase().starts_with(&p.to_lowercase()),
@@ -47,7 +46,7 @@ pub fn complete_columns(
                     items.push(create_column_item(
                         &col.name,
                         &col.data_type,
-                        Some(table_name),
+                        Some(&table_name),
                     ));
                 }
             }
@@ -91,10 +90,8 @@ pub fn complete_qualified_columns(
         return Vec::new();
     };
 
-    let columns = match prefix {
-        Some(p) => provider.columns_by_prefix(None, table, p),
-        None => provider.columns(None, table),
-    };
+    let (schema, table) = resolve_table_lookup(provider, table);
+    let columns = lookup_columns(provider, schema.as_deref(), &table, prefix);
 
     columns
         .into_iter()
@@ -109,6 +106,27 @@ pub fn complete_qualified_columns(
                 })
         })
         .collect()
+}
+
+fn lookup_columns(
+    provider: &dyn SchemaProvider,
+    schema: Option<&str>,
+    table: &str,
+    prefix: Option<&str>,
+) -> Vec<crate::types::ColumnInfo> {
+    let columns = match prefix {
+        Some(p) => provider.columns_by_prefix(schema, table, p),
+        None => provider.columns(schema, table),
+    };
+
+    if columns.is_empty() && schema.is_some() {
+        match prefix {
+            Some(p) => provider.columns_by_prefix(None, table, p),
+            None => provider.columns(None, table),
+        }
+    } else {
+        columns
+    }
 }
 
 #[cfg(test)]
@@ -178,5 +196,24 @@ mod tests {
         let provider = create_test_provider();
         let items = complete_qualified_columns(Some(&provider), "users", None);
         assert_eq!(items.len(), 3);
+    }
+
+    #[test]
+    fn test_complete_columns_schema_qualified_table() {
+        let provider = MemorySchemaProvider::new()
+            .add_table(TableInfo::new("users").with_schema("public"))
+            .add_columns(
+                Some("public".to_string()),
+                "users",
+                vec![
+                    ColumnInfo::new("id", "integer"),
+                    ColumnInfo::new("name", "text"),
+                ],
+            );
+
+        let items = complete_columns(Some(&provider), Some("public.users"), &[], None);
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().any(|i| i.label == "id"));
+        assert!(items.iter().any(|i| i.label == "name"));
     }
 }

@@ -1,0 +1,10 @@
+---
+source: crates/mold_completion/tests/snapshots.rs
+assertion_line: 110
+expression: render_completion(&result)
+---
+context: ColumnRef { table: Some("public.users"), tables: ["public.users"] }
+is_incomplete: false
+data | Column | detail=users (jsonb) | insert=-
+id | Column | detail=users (integer) | insert=-
+name | Column | detail=users (text) | insert=-

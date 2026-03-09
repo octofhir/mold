@@ -3,8 +3,10 @@
 use crate::parser::Parser;
 use mold_syntax::SyntaxKind;
 
+use super::CLAUSE_RECOVERY;
 use super::expressions::expr;
 use super::insert::returning_clause;
+use super::select::{at_ident, expect_ident, with_clause};
 
 /// Parse DELETE statement.
 ///
@@ -17,6 +19,10 @@ use super::insert::returning_clause;
 pub fn delete_stmt(p: &mut Parser<'_>) {
     let m = p.start();
 
+    if p.at(SyntaxKind::WITH_KW) {
+        with_clause(p);
+    }
+
     p.expect(SyntaxKind::DELETE_KW);
     p.expect(SyntaxKind::FROM_KW);
 
@@ -28,8 +34,8 @@ pub fn delete_stmt(p: &mut Parser<'_>) {
 
     // Optional alias
     if p.eat(SyntaxKind::AS_KW) {
-        p.expect(SyntaxKind::IDENT);
-    } else if p.at(SyntaxKind::IDENT) && !is_delete_keyword(p.current()) {
+        expect_ident(p, CLAUSE_RECOVERY);
+    } else if at_ident(p) && !is_delete_keyword(p.current()) {
         p.bump();
     }
 
@@ -53,12 +59,12 @@ pub fn delete_stmt(p: &mut Parser<'_>) {
 
 fn table_name(p: &mut Parser<'_>) {
     let m = p.start();
-    p.expect(SyntaxKind::IDENT);
+    expect_ident(p, CLAUSE_RECOVERY);
 
     // Schema qualification
     if p.at(SyntaxKind::DOT) {
         p.bump();
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, CLAUSE_RECOVERY);
     }
 
     m.complete(p, SyntaxKind::TABLE_REF);
@@ -80,18 +86,18 @@ fn table_ref(p: &mut Parser<'_>) {
     let m = p.start();
 
     // Table name
-    p.expect(SyntaxKind::IDENT);
+    expect_ident(p, CLAUSE_RECOVERY);
 
     // Schema qualification
     if p.at(SyntaxKind::DOT) {
         p.bump();
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, CLAUSE_RECOVERY);
     }
 
     // Optional alias
     if p.eat(SyntaxKind::AS_KW) {
-        p.expect(SyntaxKind::IDENT);
-    } else if p.at(SyntaxKind::IDENT) && !is_clause_keyword(p.current()) {
+        expect_ident(p, CLAUSE_RECOVERY);
+    } else if at_ident(p) && !is_clause_keyword(p.current()) {
         p.bump();
     }
 
@@ -105,7 +111,7 @@ fn where_clause(p: &mut Parser<'_>) {
     // WHERE CURRENT OF cursor_name (for cursor-based deletes)
     if p.eat(SyntaxKind::CURRENT_KW) {
         p.expect(SyntaxKind::OF_KW);
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, CLAUSE_RECOVERY);
     } else {
         expr(p);
     }

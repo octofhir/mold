@@ -1,0 +1,9 @@
+---
+source: crates/mold_completion/tests/snapshots.rs
+expression: render_completion(&result)
+---
+context: ColumnRef { table: Some("orders"), tables: ["users", "orders"] }
+is_incomplete: false
+amount | Column | detail=orders (numeric) | insert=-
+id | Column | detail=orders (integer) | insert=-
+user_id | Column | detail=orders (integer) | insert=-

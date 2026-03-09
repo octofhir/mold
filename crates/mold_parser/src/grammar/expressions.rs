@@ -1,6 +1,7 @@
 use crate::parser::{CompletedMarker, ParseContext, Parser};
 use mold_syntax::SyntaxKind;
 
+use super::select::{at_ident, expect_ident};
 use super::{CASE_RECOVERY, EXPR_LIST_RECOVERY, PAREN_RECOVERY, SUBQUERY_RECOVERY};
 
 pub fn expr(p: &mut Parser<'_>) -> Option<CompletedMarker> {
@@ -331,7 +332,7 @@ fn name_ref(p: &mut Parser<'_>) -> CompletedMarker {
             p.bump();
             return m.complete(p, SyntaxKind::STAR_EXPR);
         }
-        p.expect(SyntaxKind::IDENT);
+        expect_ident(p, EXPR_LIST_RECOVERY);
 
         // Could be schema.func() or schema.table.column
         if p.at(SyntaxKind::DOT) {
@@ -340,7 +341,7 @@ fn name_ref(p: &mut Parser<'_>) -> CompletedMarker {
                 p.bump();
                 return m.complete(p, SyntaxKind::STAR_EXPR);
             }
-            p.expect(SyntaxKind::IDENT);
+            expect_ident(p, EXPR_LIST_RECOVERY);
         }
 
         if p.at(SyntaxKind::L_PAREN) {
@@ -425,7 +426,7 @@ fn over_clause(p: &mut Parser<'_>) {
     let m = p.start();
     p.bump(); // OVER
 
-    if p.at(SyntaxKind::IDENT) {
+    if at_ident(p) {
         // Named window reference
         p.bump();
     } else {
@@ -466,7 +467,7 @@ fn over_clause(p: &mut Parser<'_>) {
     m.complete(p, SyntaxKind::OVER_CLAUSE);
 }
 
-fn frame_clause(p: &mut Parser<'_>) {
+pub(super) fn frame_clause(p: &mut Parser<'_>) {
     let m = p.start();
     p.bump(); // ROWS/RANGE/GROUPS
 

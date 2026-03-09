@@ -718,9 +718,9 @@ pub fn format_insert(node: &SyntaxNode, printer: &mut Printer) {
     }
     printer.space();
 
-    // Format table name
-    if let Some(table_name) = find_child(node, SyntaxKind::TABLE_NAME) {
-        format_children(&table_name, printer);
+    // DML targets are parsed as TABLE_REF, not TABLE_NAME.
+    if let Some(table_ref) = find_child(node, SyntaxKind::TABLE_REF) {
+        format_table_ref(&table_ref, printer);
     }
 
     // Format column list
@@ -824,9 +824,9 @@ pub fn format_update(node: &SyntaxNode, printer: &mut Printer) {
     }
     printer.space();
 
-    // Format table name
-    if let Some(table_name) = find_child(node, SyntaxKind::TABLE_NAME) {
-        format_children(&table_name, printer);
+    // DML targets are parsed as TABLE_REF, not TABLE_NAME.
+    if let Some(table_ref) = find_child(node, SyntaxKind::TABLE_REF) {
+        format_table_ref(&table_ref, printer);
     }
 
     // Format SET clause
@@ -907,9 +907,9 @@ pub fn format_delete(node: &SyntaxNode, printer: &mut Printer) {
     }
     printer.space();
 
-    // Format table name
-    if let Some(table_name) = find_child(node, SyntaxKind::TABLE_NAME) {
-        format_children(&table_name, printer);
+    // DML targets are parsed as TABLE_REF, not TABLE_NAME.
+    if let Some(table_ref) = find_child(node, SyntaxKind::TABLE_REF) {
+        format_table_ref(&table_ref, printer);
     }
 
     // Format USING clause (PostgreSQL extension)

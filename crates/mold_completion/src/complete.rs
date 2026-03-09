@@ -32,7 +32,7 @@ fn safe_slice_to(s: &str, offset: usize) -> &str {
     &s[..safe_offset]
 }
 
-use crate::context::{detect_context, find_cte_columns};
+use crate::context::{detect_context, find_cte_columns_at_offset};
 use crate::generators::{
     JsonbArgCompletion, complete_columns, complete_functions, complete_jsonb_paths,
     complete_jsonpath, complete_keywords, complete_tables, get_jsonb_arg_completion,
@@ -103,8 +103,14 @@ impl<'a> CompletionRequest<'a> {
 
 /// Performs completion at the specified position.
 pub fn complete(request: CompletionRequest<'_>) -> CompletionResult {
+    let owned_parse = request
+        .parse
+        .is_none()
+        .then(|| mold_parser::parse(request.source));
+    let parse = request.parse.or(owned_parse.as_ref());
+
     // Detect the completion context
-    let mut context = match request.parse {
+    let mut context = match parse {
         Some(parse) => detect_context(parse, request.offset),
         None => detect_context_from_text(request.source, request.offset),
     };
@@ -114,7 +120,7 @@ pub fn complete(request: CompletionRequest<'_>) -> CompletionResult {
     }
 
     // Generate completion items based on context
-    let mut items = generate_completions(&context, &request);
+    let mut items = generate_completions(&context, &request, parse);
 
     // Apply limit
     let is_incomplete = if request.limit > 0 && items.len() > request.limit {
@@ -200,11 +206,18 @@ fn detect_context_from_text(source: &str, offset: TextSize) -> CompletionContext
 
     // Check for qualified name (has a dot)
     if last_word.contains('.') {
-        let parts: Vec<&str> = last_word.split('.').collect();
-        if parts.len() == 2 {
-            let table = parts[0].to_string();
+        let trimmed = last_word.trim_end_matches('.');
+        let qualifier = if last_word.ends_with('.') {
+            Some(trimmed)
+        } else {
+            trimmed.rsplit_once('.').map(|(qualifier, _)| qualifier)
+        };
+
+        if let Some(table) = qualifier
+            && !table.is_empty()
+        {
             return CompletionContext::ColumnRef {
-                table: Some(table),
+                table: Some(table.to_string()),
                 tables: Vec::new(),
             };
         }
@@ -222,6 +235,7 @@ fn detect_context_from_text(source: &str, offset: TextSize) -> CompletionContext
 fn generate_completions(
     context: &CompletionContext,
     request: &CompletionRequest<'_>,
+    parse: Option<&Parse>,
 ) -> Vec<CompletionItem> {
     match context {
         CompletionContext::Statement => {
@@ -292,9 +306,9 @@ fn generate_completions(
 
                     // If no columns from schema provider, check if it's a CTE
                     if items.is_empty()
-                        && let Some(parse) = request.parse
+                        && let Some(parse) = parse
                     {
-                        let cte_columns = find_cte_columns(&parse.syntax(), t);
+                        let cte_columns = find_cte_columns_at_offset(parse, request.offset, t);
                         for col in cte_columns {
                             if prefix
                                 .as_ref()
@@ -1036,6 +1050,75 @@ mod tests {
         let source = "SELECT прив";
         let prefix = get_prefix_at_offset(source, TextSize::new(source.len() as u32));
         assert_eq!(prefix, Some("прив".to_string()));
+    }
+
+    #[test]
+    fn test_complete_alias_in_join_without_parse() {
+        let provider = crate::providers::MemorySchemaProvider::new()
+            .add_table(crate::types::TableInfo::new("users"))
+            .add_columns(
+                None,
+                "users",
+                vec![
+                    crate::types::ColumnInfo::new("id", "integer"),
+                    crate::types::ColumnInfo::new("name", "text"),
+                ],
+            )
+            .add_table(crate::types::TableInfo::new("orders"))
+            .add_columns(
+                None,
+                "orders",
+                vec![
+                    crate::types::ColumnInfo::new("id", "integer"),
+                    crate::types::ColumnInfo::new("user_id", "integer"),
+                ],
+            );
+
+        let source = "SELECT u. FROM users u JOIN orders o ON u.id = o.user_id";
+        let offset = source.find(" FROM").unwrap() as u32;
+        let result = complete(
+            CompletionRequest::new(source, TextSize::new(offset)).with_schema_provider(&provider),
+        );
+
+        assert!(matches!(
+            result.context,
+            CompletionContext::ColumnRef {
+                table: Some(ref table),
+                ..
+            } if table == "users"
+        ));
+        assert!(result.items.iter().any(|i| i.label == "id"));
+        assert!(result.items.iter().any(|i| i.label == "name"));
+    }
+
+    #[test]
+    fn test_complete_schema_qualified_columns_without_parse() {
+        let provider = crate::providers::MemorySchemaProvider::new()
+            .add_table(crate::types::TableInfo::new("users").with_schema("public"))
+            .add_columns(
+                Some("public".to_string()),
+                "users",
+                vec![
+                    crate::types::ColumnInfo::new("id", "integer"),
+                    crate::types::ColumnInfo::new("name", "text"),
+                ],
+            );
+
+        let source = "SELECT public.users. FROM public.users";
+        let offset = source.find(" FROM").unwrap() as u32;
+        let result = complete(
+            CompletionRequest::new(source, TextSize::new(offset)).with_schema_provider(&provider),
+        );
+
+        assert!(matches!(
+            result.context,
+            CompletionContext::ColumnRef {
+                table: Some(ref table),
+                ..
+            } if table == "public.users"
+        ));
+        assert!(result.items.iter().any(|i| i.label == "id"));
+        assert!(result.items.iter().any(|i| i.label == "name"));
     }
 
     #[test]

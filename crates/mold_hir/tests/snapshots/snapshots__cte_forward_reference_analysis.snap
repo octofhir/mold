@@ -1,0 +1,13 @@
+---
+source: crates/mold_hir/tests/snapshots.rs
+expression: render_analysis(&analysis)
+---
+diagnostics:
+- Error | Table 'later_cte' does not exist | 49..58
+- Error | Unknown table alias 'later_cte' | 26..44
+tables:
+- <none>
+columns:
+- <none>
+output_columns:
+- <none>

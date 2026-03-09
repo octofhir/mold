@@ -1,0 +1,84 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..206
+  SELECT_STMT@0..206
+    SELECT_KW@0..6 "SELECT"
+    WHITESPACE@6..7 " "
+    SELECT_ITEM_LIST@7..42
+      SELECT_ITEM@7..42
+        FUNC_CALL@7..42
+          FUNC_CALL@7..21
+            SUM_KW@7..10 "sum"
+            L_PAREN@10..11 "("
+            COLUMN_REF@11..19
+              QUOTED_IDENT@11..19 "\"amount\""
+            R_PAREN@19..20 ")"
+            WHITESPACE@20..21 " "
+          OVER_CLAUSE@21..42
+            OVER_KW@21..25 "OVER"
+            WHITESPACE@25..26 " "
+            QUOTED_IDENT@26..41 "\"DerivedWindow\""
+            WHITESPACE@41..42 " "
+    FROM_CLAUSE@42..58
+      FROM_KW@42..46 "FROM"
+      WHITESPACE@46..47 " "
+      TABLE_REF@47..58
+        QUOTED_IDENT@47..57 "\"payments\""
+        WHITESPACE@57..58 " "
+    WINDOW_SPEC@58..206
+      WINDOW_KW@58..64 "WINDOW"
+      WHITESPACE@64..65 " "
+      QUOTED_IDENT@65..77 "\"BaseWindow\""
+      WHITESPACE@77..78 " "
+      AS_KW@78..80 "AS"
+      WHITESPACE@80..81 " "
+      L_PAREN@81..82 "("
+      PARTITION_BY@82..107
+        PARTITION_KW@82..91 "PARTITION"
+        WHITESPACE@91..92 " "
+        BY_KW@92..94 "BY"
+        WHITESPACE@94..95 " "
+        COLUMN_REF@95..107
+          QUOTED_IDENT@95..107 "\"account_id\""
+      R_PAREN@107..108 ")"
+      COMMA@108..109 ","
+      WHITESPACE@109..110 " "
+      QUOTED_IDENT@110..125 "\"DerivedWindow\""
+      WHITESPACE@125..126 " "
+      AS_KW@126..128 "AS"
+      WHITESPACE@128..129 " "
+      L_PAREN@129..130 "("
+      QUOTED_IDENT@130..142 "\"BaseWindow\""
+      WHITESPACE@142..143 " "
+      ORDER_BY_CLAUSE@143..165
+        ORDER_KW@143..148 "ORDER"
+        WHITESPACE@148..149 " "
+        BY_KW@149..151 "BY"
+        WHITESPACE@151..152 " "
+        ORDER_BY_ITEM@152..165
+          COLUMN_REF@152..165
+            QUOTED_IDENT@152..164 "\"created_at\""
+            WHITESPACE@164..165 " "
+      FRAME_CLAUSE@165..205
+        ROWS_KW@165..169 "ROWS"
+        WHITESPACE@169..170 " "
+        BETWEEN_KW@170..177 "BETWEEN"
+        WHITESPACE@177..178 " "
+        FRAME_BOUND@178..190
+          LITERAL@178..180
+            INTEGER@178..179 "1"
+            WHITESPACE@179..180 " "
+          PRECEDING_KW@180..189 "PRECEDING"
+          WHITESPACE@189..190 " "
+        AND_KW@190..193 "AND"
+        WHITESPACE@193..194 " "
+        FRAME_BOUND@194..205
+          CURRENT_KW@194..201 "CURRENT"
+          WHITESPACE@201..202 " "
+          ROW_KW@202..205 "ROW"
+      R_PAREN@205..206 ")"

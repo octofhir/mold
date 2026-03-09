@@ -1,0 +1,43 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..80
+  INSERT_STMT@0..80
+    INSERT_KW@0..6 "INSERT"
+    WHITESPACE@6..7 " "
+    INTO_KW@7..11 "INTO"
+    WHITESPACE@11..12 " "
+    TABLE_REF@12..19
+      QUOTED_IDENT@12..18 "\"User\""
+      WHITESPACE@18..19 " "
+    INSERT_COLUMNS@19..28
+      L_PAREN@19..20 "("
+      QUOTED_IDENT@20..26 "\"name\""
+      R_PAREN@26..27 ")"
+      WHITESPACE@27..28 " "
+    VALUES_CLAUSE@28..45
+      VALUES_KW@28..34 "VALUES"
+      WHITESPACE@34..35 " "
+      VALUES_ROW@35..45
+        L_PAREN@35..36 "("
+        LITERAL@36..43
+          STRING@36..43 "'Alice'"
+        R_PAREN@43..44 ")"
+        WHITESPACE@44..45 " "
+    RETURNING_CLAUSE@45..80
+      RETURNING_KW@45..54 "RETURNING"
+      WHITESPACE@54..55 " "
+      COLUMN_REF@55..60
+        QUOTED_IDENT@55..59 "\"id\""
+        WHITESPACE@59..60 " "
+      AS_KW@60..62 "AS"
+      WHITESPACE@62..63 " "
+      QUOTED_IDENT@63..72 "\"user_id\""
+      COMMA@72..73 ","
+      WHITESPACE@73..74 " "
+      COLUMN_REF@74..80
+        QUOTED_IDENT@74..80 "\"name\""

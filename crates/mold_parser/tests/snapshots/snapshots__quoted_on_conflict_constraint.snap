@@ -1,0 +1,64 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..130
+  INSERT_STMT@0..130
+    INSERT_KW@0..6 "INSERT"
+    WHITESPACE@6..7 " "
+    INTO_KW@7..11 "INTO"
+    WHITESPACE@11..12 " "
+    TABLE_REF@12..19
+      QUOTED_IDENT@12..18 "\"User\""
+      WHITESPACE@18..19 " "
+    INSERT_COLUMNS@19..34
+      L_PAREN@19..20 "("
+      QUOTED_IDENT@20..24 "\"id\""
+      COMMA@24..25 ","
+      WHITESPACE@25..26 " "
+      QUOTED_IDENT@26..32 "\"name\""
+      R_PAREN@32..33 ")"
+      WHITESPACE@33..34 " "
+    VALUES_CLAUSE@34..54
+      VALUES_KW@34..40 "VALUES"
+      WHITESPACE@40..41 " "
+      VALUES_ROW@41..54
+        L_PAREN@41..42 "("
+        LITERAL@42..43
+          INTEGER@42..43 "1"
+        COMMA@43..44 ","
+        WHITESPACE@44..45 " "
+        LITERAL@45..52
+          STRING@45..52 "'Alice'"
+        R_PAREN@52..53 ")"
+        WHITESPACE@53..54 " "
+    ON_CONFLICT_CLAUSE@54..130
+      ON_KW@54..56 "ON"
+      WHITESPACE@56..57 " "
+      CONFLICT_KW@57..65 "CONFLICT"
+      WHITESPACE@65..66 " "
+      ON_KW@66..68 "ON"
+      WHITESPACE@68..69 " "
+      CONSTRAINT_KW@69..79 "CONSTRAINT"
+      WHITESPACE@79..80 " "
+      QUOTED_IDENT@80..91 "\"User_pkey\""
+      WHITESPACE@91..92 " "
+      DO_KW@92..94 "DO"
+      WHITESPACE@94..95 " "
+      UPDATE_KW@95..101 "UPDATE"
+      WHITESPACE@101..102 " "
+      DO_UPDATE@102..130
+        SET_KW@102..105 "SET"
+        WHITESPACE@105..106 " "
+        SET_ITEM@106..130
+          QUOTED_IDENT@106..112 "\"name\""
+          WHITESPACE@112..113 " "
+          EQ@113..114 "="
+          WHITESPACE@114..115 " "
+          COLUMN_REF@115..130
+            IDENT@115..123 "EXCLUDED"
+            DOT@123..124 "."
+            QUOTED_IDENT@124..130 "\"name\""

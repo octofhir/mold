@@ -55,9 +55,27 @@ fn statement(p: &mut Parser<'_>) {
 
 /// Handle WITH clause that can precede SELECT, INSERT, UPDATE, or DELETE.
 fn with_statement(p: &mut Parser<'_>) {
-    // For now, treat WITH as always leading to SELECT (existing behavior)
-    // Data-modifying CTEs will need the CTE to contain INSERT/UPDATE/DELETE
-    select::select_stmt(p);
+    let checkpoint = p.checkpoint();
+    select::with_clause(p);
+    let next = p.current();
+    p.rollback(checkpoint);
+
+    match next {
+        SyntaxKind::SELECT_KW => select::select_stmt(p),
+        SyntaxKind::INSERT_KW => insert::insert_stmt(p),
+        SyntaxKind::UPDATE_KW => update::update_stmt(p),
+        SyntaxKind::DELETE_KW => delete::delete_stmt(p),
+        _ => {
+            select::with_clause(p);
+            p.err_recover(
+                format!(
+                    "expected SELECT, INSERT, UPDATE, or DELETE after WITH clause, found {:?}",
+                    p.current()
+                ),
+                STMT_RECOVERY,
+            );
+        }
+    }
 }
 
 use crate::token_set::TokenSet;

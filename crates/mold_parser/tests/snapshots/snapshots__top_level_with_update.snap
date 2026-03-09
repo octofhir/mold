@@ -1,0 +1,72 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..126
+  UPDATE_STMT@0..126
+    WITH_CLAUSE@0..45
+      WITH_KW@0..4 "WITH"
+      WHITESPACE@4..5 " "
+      CTE@5..45
+        QUOTED_IDENT@5..14 "\"flagged\""
+        WHITESPACE@14..15 " "
+        AS_KW@15..17 "AS"
+        WHITESPACE@17..18 " "
+        L_PAREN@18..19 "("
+        SELECT_STMT@19..43
+          SELECT_KW@19..25 "SELECT"
+          WHITESPACE@25..26 " "
+          SELECT_ITEM_LIST@26..31
+            SELECT_ITEM@26..31
+              COLUMN_REF@26..31
+                QUOTED_IDENT@26..30 "\"id\""
+                WHITESPACE@30..31 " "
+          FROM_CLAUSE@31..43
+            FROM_KW@31..35 "FROM"
+            WHITESPACE@35..36 " "
+            TABLE_REF@36..43
+              QUOTED_IDENT@36..43 "\"users\""
+        R_PAREN@43..44 ")"
+        WHITESPACE@44..45 " "
+    UPDATE_KW@45..51 "UPDATE"
+    WHITESPACE@51..52 " "
+    TABLE_REF@52..60
+      QUOTED_IDENT@52..59 "\"users\""
+      WHITESPACE@59..60 " "
+    IDENT@60..61 "u"
+    WHITESPACE@61..62 " "
+    SET_CLAUSE@62..82
+      SET_KW@62..65 "SET"
+      WHITESPACE@65..66 " "
+      SET_ITEM@66..82
+        QUOTED_IDENT@66..74 "\"active\""
+        WHITESPACE@74..75 " "
+        EQ@75..76 "="
+        WHITESPACE@76..77 " "
+        LITERAL@77..82
+          TRUE_KW@77..81 "true"
+          WHITESPACE@81..82 " "
+    FROM_CLAUSE@82..97
+      FROM_KW@82..86 "FROM"
+      WHITESPACE@86..87 " "
+      TABLE_REF@87..97
+        QUOTED_IDENT@87..96 "\"flagged\""
+        WHITESPACE@96..97 " "
+    WHERE_CLAUSE@97..126
+      WHERE_KW@97..102 "WHERE"
+      WHITESPACE@102..103 " "
+      BINARY_EXPR@103..126
+        COLUMN_REF@103..110
+          IDENT@103..104 "u"
+          DOT@104..105 "."
+          QUOTED_IDENT@105..109 "\"id\""
+          WHITESPACE@109..110 " "
+        EQ@110..111 "="
+        WHITESPACE@111..112 " "
+        COLUMN_REF@112..126
+          QUOTED_IDENT@112..121 "\"flagged\""
+          DOT@121..122 "."
+          QUOTED_IDENT@122..126 "\"id\""

@@ -510,6 +510,7 @@ dependencies = [
 name = "mold_completion"
 version = "0.1.0"
 dependencies = [
+ "insta",
  "mold_hir",
  "mold_parser",
  "mold_syntax",

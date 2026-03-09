@@ -1,0 +1,56 @@
+---
+source: crates/mold_parser/tests/snapshots.rs
+expression: render_parse(sql)
+---
+errors:
+- <none>
+tree:
+SOURCE_FILE@0..92
+  INSERT_STMT@0..92
+    WITH_CLAUSE@0..38
+      WITH_KW@0..4 "WITH"
+      WHITESPACE@4..5 " "
+      CTE@5..38
+        QUOTED_IDENT@5..15 "\"incoming\""
+        WHITESPACE@15..16 " "
+        AS_KW@16..18 "AS"
+        WHITESPACE@18..19 " "
+        L_PAREN@19..20 "("
+        SELECT_STMT@20..36
+          SELECT_KW@20..26 "SELECT"
+          WHITESPACE@26..27 " "
+          SELECT_ITEM_LIST@27..36
+            SELECT_ITEM@27..36
+              LITERAL@27..29
+                INTEGER@27..28 "1"
+                WHITESPACE@28..29 " "
+              AS_KW@29..31 "AS"
+              WHITESPACE@31..32 " "
+              QUOTED_IDENT@32..36 "\"id\""
+        R_PAREN@36..37 ")"
+        WHITESPACE@37..38 " "
+    INSERT_KW@38..44 "INSERT"
+    WHITESPACE@44..45 " "
+    INTO_KW@45..49 "INTO"
+    WHITESPACE@49..50 " "
+    TABLE_REF@50..58
+      QUOTED_IDENT@50..57 "\"users\""
+      WHITESPACE@57..58 " "
+    INSERT_COLUMNS@58..65
+      L_PAREN@58..59 "("
+      QUOTED_IDENT@59..63 "\"id\""
+      R_PAREN@63..64 ")"
+      WHITESPACE@64..65 " "
+    SELECT_STMT@65..92
+      SELECT_KW@65..71 "SELECT"
+      WHITESPACE@71..72 " "
+      SELECT_ITEM_LIST@72..77
+        SELECT_ITEM@72..77
+          COLUMN_REF@72..77
+            QUOTED_IDENT@72..76 "\"id\""
+            WHITESPACE@76..77 " "
+      FROM_CLAUSE@77..92
+        FROM_KW@77..81 "FROM"
+        WHITESPACE@81..82 " "
+        TABLE_REF@82..92
+          QUOTED_IDENT@82..92 "\"incoming\""

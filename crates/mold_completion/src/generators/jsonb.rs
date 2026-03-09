@@ -1,5 +1,6 @@
 //! JSONB path completion generator.
 
+use super::resolve_table_lookup;
 use crate::providers::SchemaProvider;
 use crate::types::{
     CompletionData, CompletionItem, CompletionItemKind, JsonbField, JsonbFieldType, JsonbSchema,
@@ -28,8 +29,14 @@ pub fn complete_jsonb_paths(
         return Vec::new();
     };
 
-    let table_name = table.unwrap_or("");
-    let schema = provider.jsonb_schema(None, table_name, column);
+    let (schema_name, table_name) = resolve_table_lookup(provider, table.unwrap_or(""));
+    let schema = provider
+        .jsonb_schema(schema_name.as_deref(), &table_name, column)
+        .or_else(|| {
+            schema_name
+                .as_ref()
+                .and_then(|_| provider.jsonb_schema(None, &table_name, column))
+        });
 
     let Some(schema) = schema else {
         return Vec::new();
@@ -673,6 +680,21 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert!(items.iter().any(|i| i.label == "street"));
         assert!(items.iter().any(|i| i.label == "city"));
+    }
+
+    #[test]
+    fn test_complete_jsonb_paths_schema_qualified_table() {
+        let schema = JsonbSchema::new()
+            .with_field(JsonbField::new("name", JsonbFieldType::String))
+            .with_field(JsonbField::new("age", JsonbFieldType::Number));
+
+        let provider = MemorySchemaProvider::new()
+            .add_table(TableInfo::new("users").with_schema("public"))
+            .add_jsonb_schema(Some("public".to_string()), "users", "data", schema);
+
+        let items = complete_jsonb_paths(Some(&provider), Some("public.users"), "data", &[]);
+        assert!(items.iter().any(|i| i.label == "name"));
+        assert!(items.iter().any(|i| i.label == "age"));
     }
 
     #[test]

@@ -1,0 +1,13 @@
+---
+source: crates/mold_hir/tests/snapshots.rs
+assertion_line: 158
+expression: render_analysis(&analysis)
+---
+diagnostics:
+- Error | Column 'missing_column' not found in any table in scope | 7..22
+tables:
+- <none>
+columns:
+- <none>
+output_columns:
+- <none>

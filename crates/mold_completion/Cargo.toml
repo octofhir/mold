@@ -7,8 +7,9 @@ license.workspace = true
 [dependencies]
 mold_syntax.workspace = true
 mold_hir.workspace = true
+mold_parser.workspace = true
 text-size.workspace = true
 
 [dev-dependencies]
+insta.workspace = true
 proptest.workspace = true
-mold_parser.workspace = true

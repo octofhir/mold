@@ -1,0 +1,15 @@
+---
+source: crates/mold_completion/tests/snapshots.rs
+assertion_line: 74
+expression: render_completion(&result)
+---
+context: TableName { schema: None }
+is_incomplete: true
+orders | Table | detail=public.orders | insert=-
+public | Schema | detail=- | insert=public.
+users | Table | detail=public.users | insert=-
+GROUP BY | Keyword | detail=- | insert=GROUP BY 
+JOIN | Keyword | detail=- | insert=JOIN 
+LATERAL | Keyword | detail=- | insert=LATERAL 
+ONLY | Keyword | detail=- | insert=ONLY 
+WHERE | Keyword | detail=- | insert=WHERE

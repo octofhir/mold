@@ -83,10 +83,18 @@ impl Scope {
 
         // Check CTEs (CTEs shadow physical tables)
         if self.ctes.contains_key(&name_lower) {
-            // CTE exists but we return it as a table binding
-            // The caller should have created a TableBinding from the CTE
             if let Some(table) = self.tables.get(&name_lower) {
                 return Resolution::Resolved(Arc::clone(table));
+            }
+            if let Some(cte) = self.ctes.get(&name_lower) {
+                let binding = TableBinding::cte(cte.name.clone()).with_columns(
+                    cte.columns
+                        .iter()
+                        .enumerate()
+                        .map(|(i, c)| ColumnBinding::new(c.clone(), i))
+                        .collect(),
+                );
+                return Resolution::Resolved(Arc::new(binding));
             }
         }
 
@@ -300,6 +308,13 @@ impl ScopeBuilder {
                 .collect(),
         );
         self.tables.insert(name.clone(), Arc::new(table_binding));
+        self.ctes.insert(name, Arc::new(binding));
+        self
+    }
+
+    /// Adds a CTE declaration without exposing it as a scanned table source.
+    pub fn add_cte_declaration(mut self, binding: CteBinding) -> Self {
+        let name = normalize_name(&binding.name);
         self.ctes.insert(name, Arc::new(binding));
         self
     }
