@@ -139,6 +139,12 @@ pub enum RuleCode {
     Am04,
     /// Implicit cross join.
     Am05,
+    /// `UNION`/`EXCEPT`/`INTERSECT` without explicit `ALL`/`DISTINCT`.
+    Am02,
+    /// `LIMIT`/`OFFSET` without `ORDER BY` (non-deterministic).
+    Am09,
+    /// CTE defined but never referenced.
+    St03,
     /// `UPDATE` without `WHERE`.
     Sf01,
     /// `DELETE` without `WHERE`.
@@ -167,6 +173,9 @@ impl RuleCode {
         match self {
             RuleCode::Am04 => "AM04",
             RuleCode::Am05 => "AM05",
+            RuleCode::Am02 => "AM02",
+            RuleCode::Am09 => "AM09",
+            RuleCode::St03 => "ST03",
             RuleCode::Sf01 => "SF01",
             RuleCode::Sf02 => "SF02",
             RuleCode::Jb01 => "JB01",
@@ -1781,6 +1790,50 @@ mod tests {
             "{:?}",
             analysis.diagnostics
         );
+    }
+
+    fn core_diagnostics(sql: &str) -> Vec<Diagnostic> {
+        let options = AnalysisOptions::new().with_builtin_lint_packs([BuiltinLintPack::Core]);
+        analyze_with_test_provider_options(sql, &options).diagnostics
+    }
+
+    #[test]
+    fn test_am09_limit_without_order() {
+        assert!(
+            core_diagnostics("SELECT id FROM patient LIMIT 5")
+                .iter()
+                .any(|d| d.code == Some(RuleCode::Am09))
+        );
+        assert!(
+            core_diagnostics("SELECT id FROM patient ORDER BY id LIMIT 5")
+                .iter()
+                .all(|d| d.code != Some(RuleCode::Am09))
+        );
+    }
+
+    #[test]
+    fn test_am02_set_op_modifier() {
+        assert!(
+            core_diagnostics("SELECT 1 UNION SELECT 2")
+                .iter()
+                .any(|d| d.code == Some(RuleCode::Am02))
+        );
+        assert!(
+            core_diagnostics("SELECT 1 UNION ALL SELECT 2")
+                .iter()
+                .all(|d| d.code != Some(RuleCode::Am02))
+        );
+    }
+
+    #[test]
+    fn test_st03_unused_cte() {
+        let diags = core_diagnostics("WITH x AS (SELECT 1), y AS (SELECT 2) SELECT * FROM x");
+        let st03: Vec<_> = diags
+            .iter()
+            .filter(|d| d.code == Some(RuleCode::St03))
+            .collect();
+        assert_eq!(st03.len(), 1, "{diags:?}");
+        assert!(st03[0].message.contains("'y'"));
     }
 
     fn convention_diagnostics(sql: &str) -> Vec<Diagnostic> {
