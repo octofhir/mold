@@ -1,0 +1,22 @@
+# Example mold configuration.
+#
+# Used by `just demo-db`. Copy to `mold.toml` and adjust for your project; the
+# nearest `mold.toml` is discovered automatically by the CLI and LSP.
+
+[format]
+style = "sqlstyle"
+# keyword-case = "upper"
+# max-width = 100
+
+[lint]
+enabled = true
+# exclude = ["AM04"]
+
+# [lint.rules.CP01]
+# severity = "warning"
+
+[database]
+# Connection string is read from this environment variable (preferred over an
+# inline `url` so credentials stay out of the file).
+url-env = "DATABASE_URL"
+schema = "public"
