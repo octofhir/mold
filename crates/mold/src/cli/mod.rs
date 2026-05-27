@@ -11,6 +11,7 @@ mod io;
 mod lint_cmd;
 mod parse_cmd;
 mod rules_cmd;
+mod schema;
 
 use std::path::PathBuf;
 use std::process::ExitCode;

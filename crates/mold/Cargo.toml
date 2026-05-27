@@ -20,6 +20,12 @@ harness = false
 name = "complete"
 harness = false
 
+[features]
+default = []
+# Live database introspection for `mold lsp` and schema-aware linting. Pulls in
+# sqlx + tokio; off by default so the binary stays lean when unused.
+db = ["mold_schema/db", "dep:tokio"]
+
 [dependencies]
 mold_syntax.workspace = true
 mold_lexer.workspace = true
@@ -28,8 +34,10 @@ mold_hir.workspace = true
 mold_completion.workspace = true
 mold_format.workspace = true
 mold_config.workspace = true
+mold_schema.workspace = true
 clap = { workspace = true }
 anyhow = { workspace = true }
+tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
 
 [dev-dependencies]
 criterion.workspace = true

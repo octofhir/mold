@@ -27,10 +27,14 @@ pub struct FixArgs {
 pub fn run(args: &FixArgs, cli: &Cli) -> Result<u8> {
     let config = cli.load_config(&io::discovery_anchor(&args.paths))?;
     let inputs = gather_inputs(&args.paths)?;
+    let provider = super::schema::resolve(&config)?;
+    let provider_ref = provider
+        .as_ref()
+        .map(|p| p as &dyn mold_hir::SchemaProvider);
 
     let mut fixed_files = 0usize;
     for input in &inputs {
-        let analyzed = analysis::analyze(&input.text, &config);
+        let analyzed = analysis::analyze(&input.text, &config, provider_ref);
         let edits: Vec<TextEdit> = analyzed
             .diagnostics
             .iter()

@@ -8,6 +8,7 @@ members = [
     "crates/mold_completion",
     "crates/mold_format",
     "crates/mold_config",
+    "crates/mold_schema",
     "crates/mold",
 ]
 
@@ -48,3 +49,4 @@ mold_hir = { path = "crates/mold_hir" }
 mold_completion = { path = "crates/mold_completion" }
 mold_format = { path = "crates/mold_format" }
 mold_config = { path = "crates/mold_config" }
+mold_schema = { path = "crates/mold_schema" }
