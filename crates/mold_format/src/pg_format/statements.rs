@@ -234,6 +234,10 @@ pub(crate) fn format_from_clause(node: &SyntaxNode, printer: &mut PgPrinter) {
 
 /// Formats a table reference.
 pub(crate) fn format_table_ref(node: &SyntaxNode, printer: &mut PgPrinter) {
+    // Tracks whether the previous token was an identifier, so a bare second
+    // identifier (an implicit alias, `users a`) is separated by a space while a
+    // dotted qualifier (`schema.table`) is not.
+    let mut prev_ident = false;
     for element in node.children_with_tokens() {
         match element {
             cstree::util::NodeOrToken::Node(child) => {
@@ -245,16 +249,29 @@ pub(crate) fn format_table_ref(node: &SyntaxNode, printer: &mut PgPrinter) {
                 } else {
                     format_expression(child, printer);
                 }
+                prev_ident = false;
             }
-            cstree::util::NodeOrToken::Token(token) => {
-                if token.kind() == SyntaxKind::IDENT {
+            cstree::util::NodeOrToken::Token(token) => match token.kind() {
+                SyntaxKind::IDENT => {
+                    if prev_ident {
+                        printer.space();
+                    }
                     printer.write_identifier(token.text());
-                } else if token.kind() == SyntaxKind::QUOTED_IDENT {
-                    printer.write(token.text());
-                } else if token.kind() == SyntaxKind::DOT {
-                    printer.write(".");
+                    prev_ident = true;
                 }
-            }
+                SyntaxKind::QUOTED_IDENT => {
+                    if prev_ident {
+                        printer.space();
+                    }
+                    printer.write(token.text());
+                    prev_ident = true;
+                }
+                SyntaxKind::DOT => {
+                    printer.write(".");
+                    prev_ident = false;
+                }
+                _ => {}
+            },
         }
     }
 }
