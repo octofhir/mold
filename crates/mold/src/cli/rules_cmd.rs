@@ -17,8 +17,8 @@ pub(crate) struct RuleDoc {
 pub(crate) const RULES: &[RuleDoc] = &[
     RuleDoc {
         code: "AM04",
-        fixable: false,
-        summary: "Avoid SELECT *; list columns explicitly",
+        fixable: true,
+        summary: "Avoid SELECT *; list columns explicitly (fix needs schema)",
         explanation: "\
 `SELECT *` makes a query's result shape depend on the table definition. When a
 column is added, dropped or reordered, the query silently changes what it
