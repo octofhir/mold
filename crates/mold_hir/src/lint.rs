@@ -61,8 +61,51 @@ fn apply_core_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>)
             lint_limit_without_order(&select, analyzer);
             lint_set_op_modifier(&select, analyzer);
         }
+        if node.kind() == SyntaxKind::CASE_EXPR {
+            lint_redundant_else_null(&node, analyzer);
+        }
     }
     lint_unused_ctes(root, analyzer);
+}
+
+/// ST01 — `ELSE NULL` in a `CASE` is redundant (the default result is NULL).
+fn lint_redundant_else_null(case: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let Some(else_body) = case
+        .children()
+        .find(|c| c.kind() == SyntaxKind::CASE_ELSE)
+    else {
+        return;
+    };
+    // The ELSE body must be exactly a NULL literal.
+    let only_null = else_body
+        .children()
+        .all(|c| c.kind() == SyntaxKind::LITERAL)
+        && else_body
+            .descendants_with_tokens()
+            .filter_map(|e| e.into_token())
+            .filter(|t| !t.kind().is_trivia())
+            .all(|t| t.kind() == SyntaxKind::NULL_KW);
+    if !only_null {
+        return;
+    }
+    let Some(else_kw) = case
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .find(|t| t.kind() == SyntaxKind::ELSE_KW)
+    else {
+        return;
+    };
+    // Delete from `ELSE` through the end of its NULL body.
+    let range = text_size::TextRange::new(else_kw.text_range().start(), else_body.text_range().end());
+    analyzer.emit(
+        Diagnostic::warning("Redundant ELSE NULL in CASE expression")
+            .with_code(RuleCode::St01)
+            .with_range(range)
+            .with_fix(Fix::new(
+                "Remove ELSE NULL",
+                vec![TextEdit::replace(range, "")],
+            )),
+    );
 }
 
 /// AM09 — `LIMIT`/`OFFSET` without `ORDER BY` returns rows in an arbitrary order.

@@ -57,6 +57,17 @@ Without `ORDER BY`, `LIMIT`/`OFFSET` return an arbitrary subset of rows that can
 change between runs. Add an `ORDER BY` to make the result deterministic.",
     },
     RuleDoc {
+        code: "ST01",
+        fixable: true,
+        summary: "Redundant ELSE NULL in CASE",
+        explanation: "\
+A `CASE` expression already yields NULL when no branch matches, so `ELSE NULL`
+is redundant. Removed automatically.
+
+  bad:  CASE WHEN x THEN 1 ELSE NULL END
+  good: CASE WHEN x THEN 1 END",
+    },
+    RuleDoc {
         code: "ST03",
         fixable: false,
         summary: "CTE is defined but never used",
