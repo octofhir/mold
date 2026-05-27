@@ -86,6 +86,18 @@ literals. This rule is auto-fixable: run `mold fix` to apply.
   good: SELECT id FROM patient",
     },
     RuleDoc {
+        code: "CP02",
+        fixable: true,
+        summary: "Unquoted identifiers should be lower case",
+        explanation: "\
+Postgres folds unquoted identifiers to lower case, so a mixed- or upper-case
+unquoted name is misleading. This rule lower-cases it (auto-fixable). Quoted
+identifiers are left untouched.
+
+  bad:  SELECT Id FROM Patient
+  good: SELECT id FROM patient",
+    },
+    RuleDoc {
         code: "RF01",
         fixable: false,
         summary: "Reference to an unknown table, column or alias (needs schema)",

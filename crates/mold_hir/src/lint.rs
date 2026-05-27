@@ -57,30 +57,47 @@ fn apply_core_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>)
     }
 }
 
-/// CP01 — flags lowercase/mixed-case keyword tokens and offers an uppercase fix.
+/// CP01 — keyword tokens should be upper case (fixable).
+/// CP02 — unquoted identifiers should be lower case (fixable). Postgres folds
+/// unquoted identifiers to lower case anyway, so the rewrite is safe.
 fn apply_capitalisation_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
     for element in root.descendants_with_tokens() {
         let Some(token) = element.as_token() else {
             continue;
         };
-        if !token.kind().is_keyword() {
-            continue;
-        }
+        let kind = token.kind();
         let text = token.text();
-        let upper = text.to_ascii_uppercase();
-        if text == upper {
-            continue;
-        }
         let range = token.text_range();
-        analyzer.emit(
-            Diagnostic::warning(format!("Keyword '{text}' should be upper case"))
-                .with_code(RuleCode::Cp01)
-                .with_range(range)
-                .with_fix(Fix::new(
-                    format!("Uppercase '{text}'"),
-                    vec![TextEdit::replace(range, upper)],
-                )),
-        );
+
+        if kind.is_keyword() {
+            let upper = text.to_ascii_uppercase();
+            if text == upper {
+                continue;
+            }
+            analyzer.emit(
+                Diagnostic::warning(format!("Keyword '{text}' should be upper case"))
+                    .with_code(RuleCode::Cp01)
+                    .with_range(range)
+                    .with_fix(Fix::new(
+                        format!("Uppercase '{text}'"),
+                        vec![TextEdit::replace(range, upper)],
+                    )),
+            );
+        } else if kind == SyntaxKind::IDENT {
+            let lower = text.to_ascii_lowercase();
+            if text == lower {
+                continue;
+            }
+            analyzer.emit(
+                Diagnostic::warning(format!("Identifier '{text}' should be lower case"))
+                    .with_code(RuleCode::Cp02)
+                    .with_range(range)
+                    .with_fix(Fix::new(
+                        format!("Lowercase '{text}'"),
+                        vec![TextEdit::replace(range, lower)],
+                    )),
+            );
+        }
     }
 }
 
