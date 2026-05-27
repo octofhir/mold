@@ -6,7 +6,7 @@
 
 use mold_config::{MoldConfig, SeverityLevel};
 use mold_hir::{
-    AnalysisOptions, BuiltinLintPack, Diagnostic, NullSchemaProvider, Severity,
+    AnalysisOptions, BuiltinLintPack, Diagnostic, NullSchemaProvider, SchemaProvider, Severity,
     analyze_query_with_options,
 };
 
@@ -24,15 +24,20 @@ pub struct Analyzed {
 /// diagnostics (unknown table/column) are false positives, so only keyed lint
 /// findings are kept. Once a schema provider is wired in, semantic diagnostics
 /// can be surfaced too.
-pub fn analyze(text: &str, config: &MoldConfig) -> Analyzed {
+pub fn analyze(
+    text: &str,
+    config: &MoldConfig,
+    provider: Option<&dyn SchemaProvider>,
+) -> Analyzed {
     let parse = mold_parser::parse(text);
     let parse_errors = parse.errors().len();
 
     let options = build_options(config);
-    let provider = NullSchemaProvider;
-    let analysis = analyze_query_with_options(&parse, &provider, &options);
+    let null = NullSchemaProvider;
+    let active: &dyn SchemaProvider = provider.unwrap_or(&null);
+    let analysis = analyze_query_with_options(&parse, active, &options);
 
-    let schema_aware = config.database.is_configured();
+    let schema_aware = provider.is_some();
 
     let diagnostics = analysis
         .diagnostics

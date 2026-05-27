@@ -2,3 +2,5 @@ target
 .idea
 fuzz/artifacts
 fuzz/target
+.mold/
+.DS_Store
