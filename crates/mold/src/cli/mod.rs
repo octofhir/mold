@@ -8,6 +8,7 @@ mod analysis;
 mod complete_cmd;
 mod explain_cmd;
 mod fix_cmd;
+mod init_cmd;
 mod format_cmd;
 mod io;
 mod lint_cmd;
@@ -56,6 +57,8 @@ enum Command {
     Parse(parse_cmd::ParseArgs),
     /// List available lint rules.
     Rules,
+    /// Scaffold a mold.toml in the current directory.
+    Init(init_cmd::InitArgs),
     /// Explain a lint rule in detail.
     Explain(explain_cmd::ExplainArgs),
     /// Print completion items at a byte offset (debug helper).
@@ -73,6 +76,8 @@ pub enum ReportFormat {
     Json,
     /// GitHub Actions workflow annotations.
     Github,
+    /// SARIF 2.1.0 (for CI / code-scanning dashboards).
+    Sarif,
 }
 
 impl Cli {
@@ -85,6 +90,7 @@ impl Cli {
             Command::Fix(args) => fix_cmd::run(args, &cli),
             Command::Parse(args) => parse_cmd::run(args, &cli),
             Command::Rules => rules_cmd::run(),
+            Command::Init(args) => init_cmd::run(args),
             Command::Explain(args) => explain_cmd::run(args),
             Command::Complete(args) => complete_cmd::run(args, &cli),
             Command::Lsp => run_lsp(&cli),

@@ -192,6 +192,10 @@ impl Server {
             .iter()
             .filter(|d| match &d.code {
                 None => schema_aware,
+                // Reference checks (RF*) need a schema; suppress them without one.
+                Some(code) if code.starts_with("RF") => {
+                    schema_aware && self.config.lint.is_rule_enabled(code)
+                }
                 Some(code) => self.config.lint.is_rule_enabled(code),
             })
             .cloned()
