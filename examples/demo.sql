@@ -13,3 +13,7 @@ SELECT naem FROM patient;
 
 -- RF02 ambiguous column: 'id' exists in both tables, so it must be qualified
 SELECT id FROM patient JOIN orders ON orders.patient_id = patient.id;
+
+-- JSONB: the 'resource' column's shape is sampled from live rows, so editors
+-- suggest keys after `resource->`. See the completion demo in `just demo-db`.
+SELECT resource ->> 'resourceType' FROM patient;

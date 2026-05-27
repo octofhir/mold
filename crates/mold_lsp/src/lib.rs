@@ -496,6 +496,7 @@ mod tests {
                 nullable: false,
                 is_primary_key: true,
                 ordinal: 0,
+                jsonb: None,
             }],
         });
         CachedSchemaProvider::new(snap)

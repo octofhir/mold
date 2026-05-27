@@ -83,4 +83,9 @@ demo-db: db-up
     DATABASE_URL=postgres://mold:mold@localhost:55432/mold_demo \
         cargo run -p mold --features db -- --config mold.example.toml lint examples/demo.sql || true
     @echo
-    @echo "Schema cached at .mold/schema-cache.json"
+    @echo "--- JSONB key completion after resource-> (sampled from live rows) ---"
+    printf "select resource->'' from patient" | \
+        DATABASE_URL=postgres://mold:mold@localhost:55432/mold_demo \
+        cargo run -p mold --features db --quiet -- --config mold.example.toml complete --offset 18 - || true
+    @echo
+    @echo "Schema (incl. JSONB shapes) cached at .mold/schema-cache.json"

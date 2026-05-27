@@ -4,15 +4,23 @@
 //! functions in a target schema and assembles a [`SchemaSnapshot`]. The result
 //! is plain data and can be cached and reused without a database connection.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::future::Future;
+use std::pin::Pin;
 use std::time::Duration;
 
 use sqlx::Row;
 use sqlx::postgres::PgPoolOptions;
 
 use crate::snapshot::{
-    ColumnEntry, FunctionEntry, SchemaSnapshot, TableEntry, TableKind, fingerprint,
+    ColumnEntry, FunctionEntry, JsonbFieldShape, JsonbShape, JsonbType, SchemaSnapshot, TableEntry,
+    TableKind, fingerprint,
 };
+
+/// Rows sampled per JSONB level, and how deep to recurse.
+const JSONB_SAMPLE_ROWS: u32 = 200;
+const JSONB_MAX_DEPTH: u32 = 3;
+const JSONB_MAX_FIELDS: usize = 64;
 
 /// Connects to `url`, introspects `schema`, and returns a snapshot.
 ///
@@ -34,6 +42,7 @@ pub async fn introspect(
     let primary_keys = fetch_primary_keys(&pool, schema).await?;
     let mut tables = fetch_tables(&pool, schema).await?;
     attach_columns(&pool, schema, &mut tables, &primary_keys).await?;
+    sample_jsonb_columns(&pool, schema, &mut tables).await;
     snapshot.tables = tables.into_values().collect();
     snapshot.tables.sort_by(|a, b| a.name.cmp(&b.name));
     snapshot.functions = fetch_functions(&pool, schema).await?;
@@ -115,6 +124,7 @@ async fn attach_columns(
             nullable: is_nullable.eq_ignore_ascii_case("YES"),
             is_primary_key: is_pk,
             ordinal: ord.saturating_sub(1).max(0) as usize,
+            jsonb: None,
         });
     }
     Ok(())
@@ -168,4 +178,148 @@ async fn fetch_functions(
                 .unwrap_or_else(|_| "void".to_string()),
         })
         .collect())
+}
+
+// === JSONB shape sampling ====================================================
+
+fn quote_ident(s: &str) -> String {
+    format!("\"{}\"", s.replace('"', "\"\""))
+}
+
+fn quote_lit(s: &str) -> String {
+    s.replace('\'', "''")
+}
+
+/// Samples the structure of every json/jsonb column. Best-effort: sampling
+/// errors (permissions, odd data) are swallowed so introspection still
+/// succeeds without shapes.
+async fn sample_jsonb_columns(
+    pool: &sqlx::PgPool,
+    schema: &str,
+    tables: &mut HashMap<String, TableEntry>,
+) {
+    for table in tables.values_mut() {
+        for col in table.columns.iter_mut() {
+            let dt = col.data_type.to_ascii_lowercase();
+            if dt != "jsonb" && dt != "json" {
+                continue;
+            }
+            let value_expr = quote_ident(&col.name);
+            col.jsonb =
+                build_shape(pool, schema, &table.name, &value_expr, false, JSONB_MAX_DEPTH).await;
+        }
+    }
+}
+
+/// Recursively samples a JSONB shape. `as_array` selects element sampling for
+/// array values; otherwise object keys are sampled.
+fn build_shape<'a>(
+    pool: &'a sqlx::PgPool,
+    schema: &'a str,
+    table: &'a str,
+    value_expr: &'a str,
+    as_array: bool,
+    depth: u32,
+) -> Pin<Box<dyn Future<Output = Option<JsonbShape>> + Send + 'a>> {
+    Box::pin(async move {
+        if depth == 0 {
+            return None;
+        }
+        let fields = if as_array {
+            sample_array_fields(pool, schema, table, value_expr).await
+        } else {
+            sample_object_fields(pool, schema, table, value_expr).await
+        };
+        if fields.is_empty() {
+            return None;
+        }
+
+        let mut out = Vec::new();
+        for (name, ty) in fields.into_iter().take(JSONB_MAX_FIELDS) {
+            // Only recurse into object keys; array element fields are sampled
+            // one level deep (their own object keys) but not beyond.
+            let nested = if !as_array && depth > 1 {
+                let child_expr = format!("{value_expr}->'{}'", quote_lit(&name));
+                match ty {
+                    JsonbType::Object => {
+                        build_shape(pool, schema, table, &child_expr, false, depth - 1).await
+                    }
+                    JsonbType::Array => {
+                        build_shape(pool, schema, table, &child_expr, true, depth - 1).await
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            out.push(JsonbFieldShape { name, ty, nested });
+        }
+        Some(JsonbShape { fields: out })
+    })
+}
+
+async fn sample_object_fields(
+    pool: &sqlx::PgPool,
+    schema: &str,
+    table: &str,
+    value_expr: &str,
+) -> Vec<(String, JsonbType)> {
+    let sql = format!(
+        "SELECT e.key AS k, jsonb_typeof(e.value) AS ty \
+         FROM (SELECT {ve} AS v FROM {sch}.{tbl} WHERE {ve} IS NOT NULL LIMIT {lim}) src, \
+              LATERAL jsonb_each(src.v) e \
+         WHERE jsonb_typeof(src.v) = 'object'",
+        ve = value_expr,
+        sch = quote_ident(schema),
+        tbl = quote_ident(table),
+        lim = JSONB_SAMPLE_ROWS,
+    );
+    collect_fields(pool, &sql).await
+}
+
+async fn sample_array_fields(
+    pool: &sqlx::PgPool,
+    schema: &str,
+    table: &str,
+    value_expr: &str,
+) -> Vec<(String, JsonbType)> {
+    let sql = format!(
+        "SELECT e.key AS k, jsonb_typeof(e.value) AS ty \
+         FROM (SELECT {ve} AS v FROM {sch}.{tbl} WHERE {ve} IS NOT NULL LIMIT {lim}) src, \
+              LATERAL jsonb_array_elements(src.v) el, \
+              LATERAL jsonb_each(el) e \
+         WHERE jsonb_typeof(src.v) = 'array' AND jsonb_typeof(el) = 'object'",
+        ve = value_expr,
+        sch = quote_ident(schema),
+        tbl = quote_ident(table),
+        lim = JSONB_SAMPLE_ROWS,
+    );
+    collect_fields(pool, &sql).await
+}
+
+/// Runs a sampling query and reduces (key, type) rows to one type per key
+/// (the most frequently observed), in sorted key order for determinism.
+async fn collect_fields(pool: &sqlx::PgPool, sql: &str) -> Vec<(String, JsonbType)> {
+    let Ok(rows) = sqlx::query(sql).fetch_all(pool).await else {
+        return Vec::new();
+    };
+    // key -> (type -> count)
+    let mut counts: BTreeMap<String, HashMap<JsonbType, u32>> = BTreeMap::new();
+    for row in rows {
+        let key: String = row.get("k");
+        let ty: Option<String> = row.try_get("ty").ok();
+        let ty = ty.map(|t| JsonbType::from_typeof(&t)).unwrap_or(JsonbType::Null);
+        *counts.entry(key).or_default().entry(ty).or_insert(0) += 1;
+    }
+    counts
+        .into_iter()
+        .map(|(key, types)| {
+            let ty = types
+                .into_iter()
+                .max_by_key(|(_, c)| *c)
+                .map(|(t, _)| t)
+                .unwrap_or(JsonbType::Unknown);
+            (key, ty)
+        })
+        .collect()
 }
