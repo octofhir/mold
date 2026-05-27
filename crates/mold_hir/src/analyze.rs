@@ -1942,6 +1942,16 @@ mod tests {
             "expected JSONB text compare warning, got: {:?}",
             analysis.diagnostics
         );
+
+        // The JB01 finding carries an autofix replacing `->` with `->>`.
+        let diag = analysis
+            .diagnostics
+            .iter()
+            .find(|d| d.code == Some(RuleCode::Jb01))
+            .expect("JB01 diagnostic");
+        let fix = diag.fixes.first().expect("JB01 fix present");
+        assert_eq!(fix.edits.len(), 1);
+        assert_eq!(fix.edits[0].new_text, "->>");
     }
 
     #[test]

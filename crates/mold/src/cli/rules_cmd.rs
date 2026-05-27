@@ -65,7 +65,7 @@ truly intend to remove every row (in which case TRUNCATE is usually clearer).
     },
     RuleDoc {
         code: "JB01",
-        fixable: false,
+        fixable: true,
         summary: "Use ->> when comparing a JSONB value to text",
         explanation: "\
 The -> operator returns `jsonb`, so comparing it to a text literal never
