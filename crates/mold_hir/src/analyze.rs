@@ -89,11 +89,57 @@ pub struct ResolvedTableRef {
     pub binding: Arc<TableBinding>,
 }
 
+/// A single text replacement that, when applied, resolves (part of) a fix.
+///
+/// Edits are expressed against the original source offsets. Multiple edits in
+/// one [`Fix`] must not overlap; consumers apply them right-to-left.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TextEdit {
+    /// The source range to replace.
+    pub range: TextRange,
+    /// The replacement text (empty string = deletion).
+    pub new_text: String,
+}
+
+impl TextEdit {
+    /// Creates a replacement edit.
+    pub fn replace(range: TextRange, new_text: impl Into<String>) -> Self {
+        Self {
+            range,
+            new_text: new_text.into(),
+        }
+    }
+}
+
+/// A named, applicable fix attached to a diagnostic.
+///
+/// Maps directly onto an LSP `CodeAction` / quick-fix.
+#[derive(Clone, Debug)]
+pub struct Fix {
+    /// Human-readable title shown in the editor (e.g. "Uppercase keyword").
+    pub title: String,
+    /// The edits that make up this fix.
+    pub edits: Vec<TextEdit>,
+}
+
+impl Fix {
+    /// Creates a fix from a title and one or more edits.
+    pub fn new(title: impl Into<String>, edits: Vec<TextEdit>) -> Self {
+        Self {
+            title: title.into(),
+            edits,
+        }
+    }
+}
+
 /// A diagnostic message from analysis.
 #[derive(Clone, Debug)]
 pub struct Diagnostic {
     /// The severity of the diagnostic.
     pub severity: Severity,
+
+    /// A stable rule code (e.g. `CP01`), when the diagnostic comes from a rule.
+    pub code: Option<String>,
 
     /// The diagnostic message.
     pub message: String,
@@ -103,6 +149,9 @@ pub struct Diagnostic {
 
     /// Additional related information.
     pub related: Vec<RelatedInfo>,
+
+    /// Suggested fixes (quick-fixes / autofixes) for this diagnostic.
+    pub fixes: Vec<Fix>,
 }
 
 impl Diagnostic {
@@ -110,9 +159,11 @@ impl Diagnostic {
     pub fn error(message: impl Into<String>) -> Self {
         Self {
             severity: Severity::Error,
+            code: None,
             message: message.into(),
             range: None,
             related: Vec::new(),
+            fixes: Vec::new(),
         }
     }
 
@@ -120,9 +171,11 @@ impl Diagnostic {
     pub fn warning(message: impl Into<String>) -> Self {
         Self {
             severity: Severity::Warning,
+            code: None,
             message: message.into(),
             range: None,
             related: Vec::new(),
+            fixes: Vec::new(),
         }
     }
 
@@ -130,10 +183,18 @@ impl Diagnostic {
     pub fn info(message: impl Into<String>) -> Self {
         Self {
             severity: Severity::Info,
+            code: None,
             message: message.into(),
             range: None,
             related: Vec::new(),
+            fixes: Vec::new(),
         }
+    }
+
+    /// Sets the rule code for this diagnostic.
+    pub fn with_code(mut self, code: impl Into<String>) -> Self {
+        self.code = Some(code.into());
+        self
     }
 
     /// Sets the source range for this diagnostic.
@@ -145,6 +206,12 @@ impl Diagnostic {
     /// Adds related information to this diagnostic.
     pub fn with_related(mut self, info: RelatedInfo) -> Self {
         self.related.push(info);
+        self
+    }
+
+    /// Attaches a fix to this diagnostic.
+    pub fn with_fix(mut self, fix: Fix) -> Self {
+        self.fixes.push(fix);
         self
     }
 }
@@ -167,6 +234,9 @@ pub enum BuiltinLintPack {
     Core,
     /// JSONB-specific checks.
     Jsonb,
+    /// Capitalisation/case-consistency checks (fixable). Opt-in: not enabled by
+    /// default because the formatter already normalises case.
+    Capitalisation,
 }
 
 /// External lint pack hook.
@@ -207,7 +277,7 @@ impl AnalysisOptions {
         self
     }
 
-    fn has_builtin_pack(&self, pack: BuiltinLintPack) -> bool {
+    pub(crate) fn has_builtin_pack(&self, pack: BuiltinLintPack) -> bool {
         self.builtin_lint_packs.contains(&pack)
     }
 }
@@ -521,6 +591,11 @@ impl<'a> Analyzer<'a> {
         self.diagnostics.push(diag);
     }
 
+    /// Pushes a fully-built diagnostic (with code, fixes, related info).
+    pub fn emit(&mut self, diagnostic: Diagnostic) {
+        self.diagnostics.push(diagnostic);
+    }
+
     /// Builds a table binding from schema information.
     pub fn build_table_binding(
         &self,
@@ -698,10 +773,7 @@ pub fn expand_table_star(
 
 use mold_syntax::Parse;
 use mold_syntax::SyntaxKind;
-use mold_syntax::ast::{
-    AstNode, BinaryExpr, ColumnRef, DeleteStmt, Expr, JsonbAccessExpr, LiteralKind, SelectItem,
-    SelectStmt, UpdateStmt, WithClause,
-};
+use mold_syntax::ast::{AstNode, ColumnRef, JsonbAccessExpr, WithClause};
 
 use crate::resolve::{validate_column_reference, validate_table_reference};
 
@@ -978,7 +1050,7 @@ pub fn analyze_query_with_options(
     }
 
     // Final pass: lint rules (non-fatal quality/safety diagnostics)
-    apply_lints(&root, &mut analyzer, options);
+    crate::lint::apply_lints(&root, &mut analyzer, options);
 
     analyzer.finish(scope, Vec::new())
 }
@@ -1440,158 +1512,6 @@ fn extract_statement_target_alias(node: &mold_syntax::SyntaxNode) -> Option<Stri
 
     None
 }
-
-fn apply_lints(
-    root: &mold_syntax::SyntaxNode,
-    analyzer: &mut Analyzer<'_>,
-    options: &AnalysisOptions,
-) {
-    if options.has_builtin_pack(BuiltinLintPack::Core) {
-        apply_core_lints(root, analyzer);
-    }
-    if options.has_builtin_pack(BuiltinLintPack::Jsonb) {
-        apply_jsonb_lints(root, analyzer);
-    }
-    for pack in &options.external_lint_packs {
-        pack.apply(root, analyzer);
-    }
-}
-
-fn apply_core_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
-    for node in root.descendants() {
-        if let Some(select) = SelectStmt::cast(node.clone()) {
-            lint_select_star(&select, analyzer);
-        }
-        if let Some(update) = UpdateStmt::cast(node.clone()) {
-            lint_update_without_where(&update, analyzer);
-        }
-        if let Some(delete) = DeleteStmt::cast(node.clone()) {
-            lint_delete_without_where(&delete, analyzer);
-        }
-    }
-}
-
-fn apply_jsonb_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
-    for node in root.descendants() {
-        if let Some(binary) = BinaryExpr::cast(node.clone()) {
-            lint_jsonb_text_comparison_binary(&binary, analyzer);
-        }
-    }
-}
-
-fn lint_select_star(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
-    for node in stmt.syntax().descendants() {
-        if let Some(item) = SelectItem::cast(node.clone())
-            && select_item_has_star(&item)
-        {
-            analyzer.warning(
-                "Avoid SELECT *; list columns explicitly",
-                Some(item.syntax().text_range()),
-            );
-        }
-    }
-}
-
-fn lint_update_without_where(stmt: &UpdateStmt, analyzer: &mut Analyzer<'_>) {
-    if stmt.where_clause().is_none() {
-        analyzer.warning(
-            "UPDATE without WHERE affects all rows",
-            Some(stmt.syntax().text_range()),
-        );
-    }
-}
-
-fn lint_delete_without_where(stmt: &DeleteStmt, analyzer: &mut Analyzer<'_>) {
-    if stmt.where_clause().is_none() {
-        analyzer.warning(
-            "DELETE without WHERE affects all rows",
-            Some(stmt.syntax().text_range()),
-        );
-    }
-}
-
-fn lint_jsonb_text_comparison_binary(expr: &BinaryExpr, analyzer: &mut Analyzer<'_>) {
-    let is_like = binary_has_operator(expr, &[SyntaxKind::LIKE_KW, SyntaxKind::ILIKE_KW]);
-    let is_text_comparison = is_like
-        || binary_has_operator(
-            expr,
-            &[
-                SyntaxKind::EQ,
-                SyntaxKind::NE,
-                SyntaxKind::LT,
-                SyntaxKind::LE,
-                SyntaxKind::GT,
-                SyntaxKind::GE,
-            ],
-        );
-
-    if !is_text_comparison {
-        return;
-    }
-
-    let Some(lhs) = expr.lhs() else {
-        return;
-    };
-    let Some(rhs) = expr.rhs() else {
-        return;
-    };
-
-    let needs_arrow_text = (is_jsonb_non_text_expr(&lhs) && is_string_literal_expr(&rhs))
-        || (is_jsonb_non_text_expr(&rhs) && is_string_literal_expr(&lhs));
-
-    if needs_arrow_text {
-        let message = if is_like {
-            "Use ->> when matching JSONB scalar against text pattern"
-        } else {
-            "Use ->> when comparing JSONB scalar to text literal"
-        };
-        analyzer.warning(message, Some(expr.syntax().text_range()));
-    }
-}
-
-fn is_jsonb_non_text_expr(expr: &Expr) -> bool {
-    let mut has_non_text = false;
-    let mut has_text = false;
-
-    for child in expr.syntax().descendants_with_tokens() {
-        if let Some(token) = child.as_token() {
-            match token.kind() {
-                SyntaxKind::ARROW | SyntaxKind::HASH_ARROW => has_non_text = true,
-                SyntaxKind::ARROW_TEXT | SyntaxKind::HASH_ARROW_TEXT => has_text = true,
-                _ => {}
-            }
-        }
-    }
-
-    has_non_text && !has_text
-}
-
-fn is_string_literal_expr(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::Literal(lit)
-            if matches!(lit.kind(), Some(LiteralKind::String | LiteralKind::DollarString))
-    )
-}
-
-fn select_item_has_star(item: &SelectItem) -> bool {
-    for child in item.syntax().descendants_with_tokens() {
-        if let Some(token) = child.into_token()
-            && token.kind() == SyntaxKind::STAR
-        {
-            return true;
-        }
-    }
-    false
-}
-
-fn binary_has_operator(expr: &BinaryExpr, kinds: &[SyntaxKind]) -> bool {
-    expr.syntax()
-        .children_with_tokens()
-        .filter_map(|child| child.into_token())
-        .any(|token| kinds.contains(&token.kind()))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1688,6 +1608,72 @@ mod tests {
         assert!(analysis.has_errors());
         assert_eq!(analysis.errors().count(), 1);
         assert_eq!(analysis.warnings().count(), 1);
+    }
+
+    #[test]
+    fn test_cp01_keyword_case_with_fix() {
+        let options =
+            AnalysisOptions::new().with_builtin_lint_packs([BuiltinLintPack::Capitalisation]);
+        let analysis = analyze_with_test_provider_options("select id from patient", &options);
+
+        let cp01: Vec<_> = analysis
+            .diagnostics
+            .iter()
+            .filter(|d| d.code.as_deref() == Some("CP01"))
+            .collect();
+        // `select` and `from` are both lower case.
+        assert_eq!(cp01.len(), 2, "{:?}", analysis.diagnostics);
+
+        let select_diag = cp01
+            .iter()
+            .find(|d| d.message.contains("select"))
+            .expect("diagnostic for select keyword");
+        let fix = select_diag.fixes.first().expect("fix present");
+        assert_eq!(fix.edits.len(), 1);
+        assert_eq!(fix.edits[0].new_text, "SELECT");
+    }
+
+    #[test]
+    fn test_cp01_uppercase_is_clean() {
+        let options =
+            AnalysisOptions::new().with_builtin_lint_packs([BuiltinLintPack::Capitalisation]);
+        let analysis = analyze_with_test_provider_options("SELECT id FROM patient", &options);
+        assert!(
+            analysis
+                .diagnostics
+                .iter()
+                .all(|d| d.code.as_deref() != Some("CP01"))
+        );
+    }
+
+    #[test]
+    fn test_am05_implicit_cross_join() {
+        let options = AnalysisOptions::new().with_builtin_lint_packs([BuiltinLintPack::Core]);
+        let analysis =
+            analyze_with_test_provider_options("SELECT * FROM patient, orders", &options);
+        assert!(
+            analysis
+                .diagnostics
+                .iter()
+                .any(|d| d.code.as_deref() == Some("AM05")),
+            "{:?}",
+            analysis.diagnostics
+        );
+    }
+
+    #[test]
+    fn test_am05_explicit_join_is_clean() {
+        let options = AnalysisOptions::new().with_builtin_lint_packs([BuiltinLintPack::Core]);
+        let analysis = analyze_with_test_provider_options(
+            "SELECT * FROM patient JOIN orders ON patient.id = orders.id",
+            &options,
+        );
+        assert!(
+            analysis
+                .diagnostics
+                .iter()
+                .all(|d| d.code.as_deref() != Some("AM05"))
+        );
     }
 
     #[test]

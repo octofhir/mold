@@ -7,6 +7,7 @@ members = [
     "crates/mold_hir",
     "crates/mold_completion",
     "crates/mold_format",
+    "crates/mold_config",
     "crates/mold",
 ]
 
@@ -31,6 +32,14 @@ criterion = { version = "0.5", features = ["html_reports"] }
 # Utilities
 dirs = "5.0"
 
+# Config (serde + TOML)
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+
 # Internal crates
 mold_syntax = { path = "crates/mold_syntax" }
 mold_lexer = { path = "crates/mold_lexer" }
@@ -38,3 +47,4 @@ mold_parser = { path = "crates/mold_parser" }
 mold_hir = { path = "crates/mold_hir" }
 mold_completion = { path = "crates/mold_completion" }
 mold_format = { path = "crates/mold_format" }
+mold_config = { path = "crates/mold_config" }
