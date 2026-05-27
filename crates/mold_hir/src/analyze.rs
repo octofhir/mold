@@ -143,6 +143,8 @@ pub enum RuleCode {
     Am02,
     /// `LIMIT`/`OFFSET` without `ORDER BY` (non-deterministic).
     Am09,
+    /// Redundant `ELSE NULL` in a `CASE` expression.
+    St01,
     /// CTE defined but never referenced.
     St03,
     /// `UPDATE` without `WHERE`.
@@ -175,6 +177,7 @@ impl RuleCode {
             RuleCode::Am05 => "AM05",
             RuleCode::Am02 => "AM02",
             RuleCode::Am09 => "AM09",
+            RuleCode::St01 => "ST01",
             RuleCode::St03 => "ST03",
             RuleCode::Sf01 => "SF01",
             RuleCode::Sf02 => "SF02",
@@ -1822,6 +1825,22 @@ mod tests {
             core_diagnostics("SELECT 1 UNION ALL SELECT 2")
                 .iter()
                 .all(|d| d.code != Some(RuleCode::Am02))
+        );
+    }
+
+    #[test]
+    fn test_st01_redundant_else_null() {
+        let diags = core_diagnostics("SELECT CASE WHEN a THEN 1 ELSE NULL END FROM t");
+        let st01 = diags
+            .iter()
+            .find(|d| d.code == Some(RuleCode::St01))
+            .expect("ST01");
+        assert_eq!(st01.fixes[0].edits[0].new_text, "");
+        // Non-null ELSE is fine.
+        assert!(
+            core_diagnostics("SELECT CASE WHEN a THEN 1 ELSE 0 END FROM t")
+                .iter()
+                .all(|d| d.code != Some(RuleCode::St01))
         );
     }
 
