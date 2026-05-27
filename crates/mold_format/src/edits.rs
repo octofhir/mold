@@ -22,7 +22,16 @@ pub struct TextEdit {
 #[must_use]
 pub fn format_edits(source: &str, config: &FormatConfig) -> Vec<TextEdit> {
     let formatted = crate::format::format(source, config);
-    minimal_diff(source, &formatted)
+    diff_edits(source, &formatted)
+}
+
+/// Computes the minimal edit(s) turning `source` into `formatted`.
+///
+/// Engine-agnostic: callers may format with any engine (sqlstyle or
+/// pgFormatter) and diff the result here.
+#[must_use]
+pub fn diff_edits(source: &str, formatted: &str) -> Vec<TextEdit> {
+    minimal_diff(source, formatted)
 }
 
 /// Like [`format_edits`], but only returns edits intersecting `range`.

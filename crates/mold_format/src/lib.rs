@@ -38,7 +38,7 @@ pub mod rules;
 pub mod validate;
 
 pub use config::{CommaStyle, FormatConfig, FormatStyle, IdentifierCase, IndentStyle, KeywordCase};
-pub use edits::{TextEdit, format_edits, format_range};
+pub use edits::{TextEdit, diff_edits, format_edits, format_range};
 pub use format::format;
 pub use pg_format::PgPrinter;
 pub use pg_formatter::{CaseOption, PgFormatterConfig, PgFormatterError};

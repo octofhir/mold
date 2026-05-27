@@ -276,7 +276,8 @@ impl Server {
             .get(&uri)
             .map(|entry| {
                 let index = LineIndex::new(&entry.text);
-                mold_format::format_edits(&entry.text, &self.config.format_config())
+                self.config
+                    .format_edits(&entry.text)
                     .iter()
                     .map(|e| TextEdit {
                         range: index.range(e.range),
@@ -301,11 +302,8 @@ impl Server {
                 let index = LineIndex::new(&entry.text);
                 let start = index.offset(params.range.start);
                 let end = index.offset(params.range.end);
-                let range = text_size::TextRange::new(
-                    TextSize::from(start),
-                    TextSize::from(end),
-                );
-                mold_format::format_range(&entry.text, &self.config.format_config(), range)
+                self.config
+                    .format_range(&entry.text, start, end)
                     .iter()
                     .map(|e| TextEdit {
                         range: index.range(e.range),
