@@ -177,21 +177,40 @@ fn lint_jsonb_text_comparison_binary(expr: &BinaryExpr, analyzer: &mut Analyzer<
         return;
     };
 
-    let needs_arrow_text = (is_jsonb_non_text_expr(&lhs) && is_string_literal_expr(&rhs))
-        || (is_jsonb_non_text_expr(&rhs) && is_string_literal_expr(&lhs));
+    let lhs_jsonb = is_jsonb_non_text_expr(&lhs) && is_string_literal_expr(&rhs);
+    let rhs_jsonb = is_jsonb_non_text_expr(&rhs) && is_string_literal_expr(&lhs);
 
-    if needs_arrow_text {
+    if lhs_jsonb || rhs_jsonb {
         let message = if is_like {
             "Use ->> when matching JSONB scalar against text pattern"
         } else {
             "Use ->> when comparing JSONB scalar to text literal"
         };
-        analyzer.emit(
-            Diagnostic::warning(message)
-                .with_code(RuleCode::Jb01)
-                .with_range(expr.syntax().text_range()),
-        );
+        let mut diag = Diagnostic::warning(message)
+            .with_code(RuleCode::Jb01)
+            .with_range(expr.syntax().text_range());
+
+        // Fix: turn the last `->` on the JSONB side into `->>` so the value is
+        // extracted as text.
+        let jsonb_side = if lhs_jsonb { &lhs } else { &rhs };
+        if let Some(arrow) = last_arrow_token(jsonb_side) {
+            diag = diag.with_fix(Fix::new(
+                "Replace -> with ->>",
+                vec![TextEdit::replace(arrow, "->>")],
+            ));
+        }
+        analyzer.emit(diag);
     }
+}
+
+/// Range of the last `->` (non-text arrow) token within an expression.
+fn last_arrow_token(expr: &Expr) -> Option<text_size::TextRange> {
+    expr.syntax()
+        .descendants_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| t.kind() == SyntaxKind::ARROW)
+        .last()
+        .map(|t| t.text_range())
 }
 
 fn is_jsonb_non_text_expr(expr: &Expr) -> bool {
