@@ -7,6 +7,7 @@
 
 mod convert;
 mod semantic_tokens;
+mod sig_help;
 mod symbols;
 
 use std::collections::HashMap;
@@ -20,18 +21,19 @@ use lsp_types::{
     DocumentSymbolResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
     MarkupContent, MarkupKind, OneOf, Position, PublishDiagnosticsParams, SemanticTokensFullOptions,
     SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
-    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions, SignatureHelpParams,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
         PublishDiagnostics,
     },
     request::{
         CodeActionRequest, Completion, DocumentSymbolRequest, Formatting, HoverRequest,
-        RangeFormatting, SemanticTokensFullRequest,
+        RangeFormatting, SemanticTokensFullRequest, SignatureHelpRequest,
     },
 };
 use mold_config::MoldConfig;
+use mold_completion::providers::FunctionProvider;
 use mold_hir::{
     Analysis, AnalysisOptions, BuiltinLintPack, Diagnostic as HirDiagnostic, NullSchemaProvider,
     Resolution, SchemaProvider, analyze_query_with_options, resolve::resolve_column,
@@ -77,6 +79,10 @@ fn server_capabilities() -> ServerCapabilities {
         code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
+        signature_help_provider: Some(SignatureHelpOptions {
+            trigger_characters: Some(vec!["(".into(), ",".into()]),
+            ..Default::default()
+        }),
         semantic_tokens_provider: Some(
             SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
                 legend: SemanticTokensLegend {
@@ -154,6 +160,10 @@ impl Server {
         };
         let req = match cast::<SemanticTokensFullRequest>(req) {
             Ok((id, params)) => return self.on_semantic_tokens(id, params),
+            Err(req) => req,
+        };
+        let req = match cast::<SignatureHelpRequest>(req) {
+            Ok((id, params)) => return self.on_signature_help(id, params),
             Err(req) => req,
         };
         // Unhandled method: reply with an empty result so the client is not left
@@ -376,6 +386,23 @@ impl Server {
             })
             .unwrap_or_default();
         self.respond(Response::new_ok(id, DocumentSymbolResponse::Nested(symbols)))
+    }
+
+    fn on_signature_help(
+        &mut self,
+        id: RequestId,
+        params: SignatureHelpParams,
+    ) -> anyhow::Result<()> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+        let help = self.docs.get(&uri).and_then(|entry| {
+            let parse = mold_parser::parse(&entry.text);
+            let index = LineIndex::new(&entry.text);
+            let offset = index.offset(pos);
+            let provider = self.schema.as_ref().map(|p| p as &dyn FunctionProvider);
+            sig_help::signature_help(&parse.syntax(), offset, provider)
+        });
+        self.respond(Response::new_ok(id, help))
     }
 
     fn on_semantic_tokens(
