@@ -80,15 +80,25 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 
 | Code | Fixable | Description |
 |------|---------|-------------|
+| AM02 | —       | Set operators (`UNION`/`EXCEPT`/`INTERSECT`) should state `ALL`/`DISTINCT` |
 | AM04 | yes\*   | Avoid `SELECT *`; expand to columns (\*fix needs schema) |
 | AM05 | —       | Implicit cross join; use an explicit `JOIN` |
+| AM09 | —       | `LIMIT`/`OFFSET` without `ORDER BY` is non-deterministic |
+| ST01 | yes     | Redundant `ELSE NULL` in `CASE` |
+| ST03 | —       | CTE defined but never used |
 | SF01 | —       | `UPDATE` without `WHERE` affects all rows |
 | SF02 | —       | `DELETE` without `WHERE` affects all rows |
 | JB01 | yes     | Use `->>` when comparing a JSONB value to text |
+| CV01 | yes     | Use `<>` instead of `!=` for inequality |
+| CV05 | yes     | Compare with NULL using `IS NULL` / `IS NOT NULL` |
+| CV06 | yes     | Statements should end with a semicolon |
 | CP01 | yes     | Keywords should be upper case |
 | CP02 | yes     | Unquoted identifiers should be lower case |
 | RF01 | —       | Unknown table/column/alias (needs schema) |
 | RF02 | —       | Ambiguous column; qualify it (needs schema) |
+
+Prefixes: `AM` ambiguity, `ST` structure, `SF` safety, `JB` JSONB, `CV`
+convention, `CP` capitalisation, `RF` references.
 
 `mold fix` applies every available autofix; `mold explain <CODE>` prints the
 rationale and a before/after example. Reference checks (RF\*) only run when a
