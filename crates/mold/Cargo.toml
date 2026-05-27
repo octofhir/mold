@@ -20,6 +20,18 @@ harness = false
 name = "complete"
 harness = false
 
+[[example]]
+name = "parse_and_format"
+path = "../../examples/parse_and_format.rs"
+
+[[example]]
+name = "completion"
+path = "../../examples/completion.rs"
+
+[[example]]
+name = "custom_provider"
+path = "../../examples/custom_provider.rs"
+
 [features]
 default = []
 # Live database introspection for `mold lsp` and schema-aware linting. Pulls in
