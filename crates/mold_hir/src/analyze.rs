@@ -651,6 +651,11 @@ impl<'a> Analyzer<'a> {
         }
     }
 
+    /// The schema provider backing this analyzer.
+    pub fn provider(&self) -> &dyn SchemaProvider {
+        self.provider
+    }
+
     /// Creates an analyzer with no schema information.
     pub fn without_schema() -> Analyzer<'static> {
         static NULL_PROVIDER: NullSchemaProvider = NullSchemaProvider;
@@ -1765,6 +1770,32 @@ mod tests {
             "{:?}",
             analysis.diagnostics
         );
+    }
+
+    #[test]
+    fn test_am04_expands_star_with_schema() {
+        let options = AnalysisOptions::new().with_builtin_lint_packs([BuiltinLintPack::Core]);
+        let analysis = analyze_with_test_provider_options("SELECT * FROM patient", &options);
+        let am04 = analysis
+            .diagnostics
+            .iter()
+            .find(|d| d.code == Some(RuleCode::Am04))
+            .expect("AM04 diagnostic");
+        let fix = am04.fixes.first().expect("AM04 expansion fix present");
+        assert!(fix.edits[0].new_text.contains("id"), "{:?}", fix.edits);
+    }
+
+    #[test]
+    fn test_am04_no_fix_for_multiple_tables() {
+        let options = AnalysisOptions::new().with_builtin_lint_packs([BuiltinLintPack::Core]);
+        let analysis =
+            analyze_with_test_provider_options("SELECT * FROM patient, orders", &options);
+        let am04 = analysis
+            .diagnostics
+            .iter()
+            .find(|d| d.code == Some(RuleCode::Am04))
+            .expect("AM04 diagnostic");
+        assert!(am04.fixes.is_empty());
     }
 
     #[test]

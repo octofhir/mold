@@ -13,7 +13,7 @@
 use mold_syntax::SyntaxKind;
 use mold_syntax::ast::{
     AstNode, BinaryExpr, DeleteStmt, Expr, FromClause, LiteralKind, SelectItem, SelectStmt,
-    UpdateStmt,
+    TableRef, UpdateStmt,
 };
 
 use crate::analyze::{
@@ -109,19 +109,61 @@ fn apply_jsonb_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>
     }
 }
 
-/// AM04 — `SELECT *` hides column count and breaks on schema drift.
+/// AM04 — `SELECT *` hides column count and breaks on schema drift. When the
+/// query selects from a single known table, offers a fix expanding `*` to its
+/// explicit column list.
 fn lint_select_star(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
+    let expansion = single_table_column_list(stmt, analyzer);
     for node in stmt.syntax().descendants() {
         if let Some(item) = SelectItem::cast(node.clone())
-            && select_item_has_star(&item)
+            && let Some(star) = star_token_range(&item)
         {
-            analyzer.emit(
-                Diagnostic::warning("Avoid SELECT *; list columns explicitly")
-                    .with_code(RuleCode::Am04)
-                    .with_range(item.syntax().text_range()),
-            );
+            let mut diag = Diagnostic::warning("Avoid SELECT *; list columns explicitly")
+                .with_code(RuleCode::Am04)
+                .with_range(item.syntax().text_range());
+            if let Some(list) = &expansion {
+                // Replace just the `*` token so surrounding whitespace is kept.
+                diag = diag.with_fix(Fix::new(
+                    "Expand * to column list",
+                    vec![TextEdit::replace(star, list.clone())],
+                ));
+            }
+            analyzer.emit(diag);
         }
     }
+}
+
+/// The explicit column list for a `SELECT` over exactly one known table, or
+/// `None` when there are joins/multiple tables or the schema is unknown.
+fn single_table_column_list(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) -> Option<String> {
+    let from = stmt.from_clause()?;
+    let refs: Vec<TableRef> = from.table_refs().collect();
+    if refs.len() != 1 {
+        return None;
+    }
+    if from
+        .syntax()
+        .descendants()
+        .any(|n| n.kind() == SyntaxKind::JOIN_EXPR)
+    {
+        return None;
+    }
+    let name = match &refs[0] {
+        TableRef::Table(t) => t.name()?.text().to_string(),
+        _ => return None,
+    };
+    let mut columns = analyzer.provider().lookup_columns(None, &name);
+    if columns.is_empty() {
+        return None;
+    }
+    columns.sort_by_key(|c| c.ordinal);
+    Some(
+        columns
+            .iter()
+            .map(|c| c.name.clone())
+            .collect::<Vec<_>>()
+            .join(", "),
+    )
 }
 
 /// SF01 — `UPDATE` without `WHERE` rewrites every row.
@@ -255,15 +297,13 @@ fn is_string_literal_expr(expr: &Expr) -> bool {
     )
 }
 
-fn select_item_has_star(item: &SelectItem) -> bool {
-    for child in item.syntax().descendants_with_tokens() {
-        if let Some(token) = child.into_token()
-            && token.kind() == SyntaxKind::STAR
-        {
-            return true;
-        }
-    }
-    false
+/// Range of the `*` token in a select item, if it is a star item.
+fn star_token_range(item: &SelectItem) -> Option<text_size::TextRange> {
+    item.syntax()
+        .descendants_with_tokens()
+        .filter_map(|c| c.into_token())
+        .find(|t| t.kind() == SyntaxKind::STAR)
+        .map(|t| t.text_range())
 }
 
 fn binary_has_operator(expr: &BinaryExpr, kinds: &[SyntaxKind]) -> bool {
