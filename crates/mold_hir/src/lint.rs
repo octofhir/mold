@@ -57,6 +57,95 @@ fn apply_core_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>)
         if let Some(from) = FromClause::cast(node.clone()) {
             lint_implicit_cross_join(&from, analyzer);
         }
+        if let Some(select) = SelectStmt::cast(node.clone()) {
+            lint_limit_without_order(&select, analyzer);
+            lint_set_op_modifier(&select, analyzer);
+        }
+    }
+    lint_unused_ctes(root, analyzer);
+}
+
+/// AM09 — `LIMIT`/`OFFSET` without `ORDER BY` returns rows in an arbitrary order.
+fn lint_limit_without_order(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
+    let s = stmt.syntax();
+    let limit = s.children().find(|c| {
+        matches!(
+            c.kind(),
+            SyntaxKind::LIMIT_CLAUSE | SyntaxKind::OFFSET_CLAUSE
+        )
+    });
+    let Some(limit) = limit else { return };
+    let has_order = s.children().any(|c| c.kind() == SyntaxKind::ORDER_BY_CLAUSE);
+    if !has_order {
+        analyzer.emit(
+            Diagnostic::warning("LIMIT/OFFSET without ORDER BY returns an arbitrary set of rows")
+                .with_code(RuleCode::Am09)
+                .with_range(limit.text_range()),
+        );
+    }
+}
+
+/// AM02 — a set operator should state `ALL` or `DISTINCT` explicitly.
+fn lint_set_op_modifier(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
+    let tokens: Vec<_> = stmt
+        .syntax()
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .collect();
+    for (i, token) in tokens.iter().enumerate() {
+        if !matches!(
+            token.kind(),
+            SyntaxKind::UNION_KW | SyntaxKind::EXCEPT_KW | SyntaxKind::INTERSECT_KW
+        ) {
+            continue;
+        }
+        let next = tokens[i + 1..]
+            .iter()
+            .find(|t| !t.kind().is_trivia())
+            .map(|t| t.kind());
+        if !matches!(next, Some(SyntaxKind::ALL_KW | SyntaxKind::DISTINCT_KW)) {
+            analyzer.emit(
+                Diagnostic::warning(format!(
+                    "'{}' should specify ALL or DISTINCT explicitly",
+                    token.text().to_uppercase()
+                ))
+                .with_code(RuleCode::Am02)
+                .with_range(token.text_range()),
+            );
+        }
+    }
+}
+
+/// ST03 — a CTE that is declared but never referenced.
+fn lint_unused_ctes(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    // Collect referenced table names (every identifier that names a table).
+    let referenced: Vec<String> = root
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::TABLE_REF)
+        .filter_map(|n| {
+            n.descendants_with_tokens()
+                .filter_map(|e| e.into_token())
+                .find(|t| matches!(t.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT))
+                .map(|t| t.text().to_ascii_lowercase())
+        })
+        .collect();
+
+    for cte in root.descendants().filter(|n| n.kind() == SyntaxKind::CTE) {
+        let Some(name_tok) = cte
+            .descendants_with_tokens()
+            .filter_map(|e| e.into_token())
+            .find(|t| matches!(t.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT))
+        else {
+            continue;
+        };
+        let name = name_tok.text().to_ascii_lowercase();
+        if !referenced.iter().any(|r| *r == name) {
+            analyzer.emit(
+                Diagnostic::warning(format!("CTE '{}' is defined but never used", name_tok.text()))
+                    .with_code(RuleCode::St03)
+                    .with_range(name_tok.text_range()),
+            );
+        }
     }
 }
 

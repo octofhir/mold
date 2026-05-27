@@ -41,6 +41,30 @@ missing.
   good: SELECT * FROM patient JOIN orders ON orders.patient_id = patient.id;",
     },
     RuleDoc {
+        code: "AM02",
+        fixable: false,
+        summary: "Set operators (UNION/EXCEPT/INTERSECT) should state ALL or DISTINCT",
+        explanation: "\
+`UNION` defaults to `UNION DISTINCT`, which silently deduplicates. Stating
+`ALL` or `DISTINCT` makes the intent — and the cost — explicit.",
+    },
+    RuleDoc {
+        code: "AM09",
+        fixable: false,
+        summary: "LIMIT/OFFSET without ORDER BY is non-deterministic",
+        explanation: "\
+Without `ORDER BY`, `LIMIT`/`OFFSET` return an arbitrary subset of rows that can
+change between runs. Add an `ORDER BY` to make the result deterministic.",
+    },
+    RuleDoc {
+        code: "ST03",
+        fixable: false,
+        summary: "CTE is defined but never used",
+        explanation: "\
+A `WITH` clause declares a CTE that no later query references. It is dead code;
+remove it or use it.",
+    },
+    RuleDoc {
         code: "SF01",
         fixable: false,
         summary: "UPDATE without WHERE affects all rows",
@@ -156,7 +180,7 @@ pub(crate) fn find(code: &str) -> Option<&'static RuleDoc> {
 
 pub fn run() -> Result<u8> {
     println!(
-        "Prefixes: AM = ambiguity, SF = safety, JB = JSONB, CV = convention, CP = capitalisation, RF = references\n"
+        "Prefixes: AM = ambiguity, ST = structure, SF = safety, JB = JSONB, CV = convention, CP = capitalisation, RF = references\n"
     );
     println!("{:<6} {:<8} {}", "CODE", "FIXABLE", "DESCRIPTION");
     for r in RULES {
