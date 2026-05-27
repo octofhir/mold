@@ -14,14 +14,15 @@ use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response
 use lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeActionProviderCapability,
     CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic,
-    DocumentFormattingParams, Hover, HoverContents, HoverParams, HoverProviderCapability,
-    MarkupContent, MarkupKind, OneOf, Position, PublishDiagnosticsParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
+    DocumentFormattingParams, DocumentRangeFormattingParams, Hover, HoverContents, HoverParams,
+    HoverProviderCapability, MarkupContent, MarkupKind, OneOf, Position, PublishDiagnosticsParams,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
+    WorkspaceEdit,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
         PublishDiagnostics,
     },
-    request::{CodeActionRequest, Completion, Formatting, HoverRequest},
+    request::{CodeActionRequest, Completion, Formatting, HoverRequest, RangeFormatting},
 };
 use mold_config::MoldConfig;
 use mold_hir::{
@@ -65,6 +66,7 @@ fn server_capabilities() -> ServerCapabilities {
             ..Default::default()
         }),
         document_formatting_provider: Some(OneOf::Left(true)),
+        document_range_formatting_provider: Some(OneOf::Left(true)),
         code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         ..Default::default()
@@ -113,6 +115,10 @@ impl Server {
         };
         let req = match cast::<Formatting>(req) {
             Ok((id, params)) => return self.on_formatting(id, params),
+            Err(req) => req,
+        };
+        let req = match cast::<RangeFormatting>(req) {
+            Ok((id, params)) => return self.on_range_formatting(id, params),
             Err(req) => req,
         };
         let req = match cast::<CodeActionRequest>(req) {
@@ -269,17 +275,43 @@ impl Server {
             .docs
             .get(&uri)
             .map(|entry| {
-                let text = &entry.text;
-                let formatted = mold_format::format(text, &self.config.format_config());
-                if formatted == *text {
-                    Vec::new()
-                } else {
-                    let index = LineIndex::new(text);
-                    vec![TextEdit {
-                        range: index.range(text_size::TextRange::up_to(TextSize::of(text.as_str()))),
-                        new_text: formatted,
-                    }]
-                }
+                let index = LineIndex::new(&entry.text);
+                mold_format::format_edits(&entry.text, &self.config.format_config())
+                    .iter()
+                    .map(|e| TextEdit {
+                        range: index.range(e.range),
+                        new_text: e.new_text.clone(),
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        self.respond(Response::new_ok(id, edits))
+    }
+
+    fn on_range_formatting(
+        &mut self,
+        id: RequestId,
+        params: DocumentRangeFormattingParams,
+    ) -> anyhow::Result<()> {
+        let uri = params.text_document.uri;
+        let edits = self
+            .docs
+            .get(&uri)
+            .map(|entry| {
+                let index = LineIndex::new(&entry.text);
+                let start = index.offset(params.range.start);
+                let end = index.offset(params.range.end);
+                let range = text_size::TextRange::new(
+                    TextSize::from(start),
+                    TextSize::from(end),
+                );
+                mold_format::format_range(&entry.text, &self.config.format_config(), range)
+                    .iter()
+                    .map(|e| TextEdit {
+                        range: index.range(e.range),
+                        new_text: e.new_text.clone(),
+                    })
+                    .collect::<Vec<_>>()
             })
             .unwrap_or_default();
         self.respond(Response::new_ok(id, edits))
