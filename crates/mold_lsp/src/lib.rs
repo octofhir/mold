@@ -207,7 +207,11 @@ impl Server {
     }
 
     fn lint_options(&self) -> AnalysisOptions {
-        let mut packs = vec![BuiltinLintPack::Core, BuiltinLintPack::Jsonb];
+        let mut packs = vec![
+            BuiltinLintPack::Core,
+            BuiltinLintPack::Jsonb,
+            BuiltinLintPack::Convention,
+        ];
         if self.config.lint.is_rule_enabled("CP01") || self.config.lint.is_rule_enabled("CP02") {
             packs.push(BuiltinLintPack::Capitalisation);
         }

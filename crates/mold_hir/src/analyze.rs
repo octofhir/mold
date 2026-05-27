@@ -145,6 +145,12 @@ pub enum RuleCode {
     Sf02,
     /// JSONB text comparison via `->`.
     Jb01,
+    /// Inconsistent `!=` / `<>` spelling.
+    Cv01,
+    /// Relational operator used to compare with NULL.
+    Cv05,
+    /// Statement not terminated with a semicolon.
+    Cv06,
     /// Keyword capitalisation.
     Cp01,
     /// Unquoted identifier capitalisation.
@@ -164,6 +170,9 @@ impl RuleCode {
             RuleCode::Sf01 => "SF01",
             RuleCode::Sf02 => "SF02",
             RuleCode::Jb01 => "JB01",
+            RuleCode::Cv01 => "CV01",
+            RuleCode::Cv05 => "CV05",
+            RuleCode::Cv06 => "CV06",
             RuleCode::Cp01 => "CP01",
             RuleCode::Cp02 => "CP02",
             RuleCode::Rf01 => "RF01",
@@ -300,6 +309,8 @@ pub enum BuiltinLintPack {
     /// Capitalisation/case-consistency checks (fixable). Opt-in: not enabled by
     /// default because the formatter already normalises case.
     Capitalisation,
+    /// Convention checks (operator spelling, NULL comparison, semicolons).
+    Convention,
 }
 
 /// External lint pack hook.
@@ -1770,6 +1781,46 @@ mod tests {
             "{:?}",
             analysis.diagnostics
         );
+    }
+
+    fn convention_diagnostics(sql: &str) -> Vec<Diagnostic> {
+        let options = AnalysisOptions::new().with_builtin_lint_packs([BuiltinLintPack::Convention]);
+        analyze_with_test_provider_options(sql, &options).diagnostics
+    }
+
+    #[test]
+    fn test_cv05_null_comparison_fix() {
+        let diags = convention_diagnostics("SELECT 1 FROM t WHERE a = NULL;");
+        let cv05 = diags
+            .iter()
+            .find(|d| d.code == Some(RuleCode::Cv05))
+            .expect("CV05");
+        assert_eq!(cv05.fixes[0].edits[0].new_text, "IS");
+    }
+
+    #[test]
+    fn test_cv01_ne_spelling_fix() {
+        let diags = convention_diagnostics("SELECT 1 FROM t WHERE a != 1;");
+        let cv01 = diags
+            .iter()
+            .find(|d| d.code == Some(RuleCode::Cv01))
+            .expect("CV01");
+        assert_eq!(cv01.fixes[0].edits[0].new_text, "<>");
+    }
+
+    #[test]
+    fn test_cv01_skips_null_comparison() {
+        let diags = convention_diagnostics("SELECT 1 FROM t WHERE a != NULL;");
+        assert!(diags.iter().all(|d| d.code != Some(RuleCode::Cv01)));
+        assert!(diags.iter().any(|d| d.code == Some(RuleCode::Cv05)));
+    }
+
+    #[test]
+    fn test_cv06_missing_semicolon() {
+        let with = convention_diagnostics("SELECT 1 FROM t;");
+        assert!(with.iter().all(|d| d.code != Some(RuleCode::Cv06)));
+        let without = convention_diagnostics("SELECT 1 FROM t");
+        assert!(without.iter().any(|d| d.code == Some(RuleCode::Cv06)));
     }
 
     #[test]

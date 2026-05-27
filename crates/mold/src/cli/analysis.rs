@@ -69,7 +69,11 @@ pub fn analyze(
 /// Builds analyzer options, enabling the capitalisation pack only when at least
 /// one of its rules is active (it is off by default).
 fn build_options(config: &MoldConfig) -> AnalysisOptions {
-    let mut packs = vec![BuiltinLintPack::Core, BuiltinLintPack::Jsonb];
+    let mut packs = vec![
+        BuiltinLintPack::Core,
+        BuiltinLintPack::Jsonb,
+        BuiltinLintPack::Convention,
+    ];
     if config.lint.is_rule_enabled("CP01") || config.lint.is_rule_enabled("CP02") {
         packs.push(BuiltinLintPack::Capitalisation);
     }

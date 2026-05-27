@@ -75,6 +75,34 @@ matches. Use ->> to extract the value as `text` for the comparison.
   good: WHERE resource->>'name' = 'Ann'",
     },
     RuleDoc {
+        code: "CV01",
+        fixable: true,
+        summary: "Use <> instead of != for inequality",
+        explanation: "\
+Both `<>` and `!=` mean inequality in Postgres; `<>` is the SQL standard
+spelling. This rule rewrites `!=` to `<>` for consistency.",
+    },
+    RuleDoc {
+        code: "CV05",
+        fixable: true,
+        summary: "Compare with NULL using IS NULL / IS NOT NULL",
+        explanation: "\
+`x = NULL` and `x <> NULL` are never true — NULL comparisons via `=`/`<>` always
+yield NULL. Use `IS NULL` / `IS NOT NULL`. Fixed automatically when NULL is on
+the right-hand side.
+
+  bad:  WHERE deleted_at = NULL
+  good: WHERE deleted_at IS NULL",
+    },
+    RuleDoc {
+        code: "CV06",
+        fixable: true,
+        summary: "Statements should end with a semicolon",
+        explanation: "\
+A trailing semicolon terminates each statement, avoiding ambiguity when
+statements are concatenated. Added automatically.",
+    },
+    RuleDoc {
         code: "CP01",
         fixable: true,
         summary: "Keywords should be upper case",
@@ -128,7 +156,7 @@ pub(crate) fn find(code: &str) -> Option<&'static RuleDoc> {
 
 pub fn run() -> Result<u8> {
     println!(
-        "Prefixes: AM = ambiguity, SF = safety, JB = JSONB, CP = capitalisation, RF = references\n"
+        "Prefixes: AM = ambiguity, SF = safety, JB = JSONB, CV = convention, CP = capitalisation, RF = references\n"
     );
     println!("{:<6} {:<8} {}", "CODE", "FIXABLE", "DESCRIPTION");
     for r in RULES {
