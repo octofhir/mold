@@ -27,7 +27,9 @@ mold_parser.workspace = true
 mold_hir.workspace = true
 mold_completion.workspace = true
 mold_format.workspace = true
-atty = "0.2"
+mold_config.workspace = true
+clap = { workspace = true }
+anyhow = { workspace = true }
 
 [dev-dependencies]
 criterion.workspace = true

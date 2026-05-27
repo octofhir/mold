@@ -1,0 +1,219 @@
+//! Unified configuration for the mold SQL toolchain.
+//!
+//! [`MoldConfig`] is the single struct threaded through the formatter, linter,
+//! completion engine and the generic LSP. It deserializes from a `mold.toml`
+//! file whose schema is deliberately decoupled from the internal types of each
+//! crate, so the file format can stay stable as internals evolve.
+//!
+//! # Example `mold.toml`
+//!
+//! ```toml
+//! [format]
+//! style = "sqlstyle"
+//! keyword-case = "upper"
+//! max-width = 100
+//!
+//! [lint]
+//! enabled = true
+//! exclude = ["AM01"]
+//!
+//! [lint.rules.CP01]
+//! severity = "warning"
+//!
+//! [database]
+//! url-env = "DATABASE_URL"
+//! schema = "public"
+//! ```
+
+mod database;
+mod format;
+mod lint;
+
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+
+pub use database::DatabaseSettings;
+pub use format::{
+    CommaStyle, FormatSettings, IdentifierCase, IndentUnit, KeywordCase, StylePreset,
+};
+pub use lint::{LintSettings, RuleSetting, SeverityLevel};
+
+/// Standard config file name discovered by [`MoldConfig::discover`].
+pub const CONFIG_FILE_NAME: &str = "mold.toml";
+
+/// Completion engine settings.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", default)]
+pub struct CompletionSettings {
+    /// Suggest SQL keywords.
+    pub keywords: bool,
+    /// Suggest functions.
+    pub functions: bool,
+    /// Maximum number of items returned per request (0 = unlimited).
+    pub max_items: usize,
+}
+
+impl Default for CompletionSettings {
+    fn default() -> Self {
+        Self {
+            keywords: true,
+            functions: true,
+            max_items: 200,
+        }
+    }
+}
+
+/// Top-level configuration aggregating every subsystem's settings.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", default)]
+pub struct MoldConfig {
+    pub format: FormatSettings,
+    pub lint: LintSettings,
+    pub completion: CompletionSettings,
+    pub database: DatabaseSettings,
+}
+
+/// Errors raised while loading configuration.
+#[derive(Debug)]
+pub enum ConfigError {
+    /// The file could not be read.
+    Io(std::io::Error),
+    /// The file contents were not valid TOML for this schema.
+    Parse(toml::de::Error),
+}
+
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigError::Io(e) => write!(f, "failed to read config: {e}"),
+            ConfigError::Parse(e) => write!(f, "invalid config: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for ConfigError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ConfigError::Io(e) => Some(e),
+            ConfigError::Parse(e) => Some(e),
+        }
+    }
+}
+
+impl MoldConfig {
+    /// Parses configuration from a TOML string.
+    pub fn from_toml(src: &str) -> Result<Self, ConfigError> {
+        toml::from_str(src).map_err(ConfigError::Parse)
+    }
+
+    /// Loads configuration from an explicit file path.
+    pub fn load(path: &Path) -> Result<Self, ConfigError> {
+        let src = std::fs::read_to_string(path).map_err(ConfigError::Io)?;
+        Self::from_toml(&src)
+    }
+
+    /// Walks up from `start` looking for a `mold.toml`.
+    ///
+    /// Returns the located path without parsing it. Useful for diagnostics
+    /// ("using config at …"). `start` may be a file or a directory.
+    #[must_use]
+    pub fn find_config_file(start: &Path) -> Option<PathBuf> {
+        let mut dir = if start.is_file() {
+            start.parent()?.to_path_buf()
+        } else {
+            start.to_path_buf()
+        };
+        loop {
+            let candidate = dir.join(CONFIG_FILE_NAME);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+            if !dir.pop() {
+                return None;
+            }
+        }
+    }
+
+    /// Discovers and loads the nearest `mold.toml` walking up from `start`.
+    ///
+    /// Falls back to [`MoldConfig::default`] when no file is found. A malformed
+    /// file surfaces as an error rather than being silently ignored.
+    pub fn discover(start: &Path) -> Result<Self, ConfigError> {
+        match Self::find_config_file(start) {
+            Some(path) => Self::load(&path),
+            None => Ok(Self::default()),
+        }
+    }
+
+    /// Resolves the formatter configuration for this config.
+    #[must_use]
+    pub fn format_config(&self) -> mold_format::FormatConfig {
+        self.format.to_format_config()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_toml_is_all_defaults() {
+        let cfg = MoldConfig::from_toml("").unwrap();
+        assert!(cfg.lint.enabled);
+        assert!(!cfg.database.is_configured());
+        assert_eq!(cfg.completion.max_items, 200);
+    }
+
+    #[test]
+    fn parses_full_config() {
+        let src = r#"
+            [format]
+            style = "compact"
+            keyword-case = "lower"
+            max-width = 100
+
+            [lint]
+            exclude = ["AM01"]
+
+            [lint.rules.CP01]
+            severity = "warning"
+
+            [database]
+            url-env = "DATABASE_URL"
+            schema = "app"
+        "#;
+        let cfg = MoldConfig::from_toml(src).unwrap();
+        assert_eq!(cfg.format.style, StylePreset::Compact);
+        assert_eq!(cfg.format.max_width, Some(100));
+        assert!(!cfg.lint.is_rule_enabled("AM01"));
+        assert_eq!(cfg.lint.severity_for("CP01"), Some(SeverityLevel::Warning));
+        assert_eq!(cfg.database.schema, "app");
+        assert_eq!(cfg.database.url_env.as_deref(), Some("DATABASE_URL"));
+    }
+
+    #[test]
+    fn format_config_reflects_overrides() {
+        let cfg = MoldConfig::from_toml(
+            r#"
+            [format]
+            style = "sqlstyle"
+            keyword-case = "lower"
+        "#,
+        )
+        .unwrap();
+        let fc = cfg.format_config();
+        assert_eq!(fc.keyword_case, mold_format::KeywordCase::Lower);
+    }
+
+    #[test]
+    fn rejects_unknown_severity() {
+        let err = MoldConfig::from_toml(
+            r#"
+            [lint.rules.CP01]
+            severity = "bogus"
+        "#,
+        );
+        assert!(err.is_err());
+    }
+}
