@@ -6,8 +6,9 @@
 //! the concrete config consumed by the formatter.
 
 use mold_format::{
-    CommaStyle as FmtCommaStyle, FormatConfig, FormatStyle as FmtStyle,
+    CaseOption, CommaStyle as FmtCommaStyle, FormatConfig, FormatStyle as FmtStyle,
     IdentifierCase as FmtIdentCase, IndentStyle as FmtIndent, KeywordCase as FmtKeywordCase,
+    PgFormatterConfig,
 };
 use serde::{Deserialize, Serialize};
 
@@ -96,6 +97,48 @@ impl From<CommaStyle> for FmtCommaStyle {
     }
 }
 
+/// Case policy for pgFormatter-specific knobs (supports capitalize/unchanged
+/// that the sqlstyle engine does not).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CasePolicy {
+    Upper,
+    Lower,
+    Preserve,
+    Capitalize,
+}
+
+impl From<CasePolicy> for CaseOption {
+    fn from(c: CasePolicy) -> Self {
+        match c {
+            CasePolicy::Upper => CaseOption::Upper,
+            CasePolicy::Lower => CaseOption::Lower,
+            CasePolicy::Preserve => CaseOption::Unchanged,
+            CasePolicy::Capitalize => CaseOption::Capitalize,
+        }
+    }
+}
+
+fn keyword_case_to_pg(c: KeywordCase) -> CaseOption {
+    match c {
+        KeywordCase::Upper => CaseOption::Upper,
+        KeywordCase::Lower => CaseOption::Lower,
+        KeywordCase::Preserve => CaseOption::Unchanged,
+    }
+}
+
+/// pgFormatter-only knobs, used when `style = "pgformatter"`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", default)]
+pub struct PgFormatSettings {
+    /// Case of function names.
+    pub function_case: Option<CasePolicy>,
+    /// Case of type names.
+    pub type_case: Option<CasePolicy>,
+    /// Strip comments from the output.
+    pub no_comment: bool,
+}
+
 /// Formatter settings: a base preset plus optional per-knob overrides.
 ///
 /// Every override is `Option`: when `None`, the value from the chosen `style`
@@ -116,6 +159,8 @@ pub struct FormatSettings {
     pub comma_style: Option<CommaStyle>,
     pub parentheses_spacing: Option<bool>,
     pub align_select_items: Option<bool>,
+    /// pgFormatter-specific knobs (only consulted when `style = "pgformatter"`).
+    pub pgformatter: PgFormatSettings,
 }
 
 impl FormatSettings {
@@ -160,6 +205,45 @@ impl FormatSettings {
         if let Some(v) = self.align_select_items {
             cfg.align_select_items = v;
         }
+        cfg
+    }
+
+    /// Resolves these settings into a [`PgFormatterConfig`] for the pgFormatter
+    /// engine. Shared knobs (case, indent, commas) are mapped across; the
+    /// `pgformatter` subsection supplies engine-specific options.
+    #[must_use]
+    pub fn to_pg_config(&self) -> PgFormatterConfig {
+        let mut cfg = PgFormatterConfig::default();
+
+        if let Some(c) = self.keyword_case {
+            cfg.keyword_case = keyword_case_to_pg(c);
+        }
+        if let Some(c) = self.pgformatter.function_case {
+            cfg.function_case = c.into();
+        }
+        if let Some(c) = self.pgformatter.type_case {
+            cfg.type_case = c.into();
+        }
+        match self.indent_unit {
+            Some(IndentUnit::Tab) => cfg.use_tabs = true,
+            Some(IndentUnit::Space) | None => {
+                if let Some(w) = self.indent_width {
+                    cfg.spaces = w;
+                }
+            }
+        }
+        match self.comma_style {
+            Some(CommaStyle::Leading) => {
+                cfg.comma_start = true;
+                cfg.comma_end = false;
+            }
+            Some(CommaStyle::Trailing) => {
+                cfg.comma_start = false;
+                cfg.comma_end = true;
+            }
+            None => {}
+        }
+        cfg.no_comment = self.pgformatter.no_comment;
         cfg
     }
 }

@@ -24,12 +24,11 @@ pub struct FormatArgs {
 
 pub fn run(args: &FormatArgs, cli: &Cli) -> Result<u8> {
     let config = cli.load_config(&io::discovery_anchor(&args.paths))?;
-    let fmt_config = config.format_config();
     let inputs = gather_inputs(&args.paths)?;
 
     let mut unformatted = 0usize;
     for input in &inputs {
-        let formatted = mold_format::format(&input.text, &fmt_config);
+        let formatted = config.format(&input.text);
 
         if args.check {
             if formatted != input.text {

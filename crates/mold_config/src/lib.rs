@@ -35,7 +35,8 @@ use serde::{Deserialize, Serialize};
 
 pub use database::DatabaseSettings;
 pub use format::{
-    CommaStyle, FormatSettings, IdentifierCase, IndentUnit, KeywordCase, StylePreset,
+    CasePolicy, CommaStyle, FormatSettings, IdentifierCase, IndentUnit, KeywordCase,
+    PgFormatSettings, StylePreset,
 };
 pub use lint::{LintSettings, RuleSetting, SeverityLevel};
 
@@ -146,10 +147,42 @@ impl MoldConfig {
         }
     }
 
-    /// Resolves the formatter configuration for this config.
+    /// Resolves the sqlstyle-engine formatter configuration.
     #[must_use]
     pub fn format_config(&self) -> mold_format::FormatConfig {
         self.format.to_format_config()
+    }
+
+    /// Formats `source` with the engine selected by `format.style`.
+    ///
+    /// `pgformatter` routes through the pgFormatter engine; every other preset
+    /// uses the sqlstyle engine. This is the single entry point callers should
+    /// use so both formatting styles are honored.
+    #[must_use]
+    pub fn format(&self, source: &str) -> String {
+        match self.format.style {
+            StylePreset::Pgformatter => {
+                mold_format::pg_format::format(source, &self.format.to_pg_config())
+            }
+            _ => mold_format::format(source, &self.format.to_format_config()),
+        }
+    }
+
+    /// Formats `source` and returns the minimal edits to apply, regardless of
+    /// which engine the style selects.
+    #[must_use]
+    pub fn format_edits(&self, source: &str) -> Vec<mold_format::TextEdit> {
+        mold_format::diff_edits(source, &self.format(source))
+    }
+
+    /// Like [`MoldConfig::format_edits`], but only edits intersecting the byte
+    /// range `[start, end]`.
+    #[must_use]
+    pub fn format_range(&self, source: &str, start: u32, end: u32) -> Vec<mold_format::TextEdit> {
+        self.format_edits(source)
+            .into_iter()
+            .filter(|e| u32::from(e.range.start()) <= end && start <= u32::from(e.range.end()))
+            .collect()
     }
 }
 
