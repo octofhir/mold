@@ -4,9 +4,21 @@
 # nearest `mold.toml` is discovered automatically by the CLI and LSP.
 
 [format]
+# Base preset: "sqlstyle" (river alignment), "pgformatter", or "compact".
+# Every knob below is optional and overrides the preset's value.
 style = "sqlstyle"
-# keyword-case = "upper"
-# max-width = 100
+
+# keyword-case      = "upper"     # upper | lower | preserve
+# identifier-case   = "preserve"  # lower | preserve
+# indent-unit       = "space"     # space | tab
+# indent-width      = 4           # spaces per level (ignored for tabs)
+# max-width         = 100         # wrap width
+# comma-style       = "trailing"  # trailing | leading
+# river-alignment       = true    # right-align leading keywords (the "river")
+# newline-before-logical = true   # break before AND/OR in WHERE
+# spaces-around-operators = true
+# parentheses-spacing     = false
+# align-select-items      = true
 
 [lint]
 enabled = true
