@@ -6,6 +6,7 @@
 //! formatting, syntax diagnostics and the lint rules that need no schema.
 
 mod convert;
+mod symbols;
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -14,15 +15,18 @@ use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response
 use lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeActionProviderCapability,
     CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic,
-    DocumentFormattingParams, DocumentRangeFormattingParams, Hover, HoverContents, HoverParams,
-    HoverProviderCapability, MarkupContent, MarkupKind, OneOf, Position, PublishDiagnosticsParams,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
-    WorkspaceEdit,
+    DocumentFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
+    DocumentSymbolResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
+    MarkupContent, MarkupKind, OneOf, Position, PublishDiagnosticsParams, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
         PublishDiagnostics,
     },
-    request::{CodeActionRequest, Completion, Formatting, HoverRequest, RangeFormatting},
+    request::{
+        CodeActionRequest, Completion, DocumentSymbolRequest, Formatting, HoverRequest,
+        RangeFormatting,
+    },
 };
 use mold_config::MoldConfig;
 use mold_hir::{
@@ -69,6 +73,7 @@ fn server_capabilities() -> ServerCapabilities {
         document_range_formatting_provider: Some(OneOf::Left(true)),
         code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
+        document_symbol_provider: Some(OneOf::Left(true)),
         ..Default::default()
     }
 }
@@ -127,6 +132,10 @@ impl Server {
         };
         let req = match cast::<HoverRequest>(req) {
             Ok((id, params)) => return self.on_hover(id, params),
+            Err(req) => req,
+        };
+        let req = match cast::<DocumentSymbolRequest>(req) {
+            Ok((id, params)) => return self.on_document_symbol(id, params),
             Err(req) => req,
         };
         // Unhandled method: reply with an empty result so the client is not left
@@ -331,6 +340,24 @@ impl Server {
             .map(|entry| code_actions(&uri, entry, &params))
             .unwrap_or_default();
         self.respond(Response::new_ok(id, actions))
+    }
+
+    fn on_document_symbol(
+        &mut self,
+        id: RequestId,
+        params: DocumentSymbolParams,
+    ) -> anyhow::Result<()> {
+        let uri = params.text_document.uri;
+        let symbols = self
+            .docs
+            .get(&uri)
+            .map(|entry| {
+                let parse = mold_parser::parse(&entry.text);
+                let index = LineIndex::new(&entry.text);
+                symbols::document_symbols(&parse.syntax(), &index)
+            })
+            .unwrap_or_default();
+        self.respond(Response::new_ok(id, DocumentSymbolResponse::Nested(symbols)))
     }
 
     fn on_hover(&mut self, id: RequestId, params: HoverParams) -> anyhow::Result<()> {
