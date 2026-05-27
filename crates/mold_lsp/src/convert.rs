@@ -96,7 +96,7 @@ pub fn diagnostic(index: &LineIndex, d: &HirDiagnostic) -> LspDiagnostic {
     LspDiagnostic {
         range,
         severity: Some(severity(d.severity)),
-        code: d.code.clone().map(NumberOrString::String),
+        code: d.code.map(|c| NumberOrString::String(c.as_str().to_string())),
         source: Some("mold".to_string()),
         message,
         ..Default::default()

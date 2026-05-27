@@ -190,13 +190,13 @@ impl Server {
         let mut diagnostics: Vec<HirDiagnostic> = analysis
             .diagnostics
             .iter()
-            .filter(|d| match &d.code {
+            .filter(|d| match d.code {
                 None => schema_aware,
                 // Reference checks (RF*) need a schema; suppress them without one.
-                Some(code) if code.starts_with("RF") => {
-                    schema_aware && self.config.lint.is_rule_enabled(code)
+                Some(code) if code.is_reference() => {
+                    schema_aware && self.config.lint.is_rule_enabled(code.as_str())
                 }
-                Some(code) => self.config.lint.is_rule_enabled(code),
+                Some(code) => self.config.lint.is_rule_enabled(code.as_str()),
             })
             .cloned()
             .collect();

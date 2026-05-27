@@ -132,14 +132,62 @@ impl Fix {
     }
 }
 
+/// Stable identifier for a built-in lint/analysis rule.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum RuleCode {
+    /// Avoid `SELECT *`.
+    Am04,
+    /// Implicit cross join.
+    Am05,
+    /// `UPDATE` without `WHERE`.
+    Sf01,
+    /// `DELETE` without `WHERE`.
+    Sf02,
+    /// JSONB text comparison via `->`.
+    Jb01,
+    /// Keyword capitalisation.
+    Cp01,
+    /// Unresolved table/column/alias reference (needs schema).
+    Rf01,
+    /// Ambiguous column reference (needs schema).
+    Rf02,
+}
+
+impl RuleCode {
+    /// The canonical string form (e.g. `"AM05"`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RuleCode::Am04 => "AM04",
+            RuleCode::Am05 => "AM05",
+            RuleCode::Sf01 => "SF01",
+            RuleCode::Sf02 => "SF02",
+            RuleCode::Jb01 => "JB01",
+            RuleCode::Cp01 => "CP01",
+            RuleCode::Rf01 => "RF01",
+            RuleCode::Rf02 => "RF02",
+        }
+    }
+
+    /// Whether this is a schema-dependent reference check.
+    pub fn is_reference(self) -> bool {
+        matches!(self, RuleCode::Rf01 | RuleCode::Rf02)
+    }
+}
+
+impl std::fmt::Display for RuleCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// A diagnostic message from analysis.
 #[derive(Clone, Debug)]
 pub struct Diagnostic {
     /// The severity of the diagnostic.
     pub severity: Severity,
 
-    /// A stable rule code (e.g. `CP01`), when the diagnostic comes from a rule.
-    pub code: Option<String>,
+    /// A stable rule code, when the diagnostic comes from a rule.
+    pub code: Option<RuleCode>,
 
     /// The diagnostic message.
     pub message: String,
@@ -198,8 +246,8 @@ impl Diagnostic {
     }
 
     /// Sets the rule code for this diagnostic.
-    pub fn with_code(mut self, code: impl Into<String>) -> Self {
-        self.code = Some(code.into());
+    pub fn with_code(mut self, code: RuleCode) -> Self {
+        self.code = Some(code);
         self
     }
 
@@ -864,11 +912,11 @@ pub fn analyze_query_with_options(
                     "Schema '{}' does not exist",
                     schema.as_deref().unwrap_or("")
                 ))
-                .with_code("RF01")
+                .with_code(RuleCode::Rf01)
                 .with_range(range)
             } else {
                 let mut d = Diagnostic::error(format!("Table '{}' does not exist", name_only))
-                    .with_code("RF01")
+                    .with_code(RuleCode::Rf01)
                     .with_range(range);
                 if !validation.suggestions.is_empty() {
                     d = d.with_help(did_you_mean(&validation.suggestions));
@@ -911,7 +959,7 @@ pub fn analyze_query_with_options(
                             "Column '{}' not found in table '{}'",
                             column, table
                         ))
-                        .with_code("RF01");
+                        .with_code(RuleCode::Rf01);
                         if let Some(r) = range {
                             diag = diag.with_range(r);
                         }
@@ -926,7 +974,7 @@ pub fn analyze_query_with_options(
                         range,
                     } => {
                         let mut diag = Diagnostic::error(format!("Unknown table alias '{}'", alias))
-                            .with_code("RF01");
+                            .with_code(RuleCode::Rf01);
                         if let Some(r) = range {
                             diag = diag.with_range(r);
                         }
@@ -941,7 +989,7 @@ pub fn analyze_query_with_options(
                             "Column '{}' not found in any table in scope",
                             column
                         ))
-                        .with_code("RF01");
+                        .with_code(RuleCode::Rf01);
                         if let Some(r) = range {
                             diag = diag.with_range(r);
                         }
@@ -963,7 +1011,7 @@ pub fn analyze_query_with_options(
                             "Column '{}' is ambiguous; found in multiple tables",
                             column
                         ))
-                        .with_code("RF02");
+                        .with_code(RuleCode::Rf02);
                         if let Some(r) = range {
                             diag = diag.with_range(r);
                         }
@@ -1674,7 +1722,7 @@ mod tests {
         let cp01: Vec<_> = analysis
             .diagnostics
             .iter()
-            .filter(|d| d.code.as_deref() == Some("CP01"))
+            .filter(|d| d.code == Some(RuleCode::Cp01))
             .collect();
         // `select` and `from` are both lower case.
         assert_eq!(cp01.len(), 2, "{:?}", analysis.diagnostics);
@@ -1697,7 +1745,7 @@ mod tests {
             analysis
                 .diagnostics
                 .iter()
-                .all(|d| d.code.as_deref() != Some("CP01"))
+                .all(|d| d.code != Some(RuleCode::Cp01))
         );
     }
 
@@ -1710,7 +1758,7 @@ mod tests {
             analysis
                 .diagnostics
                 .iter()
-                .any(|d| d.code.as_deref() == Some("AM05")),
+                .any(|d| d.code == Some(RuleCode::Am05)),
             "{:?}",
             analysis.diagnostics
         );
@@ -1727,7 +1775,7 @@ mod tests {
             analysis
                 .diagnostics
                 .iter()
-                .all(|d| d.code.as_deref() != Some("AM05"))
+                .all(|d| d.code != Some(RuleCode::Am05))
         );
     }
 

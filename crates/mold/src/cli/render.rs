@@ -48,8 +48,8 @@ pub fn render(origin: &str, source: &str, diagnostics: &[Diagnostic]) -> String 
             .annotation(level.span(start..end).label(&diag.message));
 
         let mut message = level.title(&diag.message).snippet(snippet);
-        if let Some(code) = &diag.code {
-            message = message.id(code);
+        if let Some(code) = diag.code {
+            message = message.id(code.as_str());
         }
 
         let help_note;
@@ -104,7 +104,7 @@ pub fn render_sarif(files: &[(&InputFile, Vec<Diagnostic>)]) -> String {
                 Some(h) => format!("{} (help: {h})", d.message),
                 None => d.message.clone(),
             };
-            let rule_id = d.code.as_deref().unwrap_or("syntax");
+            let rule_id = d.code.map(|c| c.as_str()).unwrap_or("syntax");
             results.push(format!(
                 r#"{{"ruleId":{},"level":"{}","message":{{"text":{}}},"locations":[{{"physicalLocation":{{"artifactLocation":{{"uri":{}}},"region":{{"startLine":{},"startColumn":{},"endLine":{},"endColumn":{}}}}}}}]}}"#,
                 json_escape(rule_id),

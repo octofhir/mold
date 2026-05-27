@@ -16,7 +16,9 @@ use mold_syntax::ast::{
     UpdateStmt,
 };
 
-use crate::analyze::{AnalysisOptions, Analyzer, BuiltinLintPack, Diagnostic, Fix, TextEdit};
+use crate::analyze::{
+    AnalysisOptions, Analyzer, BuiltinLintPack, Diagnostic, Fix, RuleCode, TextEdit,
+};
 
 /// Dispatches every enabled lint pack over the syntax tree.
 pub(crate) fn apply_lints(
@@ -72,7 +74,7 @@ fn apply_capitalisation_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Ana
         let range = token.text_range();
         analyzer.emit(
             Diagnostic::warning(format!("Keyword '{text}' should be upper case"))
-                .with_code("CP01")
+                .with_code(RuleCode::Cp01)
                 .with_range(range)
                 .with_fix(Fix::new(
                     format!("Uppercase '{text}'"),
@@ -98,7 +100,7 @@ fn lint_select_star(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
         {
             analyzer.emit(
                 Diagnostic::warning("Avoid SELECT *; list columns explicitly")
-                    .with_code("AM04")
+                    .with_code(RuleCode::Am04)
                     .with_range(item.syntax().text_range()),
             );
         }
@@ -110,7 +112,7 @@ fn lint_update_without_where(stmt: &UpdateStmt, analyzer: &mut Analyzer<'_>) {
     if stmt.where_clause().is_none() {
         analyzer.emit(
             Diagnostic::warning("UPDATE without WHERE affects all rows")
-                .with_code("SF01")
+                .with_code(RuleCode::Sf01)
                 .with_range(stmt.syntax().text_range()),
         );
     }
@@ -121,7 +123,7 @@ fn lint_delete_without_where(stmt: &DeleteStmt, analyzer: &mut Analyzer<'_>) {
     if stmt.where_clause().is_none() {
         analyzer.emit(
             Diagnostic::warning("DELETE without WHERE affects all rows")
-                .with_code("SF02")
+                .with_code(RuleCode::Sf02)
                 .with_range(stmt.syntax().text_range()),
         );
     }
@@ -141,7 +143,7 @@ fn lint_implicit_cross_join(from: &FromClause, analyzer: &mut Analyzer<'_>) {
     if has_top_level_comma {
         analyzer.emit(
             Diagnostic::warning("Implicit cross join; use an explicit JOIN clause")
-                .with_code("AM05")
+                .with_code(RuleCode::Am05)
                 .with_range(from.syntax().text_range()),
         );
     }
@@ -186,7 +188,7 @@ fn lint_jsonb_text_comparison_binary(expr: &BinaryExpr, analyzer: &mut Analyzer<
         };
         analyzer.emit(
             Diagnostic::warning(message)
-                .with_code("JB01")
+                .with_code(RuleCode::Jb01)
                 .with_range(expr.syntax().text_range()),
         );
     }

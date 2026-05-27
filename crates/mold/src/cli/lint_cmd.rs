@@ -92,7 +92,7 @@ fn report_github(input: &InputFile, diags: &[Diagnostic]) {
             Severity::Error => "error",
             _ => "warning",
         };
-        let code = d.code.as_deref().unwrap_or("");
+        let code = d.code.map(|c| c.as_str()).unwrap_or("");
         println!(
             "::{level} file={},line={},col={}::{} {}",
             input.label, line, col, code, d.message
@@ -111,7 +111,7 @@ fn report_json(input: &InputFile, diags: &[Diagnostic]) {
                 .unwrap_or((1, 1));
             format!(
                 r#"{{"code":{},"severity":"{}","line":{},"col":{},"message":{},"fixable":{}}}"#,
-                json_str(d.code.as_deref()),
+                json_str(d.code.map(|c| c.as_str())),
                 severity_label(d.severity),
                 line,
                 col,
