@@ -1,48 +1,173 @@
-# Mold
+# mold
 
-Mold is a pure Rust PostgreSQL SQL parser and formatter built for editor tooling.
-It is part of the OctoFHIR ecosystem.
-It provides a lossless CST parser, semantic analysis helpers, and a completion engine.
+A PostgreSQL SQL parser, formatter, linter, and language server, written in Rust.
 
-## Features
-- Lossless CST with recovery for partial or invalid SQL
-- PostgreSQL-oriented grammar and JSONB/JSONPath support
-- Formatter aligned with sqlstyle.guide
-- Completion engine decoupled from LSP types
+mold builds a **lossless concrete syntax tree** with error recovery, so it keeps
+working on incomplete or invalid SQL — the use case editors actually need. On
+top of the tree it resolves names, formats, lints (with autofixes), and serves
+an LSP. When a database connection is configured it introspects the live schema
+to make completion and reference checks accurate.
 
-## Architecture overview
-The project is split into focused crates under `crates/`:
-- `mold_lexer`: tokenizes SQL input
-- `mold_parser`: builds a CST with errors
-- `mold_syntax`: syntax kinds and `Parse` container
-- `mold_hir`: semantic analysis and name resolution
-- `mold_completion`: completion logic and providers
-- `mold_format`: SQL formatting
-- `mold`: facade crate and CLI entry point
+Scope is deliberately **PostgreSQL only**. There is no dialect-abstraction
+layer; the grammar, JSONB/JSONPath support, and lint rules target Postgres.
 
-For a deeper design walkthrough, see `ARCHITECTURE.md`.
+## Install
 
-## Usage
-```ignore
-let parse = mold::parser::parse("SELECT * FROM users");
-if !parse.errors().is_empty() {
-    eprintln!("parse errors: {:?}", parse.errors());
-}
+```sh
+cargo build --release -p mold                  # parser, formatter, linter, LSP
+cargo build --release -p mold --features db    # + live schema introspection
+```
 
-let formatted = mold_format::format_sqlstyle("select * from users");
+The binary is `target/release/mold`. The `db` feature pulls in `sqlx`/`tokio`;
+leave it off and the binary stays async-free, using a cached schema if present.
+
+## CLI
+
+```
+mold format [--write|--check] [files…|-]
+mold lint   [--format human|json|github|sarif] [files…|-]
+mold fix    [--diff] [files…|-]
+mold parse  [--format tree|json] [files…|-]
+mold rules                 # list lint rules
+mold explain <CODE>        # detailed rule description with examples
+mold init                  # scaffold a mold.toml
+mold lsp                   # language server over stdio
+```
+
+Inputs are files, directories (walked for `*.sql`), or stdin (`-`). Exit codes:
+`0` clean, `1` findings / unformatted, `2` error.
+
+```sh
+echo "select id,name from users where active=true" | mold format -
+#  SELECT id, name
+#    FROM users
+#   WHERE active = true
+
+echo "select * from a, b" | mold lint -
+#  warning[AM04]: Avoid SELECT *; list columns explicitly
+#  warning[AM05]: Implicit cross join; use an explicit JOIN clause
+#  …
+```
+
+Human output is rendered rustc-style (caret underlines, `help:` hints, colors on
+a TTY). `--format json|github|sarif` is for CI and code-scanning.
+
+## Configuration
+
+Configuration lives in `mold.toml`, discovered by walking up from the input.
+The on-disk schema is decoupled from the engine's internal types.
+
+```toml
+[format]
+style = "sqlstyle"        # sqlstyle | pgformatter | compact
+# keyword-case = "upper"  # plus per-knob overrides (indent, commas, width…)
+
+[lint]
+enabled = true
+# exclude = ["AM04"]
+# [lint.rules.CP01]
+# severity = "warning"
+
+[database]
+url-env = "DATABASE_URL"  # read the connection string from this env var
+schema  = "public"
+```
+
+The formatter ships two engines: `sqlstyle` (river alignment, sqlstyle.guide)
+and `pgformatter`. `style` selects the engine; shared knobs map across both.
+
+## Linting
+
+| Code | Fixable | Description |
+|------|---------|-------------|
+| AM04 | yes\*   | Avoid `SELECT *`; expand to columns (\*fix needs schema) |
+| AM05 | —       | Implicit cross join; use an explicit `JOIN` |
+| SF01 | —       | `UPDATE` without `WHERE` affects all rows |
+| SF02 | —       | `DELETE` without `WHERE` affects all rows |
+| JB01 | yes     | Use `->>` when comparing a JSONB value to text |
+| CP01 | yes     | Keywords should be upper case |
+| CP02 | yes     | Unquoted identifiers should be lower case |
+| RF01 | —       | Unknown table/column/alias (needs schema) |
+| RF02 | —       | Ambiguous column; qualify it (needs schema) |
+
+`mold fix` applies every available autofix; `mold explain <CODE>` prints the
+rationale and a before/after example. Reference checks (RF\*) only run when a
+schema is available, so they never produce false positives offline.
+
+## Schema-aware features
+
+With `[database]` configured and a `db` build, mold introspects
+`information_schema`/`pg_catalog` for tables, columns, primary keys, functions,
+and **samples JSONB columns** to infer their shape. The result is cached at
+`.mold/schema-cache.json` (keyed by connection + schema, with a TTL), so only
+the first run touches the database.
+
+The cached schema drives:
+- column / table completion,
+- JSONB key completion (`resource->'…'`),
+- `RF01`/`RF02` reference checks and "did you mean?" suggestions,
+- `AM04`'s `SELECT *` expansion.
+
+A `.mold/` cache is plain JSON and can be read without the `db` feature, so
+embedders stay async-free.
+
+## Language server
+
+`mold lsp` speaks LSP over stdio. Implemented:
+
+- diagnostics (parse errors + lint findings, with quick-fix code actions),
+- completion (keywords, schema columns/tables, JSONB paths),
+- hover (column type and source table),
+- document formatting and range formatting,
+- document symbols (outline),
+- semantic tokens (highlighting),
+- signature help.
+
+## Library
+
+The workspace is split into focused crates:
+
+| Crate | Purpose |
+|-------|---------|
+| `mold_lexer` | Tokenizer |
+| `mold_parser` | Recovering parser → lossless CST |
+| `mold_syntax` | Syntax kinds, AST, `Parse` container |
+| `mold_hir` | Name resolution, scopes, lint rules |
+| `mold_completion` | Completion engine and provider traits |
+| `mold_format` | Formatter (two engines) and edit diffing |
+| `mold_config` | `mold.toml` schema (serde) |
+| `mold_schema` | Schema snapshot, `.mold/` cache, live introspection |
+| `mold_lsp` | Language server |
+| `mold` | Facade crate and CLI |
+
+```rust
+let parse = mold::parser::parse("SELECT id, name FROM users");
+assert!(parse.errors().is_empty());
+
+let formatted = mold_format::format_sqlstyle("select id,name from users");
 println!("{formatted}");
 ```
 
-## Examples
-Run from the repository root:
-- `cargo run --example parse_and_format`
-- `cargo run --example completion`
-- `cargo run --example custom_provider`
+Runnable examples:
+
+```sh
+cargo run -p mold --example parse_and_format
+cargo run -p mold --example completion
+cargo run -p mold --example custom_provider
+```
 
 ## Development
-- `cargo test --all`
-- `cargo bench -p mold`
-- `just fmt`
+
+```sh
+just test          # cargo test --all
+just check         # fmt + clippy + test
+just demo-db       # spin up Postgres, introspect, lint a sample (needs Docker)
+```
+
+`just demo-db` brings up a seeded Postgres via `docker-compose.yml`, introspects
+it (writing `.mold/schema-cache.json`), and runs schema-aware lint plus JSONB
+key completion against it end to end.
 
 ## License
+
 MIT
