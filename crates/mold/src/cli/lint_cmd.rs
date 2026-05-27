@@ -28,13 +28,23 @@ pub fn run(args: &LintArgs, cli: &Cli) -> Result<u8> {
         .map(|p| p as &dyn mold_hir::SchemaProvider);
 
     let mut total = 0usize;
+    // SARIF is a single aggregated document, so collect rather than stream.
+    let sarif = matches!(args.format, ReportFormat::Sarif);
+    let mut analyzed_all: Vec<(&InputFile, Vec<Diagnostic>)> = Vec::new();
+
     for input in &inputs {
         let analyzed = super::analysis::analyze(&input.text, &config, provider_ref);
         total += analyzed.diagnostics.len();
-        report(args.format, input, &analyzed.diagnostics);
+        if sarif {
+            analyzed_all.push((input, analyzed.diagnostics));
+        } else {
+            report(args.format, input, &analyzed.diagnostics);
+        }
     }
 
-    if matches!(args.format, ReportFormat::Human) {
+    if sarif {
+        print!("{}", super::render::render_sarif(&analyzed_all));
+    } else if matches!(args.format, ReportFormat::Human) {
         if total == 0 {
             eprintln!("No issues found.");
         } else {
@@ -50,6 +60,8 @@ fn report(format: ReportFormat, input: &InputFile, diags: &[Diagnostic]) {
         ReportFormat::Human => report_human(input, diags),
         ReportFormat::Json => report_json(input, diags),
         ReportFormat::Github => report_github(input, diags),
+        // Aggregated separately in `run`.
+        ReportFormat::Sarif => {}
     }
 }
 

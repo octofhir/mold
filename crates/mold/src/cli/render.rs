@@ -9,6 +9,9 @@ use std::io::IsTerminal;
 use annotate_snippets::{Level, Renderer, Snippet};
 use mold_hir::{Diagnostic, Severity};
 
+use super::io::{InputFile, json_escape, line_col};
+use super::rules_cmd;
+
 fn level_of(severity: Severity) -> Level {
     match severity {
         Severity::Error => Level::Error,
@@ -65,4 +68,60 @@ pub fn render(origin: &str, source: &str, diagnostics: &[Diagnostic]) -> String 
         out.push('\n');
     }
     out
+}
+
+/// Renders all findings as a single SARIF 2.1.0 document.
+pub fn render_sarif(files: &[(&InputFile, Vec<Diagnostic>)]) -> String {
+    // Tool driver rules from the catalog.
+    let rules: Vec<String> = rules_cmd::RULES
+        .iter()
+        .map(|r| {
+            format!(
+                r#"{{"id":{},"shortDescription":{{"text":{}}}}}"#,
+                json_escape(r.code),
+                json_escape(r.summary)
+            )
+        })
+        .collect();
+
+    let mut results: Vec<String> = Vec::new();
+    for (input, diags) in files {
+        for d in diags {
+            let (sl, sc) = d
+                .range
+                .map(|r| line_col(&input.text, u32::from(r.start())))
+                .unwrap_or((1, 1));
+            let (el, ec) = d
+                .range
+                .map(|r| line_col(&input.text, u32::from(r.end())))
+                .unwrap_or((1, 1));
+            let level = match d.severity {
+                Severity::Error => "error",
+                Severity::Info | Severity::Hint => "note",
+                _ => "warning",
+            };
+            let text = match &d.help {
+                Some(h) => format!("{} (help: {h})", d.message),
+                None => d.message.clone(),
+            };
+            let rule_id = d.code.as_deref().unwrap_or("syntax");
+            results.push(format!(
+                r#"{{"ruleId":{},"level":"{}","message":{{"text":{}}},"locations":[{{"physicalLocation":{{"artifactLocation":{{"uri":{}}},"region":{{"startLine":{},"startColumn":{},"endLine":{},"endColumn":{}}}}}}}]}}"#,
+                json_escape(rule_id),
+                level,
+                json_escape(&text),
+                json_escape(&input.label),
+                sl,
+                sc,
+                el,
+                ec,
+            ));
+        }
+    }
+
+    format!(
+        r#"{{"$schema":"https://json.schemastore.org/sarif-2.1.0.json","version":"2.1.0","runs":[{{"tool":{{"driver":{{"name":"mold","rules":[{}]}}}},"results":[{}]}}]}}"#,
+        rules.join(","),
+        results.join(",")
+    )
 }

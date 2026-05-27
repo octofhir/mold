@@ -42,6 +42,8 @@ pub fn analyze(
         .filter(|d| match &d.code {
             // Unkeyed semantic diagnostics are only trustworthy with a schema.
             None => schema_aware,
+            // Reference checks (RF*) need a schema; suppress them without one.
+            Some(code) if is_reference_rule(code) => schema_aware && config.lint.is_rule_enabled(code),
             Some(code) => config.lint.is_rule_enabled(code),
         })
         .map(|mut d| {
@@ -70,6 +72,11 @@ fn build_options(config: &MoldConfig) -> AnalysisOptions {
         packs.push(BuiltinLintPack::Capitalisation);
     }
     AnalysisOptions::new().with_builtin_lint_packs(packs)
+}
+
+/// Whether a rule code is a schema-dependent reference check.
+fn is_reference_rule(code: &str) -> bool {
+    code.starts_with("RF")
 }
 
 fn map_severity(level: SeverityLevel) -> Option<Severity> {
