@@ -6,6 +6,7 @@
 //! formatting, syntax diagnostics and the lint rules that need no schema.
 
 mod convert;
+mod semantic_tokens;
 mod symbols;
 
 use std::collections::HashMap;
@@ -17,15 +18,17 @@ use lsp_types::{
     CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic,
     DocumentFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
     DocumentSymbolResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
-    MarkupContent, MarkupKind, OneOf, Position, PublishDiagnosticsParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
+    MarkupContent, MarkupKind, OneOf, Position, PublishDiagnosticsParams, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
         PublishDiagnostics,
     },
     request::{
         CodeActionRequest, Completion, DocumentSymbolRequest, Formatting, HoverRequest,
-        RangeFormatting,
+        RangeFormatting, SemanticTokensFullRequest,
     },
 };
 use mold_config::MoldConfig;
@@ -74,6 +77,17 @@ fn server_capabilities() -> ServerCapabilities {
         code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
+        semantic_tokens_provider: Some(
+            SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+                legend: SemanticTokensLegend {
+                    token_types: semantic_tokens::LEGEND.to_vec(),
+                    token_modifiers: vec![],
+                },
+                full: Some(SemanticTokensFullOptions::Bool(true)),
+                range: Some(false),
+                ..Default::default()
+            }),
+        ),
         ..Default::default()
     }
 }
@@ -136,6 +150,10 @@ impl Server {
         };
         let req = match cast::<DocumentSymbolRequest>(req) {
             Ok((id, params)) => return self.on_document_symbol(id, params),
+            Err(req) => req,
+        };
+        let req = match cast::<SemanticTokensFullRequest>(req) {
+            Ok((id, params)) => return self.on_semantic_tokens(id, params),
             Err(req) => req,
         };
         // Unhandled method: reply with an empty result so the client is not left
@@ -358,6 +376,21 @@ impl Server {
             })
             .unwrap_or_default();
         self.respond(Response::new_ok(id, DocumentSymbolResponse::Nested(symbols)))
+    }
+
+    fn on_semantic_tokens(
+        &mut self,
+        id: RequestId,
+        params: SemanticTokensParams,
+    ) -> anyhow::Result<()> {
+        let uri = params.text_document.uri;
+        let tokens = self.docs.get(&uri).map(|entry| {
+            let parse = mold_parser::parse(&entry.text);
+            let index = LineIndex::new(&entry.text);
+            semantic_tokens::semantic_tokens(&parse.syntax(), &index)
+        });
+        let result = tokens.map(SemanticTokensResult::Tokens);
+        self.respond(Response::new_ok(id, result))
     }
 
     fn on_hover(&mut self, id: RequestId, params: HoverParams) -> anyhow::Result<()> {
