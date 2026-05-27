@@ -86,36 +86,55 @@ pub(crate) fn format_paren_expr(node: &SyntaxNode, printer: &mut PgPrinter) {
 
 /// Formats a function call.
 pub(crate) fn format_func_call(node: &SyntaxNode, printer: &mut PgPrinter) {
+    // The grammar emits arguments and parentheses flat inside FUNC_CALL (no
+    // ARG_LIST node), so track whether we have passed the opening paren to tell
+    // the function name from its arguments.
+    let mut seen_open = false;
     for element in node.children_with_tokens() {
         match element {
-            cstree::util::NodeOrToken::Node(child) => {
-                if child.kind() == SyntaxKind::ARG_LIST {
-                    if !printer.no_space_function() {
-                        // pgFormatter default: no space before (
-                    }
-                    printer.write("(");
-                    format_arg_list(child, printer);
-                    printer.write(")");
-                } else if child.kind() == SyntaxKind::OVER_CLAUSE {
+            cstree::util::NodeOrToken::Node(child) => match child.kind() {
+                SyntaxKind::ARG_LIST => format_arg_list(child, printer),
+                SyntaxKind::OVER_CLAUSE => {
                     printer.space();
                     format_over_clause(child, printer);
-                } else if child.kind() == SyntaxKind::FILTER_CLAUSE {
+                }
+                SyntaxKind::FILTER_CLAUSE => {
                     printer.space();
                     format_filter_clause(child, printer);
-                } else if child.kind() == SyntaxKind::QUALIFIED_NAME {
-                    format_column_ref(child, printer);
-                } else {
-                    format_expression(child, printer);
                 }
-            }
-            cstree::util::NodeOrToken::Token(token) => {
-                if token.kind() == SyntaxKind::IDENT {
-                    printer.write_function(token.text());
-                } else if token.kind() != SyntaxKind::L_PAREN && token.kind() != SyntaxKind::R_PAREN
-                {
-                    format_token(token, printer);
+                SyntaxKind::QUALIFIED_NAME => format_column_ref(child, printer),
+                _ => format_expression(child, printer),
+            },
+            cstree::util::NodeOrToken::Token(token) => match token.kind() {
+                SyntaxKind::L_PAREN => {
+                    printer.write("(");
+                    seen_open = true;
                 }
-            }
+                SyntaxKind::R_PAREN => printer.write(")"),
+                SyntaxKind::COMMA => {
+                    printer.write(",");
+                    printer.space();
+                }
+                SyntaxKind::STAR => printer.write("*"),
+                SyntaxKind::DISTINCT_KW => {
+                    printer.write_keyword("DISTINCT");
+                    printer.space();
+                }
+                SyntaxKind::ALL_KW => {
+                    printer.write_keyword("ALL");
+                    printer.space();
+                }
+                SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT => {
+                    if seen_open {
+                        printer.write_identifier(token.text());
+                    } else {
+                        printer.write_function(token.text());
+                    }
+                }
+                // A keyword before the paren is the function name (COUNT, …).
+                k if k.is_keyword() && !seen_open => printer.write_function(token.text()),
+                _ => format_token(token, printer),
+            },
         }
     }
 }
