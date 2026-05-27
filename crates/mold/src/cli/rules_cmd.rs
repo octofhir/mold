@@ -115,6 +115,9 @@ pub(crate) fn find(code: &str) -> Option<&'static RuleDoc> {
 }
 
 pub fn run() -> Result<u8> {
+    println!(
+        "Prefixes: AM = ambiguity, SF = safety, JB = JSONB, CP = capitalisation, RF = references\n"
+    );
     println!("{:<6} {:<8} {}", "CODE", "FIXABLE", "DESCRIPTION");
     for r in RULES {
         println!(
