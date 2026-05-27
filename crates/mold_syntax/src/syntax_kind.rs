@@ -637,7 +637,7 @@ impl cstree::Syntax for SyntaxKind {
             Self::DOLLAR => Some("$"),
             // Operators
             Self::EQ => Some("="),
-            Self::NE => Some("<>"),
+            // NE has two spellings (`<>` and `!=`); no single static text.
             Self::LT => Some("<"),
             Self::LE => Some("<="),
             Self::GT => Some(">"),
