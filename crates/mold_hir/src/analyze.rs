@@ -147,6 +147,8 @@ pub enum RuleCode {
     Jb01,
     /// Keyword capitalisation.
     Cp01,
+    /// Unquoted identifier capitalisation.
+    Cp02,
     /// Unresolved table/column/alias reference (needs schema).
     Rf01,
     /// Ambiguous column reference (needs schema).
@@ -163,6 +165,7 @@ impl RuleCode {
             RuleCode::Sf02 => "SF02",
             RuleCode::Jb01 => "JB01",
             RuleCode::Cp01 => "CP01",
+            RuleCode::Cp02 => "CP02",
             RuleCode::Rf01 => "RF01",
             RuleCode::Rf02 => "RF02",
         }

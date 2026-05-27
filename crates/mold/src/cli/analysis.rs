@@ -70,7 +70,7 @@ pub fn analyze(
 /// one of its rules is active (it is off by default).
 fn build_options(config: &MoldConfig) -> AnalysisOptions {
     let mut packs = vec![BuiltinLintPack::Core, BuiltinLintPack::Jsonb];
-    if config.lint.is_rule_enabled("CP01") {
+    if config.lint.is_rule_enabled("CP01") || config.lint.is_rule_enabled("CP02") {
         packs.push(BuiltinLintPack::Capitalisation);
     }
     AnalysisOptions::new().with_builtin_lint_packs(packs)
