@@ -78,7 +78,7 @@ impl Cli {
             Command::Fix(args) => fix_cmd::run(args, &cli),
             Command::Parse(args) => parse_cmd::run(args, &cli),
             Command::Rules => rules_cmd::run(),
-            Command::Lsp => run_lsp(),
+            Command::Lsp => run_lsp(&cli),
         };
         match result {
             Ok(code) => ExitCode::from(code),
@@ -101,7 +101,9 @@ impl Cli {
     }
 }
 
-fn run_lsp() -> anyhow::Result<u8> {
-    // The language server lives in the `mold_lsp` crate; wired in a follow-up.
-    anyhow::bail!("the `lsp` subcommand is not available in this build");
+fn run_lsp(cli: &Cli) -> anyhow::Result<u8> {
+    let config = cli.load_config(&PathBuf::from("."))?;
+    let schema = schema::resolve(&config)?;
+    mold_lsp::run_stdio(config, schema)?;
+    Ok(exit::OK)
 }

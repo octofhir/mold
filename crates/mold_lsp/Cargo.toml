@@ -1,0 +1,22 @@
+[package]
+name = "mold_lsp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Generic PostgreSQL language server built on the mold engine."
+
+[dependencies]
+lsp-server = "0.7"
+lsp-types = "0.94"
+serde = { workspace = true }
+serde_json = "1.0"
+anyhow = { workspace = true }
+text-size = { workspace = true }
+
+mold_parser = { workspace = true }
+mold_syntax = { workspace = true }
+mold_hir = { workspace = true }
+mold_completion = { workspace = true }
+mold_format = { workspace = true }
+mold_config = { workspace = true }
+mold_schema = { workspace = true }
