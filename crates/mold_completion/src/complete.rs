@@ -32,6 +32,21 @@ fn safe_slice_to(s: &str, offset: usize) -> &str {
     &s[..safe_offset]
 }
 
+/// Whether the cursor sits inside a quoted JSONB key (e.g. `resource->'na|'`).
+///
+/// Detected by an odd number of single quotes after the last `->`/`#>`
+/// accessor operator, meaning a quote is still open.
+fn cursor_in_jsonb_key(source: &str, offset: usize) -> bool {
+    let before = safe_slice_to(source, offset);
+    let op_idx = match (before.rfind("->"), before.rfind("#>")) {
+        (Some(a), Some(b)) => a.max(b),
+        (Some(a), None) => a,
+        (None, Some(b)) => b,
+        (None, None) => return false,
+    };
+    before[op_idx..].matches('\'').count() % 2 == 1
+}
+
 use crate::context::{detect_context, find_cte_columns_at_offset};
 use crate::generators::{
     JsonbArgCompletion, complete_columns, complete_functions, complete_jsonb_paths,
@@ -473,8 +488,12 @@ fn generate_completions(
                 &path,
             ));
 
-            // Add JSONB operators
-            items.extend(crate::generators::jsonb::complete_jsonb_operators());
+            // Only suggest operators at an operator position. Inside a quoted
+            // key (e.g. `resource->'na|'`) the user is typing a key name, so
+            // operators would be noise.
+            if !cursor_in_jsonb_key(request.source, request.offset.into()) {
+                items.extend(crate::generators::jsonb::complete_jsonb_operators());
+            }
 
             // Filter completions by what the user has typed so far
             if !current_accessor.is_empty() {
@@ -940,6 +959,17 @@ pub fn get_prefix_at_offset(source: &str, offset: TextSize) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_cursor_in_jsonb_key() {
+        // Inside the quotes => key position.
+        assert!(cursor_in_jsonb_key("select resource->'", 18));
+        assert!(cursor_in_jsonb_key("select resource->'na", 20));
+        // After the closing quote => operator position.
+        assert!(!cursor_in_jsonb_key("select resource->'name'", 23));
+        // No accessor at all.
+        assert!(!cursor_in_jsonb_key("select id", 9));
+    }
 
     #[test]
     fn test_completion_request() {

@@ -48,7 +48,7 @@ pub mod scope;
 pub use analyze::{
     Analysis, AnalysisOptions, Analyzer, BuiltinLintPack, ColumnInfo, Diagnostic, Fix,
     LintRulePack, NullSchemaProvider, RelatedInfo, ResolvedReference, ResolvedTableRef,
-    SchemaProvider, Severity, TableInfo, TableType, TextEdit, analyze_query,
+    RuleCode, SchemaProvider, Severity, TableInfo, TableType, TextEdit, analyze_query,
     analyze_query_with_options, suggest_similar,
 };
 pub use binding::{
