@@ -35,6 +35,7 @@ mold_completion.workspace = true
 mold_format.workspace = true
 mold_config.workspace = true
 mold_schema.workspace = true
+mold_lsp.workspace = true
 clap = { workspace = true }
 anyhow = { workspace = true }
 tokio = { version = "1", features = ["rt-multi-thread"], optional = true }

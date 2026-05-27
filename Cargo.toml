@@ -9,6 +9,7 @@ members = [
     "crates/mold_format",
     "crates/mold_config",
     "crates/mold_schema",
+    "crates/mold_lsp",
     "crates/mold",
 ]
 
@@ -50,3 +51,4 @@ mold_completion = { path = "crates/mold_completion" }
 mold_format = { path = "crates/mold_format" }
 mold_config = { path = "crates/mold_config" }
 mold_schema = { path = "crates/mold_schema" }
+mold_lsp = { path = "crates/mold_lsp" }
