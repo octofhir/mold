@@ -6,14 +6,15 @@
 
 use mold_completion::providers::{FunctionProvider, SchemaProvider as CompletionSchemaProvider};
 use mold_completion::types::{
-    ColumnInfo as CompletionColumn, FunctionInfo, JsonbSchema, TableInfo as CompletionTable,
+    ColumnInfo as CompletionColumn, FunctionInfo, JsonbField, JsonbFieldType, JsonbSchema,
+    TableInfo as CompletionTable,
 };
 use mold_hir::{
     ColumnInfo as HirColumn, DataType, SchemaProvider as HirSchemaProvider, TableInfo as HirTable,
     TableType as HirTableType,
 };
 
-use crate::snapshot::{SchemaSnapshot, TableEntry, TableKind};
+use crate::snapshot::{JsonbShape, JsonbType, SchemaSnapshot, TableEntry, TableKind};
 
 /// A schema provider reading from an in-memory snapshot.
 #[derive(Debug, Clone)]
@@ -125,13 +126,42 @@ impl CompletionSchemaProvider for CachedSchemaProvider {
 
     fn jsonb_schema(
         &self,
-        _schema: Option<&str>,
-        _table: &str,
-        _column: &str,
+        schema: Option<&str>,
+        table: &str,
+        column: &str,
     ) -> Option<JsonbSchema> {
-        // JSONB shape introspection is out of scope for v1.
-        None
+        let entry = self.find_table(schema, table)?;
+        let col = entry
+            .columns
+            .iter()
+            .find(|c| c.name.eq_ignore_ascii_case(column))?;
+        col.jsonb.as_ref().map(build_jsonb_schema)
     }
+}
+
+fn jsonb_field_type(ty: JsonbType) -> JsonbFieldType {
+    match ty {
+        JsonbType::Object => JsonbFieldType::Object,
+        JsonbType::Array => JsonbFieldType::Array,
+        JsonbType::String => JsonbFieldType::String,
+        JsonbType::Number => JsonbFieldType::Number,
+        JsonbType::Boolean => JsonbFieldType::Boolean,
+        JsonbType::Null => JsonbFieldType::Null,
+        JsonbType::Unknown => JsonbFieldType::Unknown,
+    }
+}
+
+/// Converts a sampled [`JsonbShape`] into the completion engine's schema.
+fn build_jsonb_schema(shape: &JsonbShape) -> JsonbSchema {
+    let mut schema = JsonbSchema::new();
+    for field in &shape.fields {
+        let mut f = JsonbField::new(field.name.clone(), jsonb_field_type(field.ty));
+        if let Some(nested) = &field.nested {
+            f.nested = Some(Box::new(build_jsonb_schema(nested)));
+        }
+        schema = schema.with_field(f);
+    }
+    schema
 }
 
 impl FunctionProvider for CachedSchemaProvider {
@@ -147,7 +177,7 @@ impl FunctionProvider for CachedSchemaProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::snapshot::{ColumnEntry, FunctionEntry};
+    use crate::snapshot::{ColumnEntry, FunctionEntry, JsonbFieldShape, JsonbShape};
 
     fn sample() -> CachedSchemaProvider {
         let mut snap = SchemaSnapshot::new("fp", "public");
@@ -162,6 +192,7 @@ mod tests {
                     nullable: false,
                     is_primary_key: true,
                     ordinal: 0,
+                    jsonb: None,
                 },
                 ColumnEntry {
                     name: "resource".into(),
@@ -169,6 +200,26 @@ mod tests {
                     nullable: true,
                     is_primary_key: false,
                     ordinal: 1,
+                    jsonb: Some(JsonbShape {
+                        fields: vec![
+                            JsonbFieldShape {
+                                name: "resourceType".into(),
+                                ty: JsonbType::String,
+                                nested: None,
+                            },
+                            JsonbFieldShape {
+                                name: "name".into(),
+                                ty: JsonbType::Array,
+                                nested: Some(JsonbShape {
+                                    fields: vec![JsonbFieldShape {
+                                        name: "given".into(),
+                                        ty: JsonbType::Array,
+                                        nested: None,
+                                    }],
+                                }),
+                            },
+                        ],
+                    }),
                 },
             ],
         });
@@ -199,6 +250,19 @@ mod tests {
         let cols = CompletionSchemaProvider::columns(&p, None, "patient");
         assert!(cols.iter().any(|c| c.name == "id" && c.is_primary_key));
         assert_eq!(FunctionProvider::functions(&p).len(), 1);
+    }
+
+    #[test]
+    fn jsonb_schema_exposes_sampled_shape() {
+        let p = sample();
+        let schema = CompletionSchemaProvider::jsonb_schema(&p, None, "patient", "resource")
+            .expect("jsonb shape present");
+        assert!(schema.find_field("resourceType").is_some());
+        let name = schema.find_field("name").expect("name field");
+        let nested = name.nested.as_ref().expect("nested shape");
+        assert!(nested.find_field("given").is_some());
+        // A non-jsonb column has no shape.
+        assert!(CompletionSchemaProvider::jsonb_schema(&p, None, "patient", "id").is_none());
     }
 
     #[test]

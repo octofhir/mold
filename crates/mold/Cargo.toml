@@ -39,6 +39,7 @@ mold_lsp.workspace = true
 clap = { workspace = true }
 anyhow = { workspace = true }
 annotate-snippets = "0.11"
+text-size = { workspace = true }
 tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
 
 [dev-dependencies]

@@ -80,6 +80,53 @@ pub struct ColumnEntry {
     pub is_primary_key: bool,
     /// 0-based ordinal position.
     pub ordinal: usize,
+    /// Inferred shape for `json`/`jsonb` columns, sampled from live rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jsonb: Option<JsonbShape>,
+}
+
+/// A sampled JSONB structure: the set of keys seen at a level and their types.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct JsonbShape {
+    pub fields: Vec<JsonbFieldShape>,
+}
+
+/// One key within a [`JsonbShape`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JsonbFieldShape {
+    pub name: String,
+    pub ty: JsonbType,
+    /// Nested shape for object/array-of-object values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nested: Option<JsonbShape>,
+}
+
+/// JSON value kind, mirroring `jsonb_typeof`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JsonbType {
+    Object,
+    Array,
+    String,
+    Number,
+    Boolean,
+    Null,
+    Unknown,
+}
+
+impl JsonbType {
+    /// Maps a `jsonb_typeof` result to a [`JsonbType`].
+    pub fn from_typeof(s: &str) -> Self {
+        match s {
+            "object" => JsonbType::Object,
+            "array" => JsonbType::Array,
+            "string" => JsonbType::String,
+            "number" => JsonbType::Number,
+            "boolean" => JsonbType::Boolean,
+            "null" => JsonbType::Null,
+            _ => JsonbType::Unknown,
+        }
+    }
 }
 
 /// A callable function.
