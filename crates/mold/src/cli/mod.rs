@@ -10,6 +10,7 @@ mod format_cmd;
 mod io;
 mod lint_cmd;
 mod parse_cmd;
+mod render;
 mod rules_cmd;
 mod schema;
 

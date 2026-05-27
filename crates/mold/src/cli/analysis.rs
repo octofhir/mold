@@ -12,10 +12,8 @@ use mold_hir::{
 
 /// The result of analyzing one source file.
 pub struct Analyzed {
-    /// Lint diagnostics surviving the configured rule selection.
+    /// Lint findings and syntax errors surviving rule selection.
     pub diagnostics: Vec<Diagnostic>,
-    /// Parse error count (reported separately from lint findings).
-    pub parse_errors: usize,
 }
 
 /// Parses and analyzes `text` under the given configuration.
@@ -30,7 +28,6 @@ pub fn analyze(
     provider: Option<&dyn SchemaProvider>,
 ) -> Analyzed {
     let parse = mold_parser::parse(text);
-    let parse_errors = parse.errors().len();
 
     let options = build_options(config);
     let null = NullSchemaProvider;
@@ -39,7 +36,7 @@ pub fn analyze(
 
     let schema_aware = provider.is_some();
 
-    let diagnostics = analysis
+    let mut diagnostics: Vec<Diagnostic> = analysis
         .diagnostics
         .into_iter()
         .filter(|d| match &d.code {
@@ -57,10 +54,12 @@ pub fn analyze(
         })
         .collect();
 
-    Analyzed {
-        diagnostics,
-        parse_errors,
+    // Surface syntax errors alongside lint findings so they render too.
+    for err in parse.errors() {
+        diagnostics.push(Diagnostic::error(err.message.clone()).with_range(err.range));
     }
+
+    Analyzed { diagnostics }
 }
 
 /// Builds analyzer options, enabling the capitalisation pack only when at least

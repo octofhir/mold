@@ -30,7 +30,7 @@ pub fn run(args: &LintArgs, cli: &Cli) -> Result<u8> {
     let mut total = 0usize;
     for input in &inputs {
         let analyzed = super::analysis::analyze(&input.text, &config, provider_ref);
-        total += analyzed.diagnostics.len() + analyzed.parse_errors;
+        total += analyzed.diagnostics.len();
         report(args.format, input, &analyzed.diagnostics);
     }
 
@@ -64,24 +64,10 @@ fn severity_label(s: Severity) -> &'static str {
 }
 
 fn report_human(input: &InputFile, diags: &[Diagnostic]) {
-    for d in diags {
-        let (line, col) = d
-            .range
-            .map(|r| line_col(&input.text, u32::from(r.start())))
-            .unwrap_or((1, 1));
-        let code = d.code.as_deref().unwrap_or("--");
-        let fixable = if d.fixes.is_empty() { "" } else { " [fixable]" };
-        println!(
-            "{}:{}:{}: {} {}: {}{}",
-            input.label,
-            line,
-            col,
-            severity_label(d.severity),
-            code,
-            d.message,
-            fixable
-        );
+    if diags.is_empty() {
+        return;
     }
+    print!("{}", super::render::render(&input.label, &input.text, diags));
 }
 
 fn report_github(input: &InputFile, diags: &[Diagnostic]) {
