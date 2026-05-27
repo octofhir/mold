@@ -152,6 +152,9 @@ pub struct Diagnostic {
 
     /// Suggested fixes (quick-fixes / autofixes) for this diagnostic.
     pub fixes: Vec<Fix>,
+
+    /// An optional `help:` line (e.g. a "did you mean …?" suggestion).
+    pub help: Option<String>,
 }
 
 impl Diagnostic {
@@ -164,6 +167,7 @@ impl Diagnostic {
             range: None,
             related: Vec::new(),
             fixes: Vec::new(),
+            help: None,
         }
     }
 
@@ -176,6 +180,7 @@ impl Diagnostic {
             range: None,
             related: Vec::new(),
             fixes: Vec::new(),
+            help: None,
         }
     }
 
@@ -188,6 +193,7 @@ impl Diagnostic {
             range: None,
             related: Vec::new(),
             fixes: Vec::new(),
+            help: None,
         }
     }
 
@@ -212,6 +218,12 @@ impl Diagnostic {
     /// Attaches a fix to this diagnostic.
     pub fn with_fix(mut self, fix: Fix) -> Self {
         self.fixes.push(fix);
+        self
+    }
+
+    /// Sets the `help:` line for this diagnostic.
+    pub fn with_help(mut self, help: impl Into<String>) -> Self {
+        self.help = Some(help.into());
         self
     }
 }
@@ -418,6 +430,27 @@ pub trait SchemaProvider: Send + Sync {
 /// 2. Levenshtein distance within max_distance
 ///
 /// This ensures that typing 'pa' suggests 'patient' before 'app'.
+/// Formats a list of candidate names as a `help:` suggestion line.
+fn did_you_mean(suggestions: &[String]) -> String {
+    match suggestions {
+        [one] => format!("did you mean '{one}'?"),
+        many => format!("did you mean one of: {}?", many.join(", ")),
+    }
+}
+
+/// Collects every column name visible in a scope (for "did you mean" hints).
+fn scope_column_names(scope: &Arc<Scope>) -> Vec<String> {
+    let mut names = Vec::new();
+    for table in scope.tables() {
+        for column in &table.columns {
+            names.push(column.name.clone());
+        }
+    }
+    names.sort();
+    names.dedup();
+    names
+}
+
 pub fn suggest_similar(needle: &str, haystack: &[String], max_distance: usize) -> Vec<String> {
     let needle_lower = needle.to_lowercase();
 
@@ -826,21 +859,23 @@ pub fn analyze_query_with_options(
             validate_table_reference(schema.as_deref(), &name_only, provider, Some(range));
 
         if !validation.exists {
-            let message = if !validation.schema_exists {
-                format!(
+            let diag = if !validation.schema_exists {
+                Diagnostic::error(format!(
                     "Schema '{}' does not exist",
                     schema.as_deref().unwrap_or("")
-                )
-            } else if !validation.suggestions.is_empty() {
-                format!(
-                    "Table '{}' does not exist. Did you mean: {}?",
-                    name_only,
-                    validation.suggestions.join(", ")
-                )
+                ))
+                .with_code("RF01")
+                .with_range(range)
             } else {
-                format!("Table '{}' does not exist", name_only)
+                let mut d = Diagnostic::error(format!("Table '{}' does not exist", name_only))
+                    .with_code("RF01")
+                    .with_range(range);
+                if !validation.suggestions.is_empty() {
+                    d = d.with_help(did_you_mean(&validation.suggestions));
+                }
+                d
             };
-            analyzer.error(message, Some(range));
+            analyzer.emit(diag);
         }
     }
 
@@ -872,39 +907,50 @@ pub fn analyze_query_with_options(
                         range,
                         ..
                     } => {
-                        let message = if !suggestions.is_empty() {
-                            format!(
-                                "Column '{}' not found in table '{}'. Did you mean: {}?",
-                                column,
-                                table,
-                                suggestions.join(", ")
-                            )
-                        } else {
-                            format!("Column '{}' not found in table '{}'", column, table)
-                        };
-                        analyzer.error(message, range);
+                        let mut diag = Diagnostic::error(format!(
+                            "Column '{}' not found in table '{}'",
+                            column, table
+                        ))
+                        .with_code("RF01");
+                        if let Some(r) = range {
+                            diag = diag.with_range(r);
+                        }
+                        if !suggestions.is_empty() {
+                            diag = diag.with_help(did_you_mean(&suggestions));
+                        }
+                        analyzer.emit(diag);
                     }
                     crate::resolve::ColumnValidation::UnknownAlias {
                         alias,
                         available_aliases,
                         range,
                     } => {
-                        let message = if available_aliases.is_empty() {
-                            format!("Unknown table alias '{}'", alias)
-                        } else {
-                            format!(
-                                "Unknown table alias '{}'. Available: {}",
-                                alias,
-                                available_aliases.join(", ")
-                            )
-                        };
-                        analyzer.error(message, range);
+                        let mut diag = Diagnostic::error(format!("Unknown table alias '{}'", alias))
+                            .with_code("RF01");
+                        if let Some(r) = range {
+                            diag = diag.with_range(r);
+                        }
+                        if !available_aliases.is_empty() {
+                            diag = diag
+                                .with_help(format!("available aliases: {}", available_aliases.join(", ")));
+                        }
+                        analyzer.emit(diag);
                     }
                     crate::resolve::ColumnValidation::NotFound { column, range } => {
-                        analyzer.error(
-                            format!("Column '{}' not found in any table in scope", column),
-                            range,
-                        );
+                        let mut diag = Diagnostic::error(format!(
+                            "Column '{}' not found in any table in scope",
+                            column
+                        ))
+                        .with_code("RF01");
+                        if let Some(r) = range {
+                            diag = diag.with_range(r);
+                        }
+                        let candidates = scope_column_names(&local_scope);
+                        let suggestions = suggest_similar(&column, &candidates, 3);
+                        if !suggestions.is_empty() {
+                            diag = diag.with_help(did_you_mean(&suggestions));
+                        }
+                        analyzer.emit(diag);
                     }
                     crate::resolve::ColumnValidation::Ambiguous {
                         column,
@@ -913,14 +959,23 @@ pub fn analyze_query_with_options(
                     } => {
                         let table_names: Vec<String> =
                             tables.iter().map(|(alias, _)| alias.clone()).collect();
-                        analyzer.error(
-                            format!(
-                                "Column '{}' is ambiguous. Found in tables: {}. Use table qualifier.",
-                                column,
-                                table_names.join(", ")
-                            ),
-                            range,
-                        );
+                        let mut diag = Diagnostic::error(format!(
+                            "Column '{}' is ambiguous; found in multiple tables",
+                            column
+                        ))
+                        .with_code("RF02");
+                        if let Some(r) = range {
+                            diag = diag.with_range(r);
+                        }
+                        diag = diag.with_help(format!(
+                            "qualify with a table name: {}",
+                            table_names
+                                .iter()
+                                .map(|t| format!("{t}.{column}"))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ));
+                        analyzer.emit(diag);
                     }
                 }
             }
