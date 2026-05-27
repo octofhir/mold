@@ -5,6 +5,7 @@
 //! and edit application live in [`io`].
 
 mod analysis;
+mod explain_cmd;
 mod fix_cmd;
 mod format_cmd;
 mod io;
@@ -54,6 +55,8 @@ enum Command {
     Parse(parse_cmd::ParseArgs),
     /// List available lint rules.
     Rules,
+    /// Explain a lint rule in detail.
+    Explain(explain_cmd::ExplainArgs),
     /// Run the language server over stdio.
     Lsp,
 }
@@ -79,6 +82,7 @@ impl Cli {
             Command::Fix(args) => fix_cmd::run(args, &cli),
             Command::Parse(args) => parse_cmd::run(args, &cli),
             Command::Rules => rules_cmd::run(),
+            Command::Explain(args) => explain_cmd::run(args),
             Command::Lsp => run_lsp(&cli),
         };
         match result {

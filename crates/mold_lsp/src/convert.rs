@@ -89,12 +89,16 @@ pub fn diagnostic(index: &LineIndex, d: &HirDiagnostic) -> LspDiagnostic {
         .range
         .map(|r| index.range(r))
         .unwrap_or(Range::default());
+    let message = match &d.help {
+        Some(help) => format!("{}\nhelp: {help}", d.message),
+        None => d.message.clone(),
+    };
     LspDiagnostic {
         range,
         severity: Some(severity(d.severity)),
         code: d.code.clone().map(NumberOrString::String),
         source: Some("mold".to_string()),
-        message: d.message.clone(),
+        message,
         ..Default::default()
     }
 }

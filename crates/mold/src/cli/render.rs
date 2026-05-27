@@ -49,6 +49,12 @@ pub fn render(origin: &str, source: &str, diagnostics: &[Diagnostic]) -> String 
             message = message.id(code);
         }
 
+        let help_note;
+        if let Some(help) = &diag.help {
+            help_note = Level::Help.title(help.as_str());
+            message = message.footer(help_note);
+        }
+
         let fix_note;
         if !diag.fixes.is_empty() {
             fix_note = Level::Note.title("a fix is available; run `mold fix`");
