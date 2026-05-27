@@ -7,5 +7,9 @@ SELECT * FROM patient, orders WHERE patient.id = orders.patient_id;
 -- SF01 (UPDATE without WHERE)
 UPDATE patient SET name = 'anon';
 
--- references an unknown column; flagged only when the schema is known
-SELECT nonexistent_column FROM patient;
+-- RF01 with a "did you mean?" hint: 'naem' is close to the real column 'name'
+-- (flagged only when the schema is known)
+SELECT naem FROM patient;
+
+-- RF02 ambiguous column: 'id' exists in both tables, so it must be qualified
+SELECT id FROM patient JOIN orders ON orders.patient_id = patient.id;
