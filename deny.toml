@@ -19,6 +19,9 @@ allow = [
     "Zlib",
     "MPL-2.0",
     "CC0-1.0",
+    # webpki-roots ships the Mozilla CA bundle under this data license (pulled
+    # in via sqlx + rustls under --all-features).
+    "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.9
 
