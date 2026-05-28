@@ -3,6 +3,10 @@ name = "mold_lsp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["sql", "postgres", "lsp", "language-server"]
+categories = ["development-tools"]
 description = "Generic PostgreSQL language server built on the mold engine."
 
 [dependencies]

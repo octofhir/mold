@@ -3,6 +3,10 @@ name = "mold_config"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["sql", "postgres", "config"]
+categories = ["config", "development-tools"]
 description = "Unified, serde-based configuration for the mold SQL toolchain."
 
 [dependencies]

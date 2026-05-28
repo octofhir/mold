@@ -3,6 +3,11 @@ name = "mold_completion"
 version.workspace = true
 edition = "2024"
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Completion engine and schema provider traits for PostgreSQL SQL."
+keywords = ["sql", "postgres", "completion", "lsp"]
+categories = ["development-tools"]
 
 [dependencies]
 mold_syntax.workspace = true
