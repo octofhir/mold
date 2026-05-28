@@ -34,9 +34,19 @@ pub mod exit {
     pub const ERROR: u8 = 2;
 }
 
+/// Version string: crate version plus build-time git hash and date.
+const LONG_VERSION: &str = concat!(
+    env!("CARGO_PKG_VERSION"),
+    " (",
+    env!("MOLD_GIT_SHA"),
+    " ",
+    env!("MOLD_BUILD_DATE"),
+    ")"
+);
+
 /// PostgreSQL SQL parser, formatter and linter.
 #[derive(Parser, Debug)]
-#[command(name = "mold", version, about, long_about = None)]
+#[command(name = "mold", version = LONG_VERSION, about, long_about = None)]
 pub struct Cli {
     /// Path to a `mold.toml`. When omitted, the nearest one is discovered.
     #[arg(long, global = true, value_name = "FILE")]
