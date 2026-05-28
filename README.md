@@ -139,6 +139,28 @@ embedders stay async-free.
 - semantic tokens (highlighting),
 - signature help.
 
+### Editor setup — VS Code
+
+A local extension lives in [`editors/code`](editors/code). Build `mold`, put it
+on your `PATH` (or set `mold.path`), then from `editors/code` run
+`npm install && npm run compile` and press **F5** in VS Code to launch it. See
+[`editors/code/README.md`](editors/code/README.md) for details. It is not
+published to the Marketplace.
+
+## CI integration
+
+`mold lint --format sarif` emits SARIF 2.1.0; upload it to GitHub code scanning:
+
+```yaml
+- run: mold lint --format sarif . > mold.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: mold.sarif
+```
+
+For pre-commit, this repo ships hooks (`mold-format`, `mold-lint`) — see
+`.pre-commit-hooks.yaml`.
+
 ## Library
 
 The workspace is split into focused crates:
@@ -183,6 +205,17 @@ just demo-db       # spin up Postgres, introspect, lint a sample (needs Docker)
 `just demo-db` brings up a seeded Postgres via `docker-compose.yml`, introspects
 it (writing `.mold/schema-cache.json`), and runs schema-aware lint plus JSONB
 key completion against it end to end.
+
+The project tracks the latest stable Rust toolchain; there is no pinned MSRV.
+
+## Stability
+
+Pre-1.0: the public API of the engine crates may change between minor versions.
+The intended public surface is what each crate re-exports from its `lib.rs`
+(notably `Parse`/`SyntaxNode` in `mold_syntax`, `parse` in `mold_parser`,
+`analyze_query*` / `SchemaProvider` / `Diagnostic` / `RuleCode` in `mold_hir`,
+the provider traits in `mold_completion`, and `format*` in `mold_format`).
+Items reachable but not part of that surface may change without notice.
 
 ## License
 
