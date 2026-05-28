@@ -37,6 +37,10 @@ path = "../../examples/completion.rs"
 name = "custom_provider"
 path = "../../examples/custom_provider.rs"
 
+[[example]]
+name = "server_integration"
+path = "../../examples/server_integration.rs"
+
 [features]
 default = []
 # Live database introspection for `mold lsp` and schema-aware linting. Pulls in
