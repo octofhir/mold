@@ -16,6 +16,7 @@ mod parse_cmd;
 mod render;
 mod rules_cmd;
 mod schema;
+mod schema_cmd;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -57,6 +58,8 @@ enum Command {
     Parse(parse_cmd::ParseArgs),
     /// List available lint rules.
     Rules,
+    /// Inspect and manage the .mold schema cache.
+    Schema(schema_cmd::SchemaArgs),
     /// Scaffold a mold.toml in the current directory.
     Init(init_cmd::InitArgs),
     /// Explain a lint rule in detail.
@@ -90,6 +93,7 @@ impl Cli {
             Command::Fix(args) => fix_cmd::run(args, &cli),
             Command::Parse(args) => parse_cmd::run(args, &cli),
             Command::Rules => rules_cmd::run(),
+            Command::Schema(args) => schema_cmd::run(args, &cli),
             Command::Init(args) => init_cmd::run(args),
             Command::Explain(args) => explain_cmd::run(args),
             Command::Complete(args) => complete_cmd::run(args, &cli),
