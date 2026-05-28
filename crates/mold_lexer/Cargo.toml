@@ -3,6 +3,11 @@ name = "mold_lexer"
 version.workspace = true
 edition = "2024"
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "PostgreSQL SQL tokenizer for the mold toolchain."
+keywords = ["sql", "postgres", "lexer", "tokenizer"]
+categories = ["parser-implementations"]
 
 [dependencies]
 mold_syntax.workspace = true

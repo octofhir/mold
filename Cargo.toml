@@ -17,6 +17,8 @@ members = [
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+repository = "https://github.com/octofhir/mold"
+homepage = "https://github.com/octofhir/mold"
 
 [workspace.dependencies]
 # CST infrastructure (rust-analyzer's rowan fork with interning)

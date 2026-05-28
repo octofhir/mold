@@ -3,6 +3,11 @@ name = "mold_parser"
 version.workspace = true
 edition = "2024"
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Recovering PostgreSQL SQL parser producing a lossless CST."
+keywords = ["sql", "postgres", "parser", "cst"]
+categories = ["parser-implementations"]
 
 [dependencies]
 mold_syntax.workspace = true

@@ -3,6 +3,11 @@ name = "mold_hir"
 version.workspace = true
 edition = "2024"
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Name resolution, scopes and lint rules for PostgreSQL SQL."
+keywords = ["sql", "postgres", "analysis", "lint"]
+categories = ["development-tools"]
 
 [dependencies]
 mold_syntax.workspace = true
