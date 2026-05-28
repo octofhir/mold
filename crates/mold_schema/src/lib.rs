@@ -6,7 +6,7 @@
 //! - **Always available (sync, serde-only):** the [`snapshot`] model, the
 //!   `.mold/` [`cache`], and [`CachedSchemaProvider`]. Embedders can read a
 //!   cached schema without pulling in any async runtime.
-//! - **Behind the `db` feature:** live Postgres [`introspect`]ion via `sqlx`.
+//! - **Behind the `db` feature:** live Postgres `introspect`ion via `sqlx`.
 //!
 //! Typical flow: load a fresh cache if present; otherwise (with `db`)
 //! introspect the database and persist the result for next time.

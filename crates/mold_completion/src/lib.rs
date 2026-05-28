@@ -35,7 +35,7 @@
 //! - [`context`] - Completion context detection
 //! - [`generators`] - Completion item generators
 //! - [`triggers`] - JSONB operator trigger detection
-//! - [`complete`] - Main completion logic
+//! - [`mod@complete`] - Main completion logic
 
 pub mod complete;
 pub mod context;

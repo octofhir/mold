@@ -114,7 +114,7 @@ impl Default for FormatConfig {
 impl FormatConfig {
     /// Creates a new configuration with sqlstyle.guide defaults.
     ///
-    /// This follows the conventions from https://www.sqlstyle.guide/
+    /// This follows the conventions from <https://www.sqlstyle.guide/>
     pub fn sqlstyle() -> Self {
         Self {
             keyword_case: KeywordCase::Upper,
