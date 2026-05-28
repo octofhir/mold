@@ -85,10 +85,7 @@ fn severity(s: Severity) -> DiagnosticSeverity {
 /// Converts a mold diagnostic to its LSP form. Diagnostics without a range are
 /// anchored at the document start.
 pub fn diagnostic(index: &LineIndex, d: &HirDiagnostic) -> LspDiagnostic {
-    let range = d
-        .range
-        .map(|r| index.range(r))
-        .unwrap_or(Range::default());
+    let range = d.range.map(|r| index.range(r)).unwrap_or_default();
     let message = match &d.help {
         Some(help) => format!("{}\nhelp: {help}", d.message),
         None => d.message.clone(),
@@ -96,7 +93,9 @@ pub fn diagnostic(index: &LineIndex, d: &HirDiagnostic) -> LspDiagnostic {
     LspDiagnostic {
         range,
         severity: Some(severity(d.severity)),
-        code: d.code.map(|c| NumberOrString::String(c.as_str().to_string())),
+        code: d
+            .code
+            .map(|c| NumberOrString::String(c.as_str().to_string())),
         source: Some("mold".to_string()),
         message,
         ..Default::default()
@@ -119,7 +118,13 @@ mod tests {
     fn position_roundtrip_ascii() {
         let idx = LineIndex::new("select 1\nfrom t");
         let pos = idx.position(9); // start of "from"
-        assert_eq!(pos, Position { line: 1, character: 0 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 1,
+                character: 0
+            }
+        );
         assert_eq!(idx.offset(pos), 9);
     }
 

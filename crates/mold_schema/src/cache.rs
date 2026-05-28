@@ -83,7 +83,8 @@ mod tests {
 
     #[test]
     fn save_then_load_roundtrips() {
-        let dir = std::env::temp_dir().join(format!("mold_cache_test_{}", crate::snapshot::now_unix()));
+        let dir =
+            std::env::temp_dir().join(format!("mold_cache_test_{}", crate::snapshot::now_unix()));
         std::fs::create_dir_all(&dir).unwrap();
 
         let snap = SchemaSnapshot::new("fp", "public");

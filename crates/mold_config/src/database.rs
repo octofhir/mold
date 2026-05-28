@@ -60,12 +60,11 @@ impl DatabaseSettings {
     /// inline `url` is used. Returns `None` when no connection is configured.
     #[must_use]
     pub fn resolve_url(&self) -> Option<String> {
-        if let Some(var) = &self.url_env {
-            if let Ok(val) = std::env::var(var) {
-                if !val.is_empty() {
-                    return Some(val);
-                }
-            }
+        if let Some(var) = &self.url_env
+            && let Ok(val) = std::env::var(var)
+            && !val.is_empty()
+        {
+            return Some(val);
         }
         self.url.clone().filter(|u| !u.is_empty())
     }

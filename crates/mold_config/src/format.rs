@@ -166,7 +166,6 @@ pub struct FormatSettings {
 impl FormatSettings {
     /// Resolves these settings against the base preset into a concrete
     /// [`FormatConfig`] for the formatter.
-    #[must_use]
     pub fn to_format_config(&self) -> FormatConfig {
         let mut cfg = FmtStyle::from(self.style).to_config();
 

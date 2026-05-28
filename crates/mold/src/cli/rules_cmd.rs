@@ -229,7 +229,7 @@ pub fn run() -> Result<u8> {
     println!(
         "Prefixes: AL = aliasing, AM = ambiguity, ST = structure, SF = safety, JB = JSONB, CV = convention, CP = capitalisation, RF = references\n"
     );
-    println!("{:<6} {:<8} {}", "CODE", "FIXABLE", "DESCRIPTION");
+    println!("{:<6} {:<8} DESCRIPTION", "CODE", "FIXABLE");
     for r in RULES {
         println!(
             "{:<6} {:<8} {}",

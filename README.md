@@ -1,5 +1,7 @@
 # mold
 
+[![CI](https://github.com/octofhir/mold/actions/workflows/ci.yml/badge.svg)](https://github.com/octofhir/mold/actions/workflows/ci.yml)
+
 A PostgreSQL SQL parser, formatter, linter, and language server, written in Rust.
 
 mold builds a **lossless concrete syntax tree** with error recovery, so it keeps

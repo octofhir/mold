@@ -70,10 +70,10 @@ fn apply_core_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>)
             lint_aliasing_and_qualification(delete.syntax(), analyzer);
         }
         if node.kind() == SyntaxKind::CASE_EXPR {
-            lint_redundant_else_null(&node, analyzer);
+            lint_redundant_else_null(node, analyzer);
         }
         if node.kind() == SyntaxKind::TABLE_REF {
-            lint_subquery_as_table(&node, analyzer);
+            lint_subquery_as_table(node, analyzer);
         }
     }
     lint_unused_ctes(root, analyzer);
@@ -86,7 +86,7 @@ fn lint_aliasing_and_qualification(stmt: &mold_syntax::SyntaxNode, analyzer: &mu
     let aliases: Vec<(String, text_size::TextRange)> = stmt
         .descendants()
         .filter(|n| n.kind() == SyntaxKind::TABLE_REF)
-        .filter_map(|t| table_ref_alias(&t))
+        .filter_map(table_ref_alias)
         .map(|(name, range)| (name.to_ascii_lowercase(), range))
         .collect();
 
@@ -154,7 +154,9 @@ fn lint_aliasing_and_qualification(stmt: &mold_syntax::SyntaxNode, analyzer: &mu
 /// has a stable, named identity.
 fn lint_unaliased_select_items(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
     for node in stmt.syntax().descendants() {
-        let Some(item) = SelectItem::cast(node.clone()) else { continue };
+        let Some(item) = SelectItem::cast(node.clone()) else {
+            continue;
+        };
         if has_select_item_alias(&item) {
             continue;
         }
@@ -209,22 +211,16 @@ fn lint_subquery_as_table(table_ref: &mold_syntax::SyntaxNode, analyzer: &mut An
 /// Returns the alias `(name, range)` of a `TABLE_REF`, handling both
 /// `AS a` (an `ALIAS` node) and the implicit `users a` form (a bare second
 /// identifier that isn't part of a dotted qualifier).
-fn table_ref_alias(
-    table_ref: &mold_syntax::SyntaxNode,
-) -> Option<(String, text_size::TextRange)> {
+fn table_ref_alias(table_ref: &mold_syntax::SyntaxNode) -> Option<(String, text_size::TextRange)> {
     // Explicit `AS alias` produces an ALIAS child whose first identifier is the
     // name. Look for that first.
-    if let Some(alias) = table_ref
-        .children()
-        .find(|c| c.kind() == SyntaxKind::ALIAS)
-    {
-        if let Some(token) = alias
+    if let Some(alias) = table_ref.children().find(|c| c.kind() == SyntaxKind::ALIAS)
+        && let Some(token) = alias
             .descendants_with_tokens()
             .filter_map(|e| e.into_token())
             .find(|t| matches!(t.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT))
-        {
-            return Some((token.text().to_string(), token.text_range()));
-        }
+    {
+        return Some((token.text().to_string(), token.text_range()));
     }
     // Implicit alias: count direct IDENT vs DOT tokens. An extra identifier
     // beyond the qualified name (idents > dots + 1) is the alias.
@@ -248,10 +244,7 @@ fn table_ref_alias(
 
 /// ST01 — `ELSE NULL` in a `CASE` is redundant (the default result is NULL).
 fn lint_redundant_else_null(case: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
-    let Some(else_body) = case
-        .children()
-        .find(|c| c.kind() == SyntaxKind::CASE_ELSE)
-    else {
+    let Some(else_body) = case.children().find(|c| c.kind() == SyntaxKind::CASE_ELSE) else {
         return;
     };
     // The ELSE body must be exactly a NULL literal.
@@ -274,7 +267,8 @@ fn lint_redundant_else_null(case: &mold_syntax::SyntaxNode, analyzer: &mut Analy
         return;
     };
     // Delete from `ELSE` through the end of its NULL body.
-    let range = text_size::TextRange::new(else_kw.text_range().start(), else_body.text_range().end());
+    let range =
+        text_size::TextRange::new(else_kw.text_range().start(), else_body.text_range().end());
     analyzer.emit(
         Diagnostic::warning("Redundant ELSE NULL in CASE expression")
             .with_code(RuleCode::St01)
@@ -296,7 +290,9 @@ fn lint_limit_without_order(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
         )
     });
     let Some(limit) = limit else { return };
-    let has_order = s.children().any(|c| c.kind() == SyntaxKind::ORDER_BY_CLAUSE);
+    let has_order = s
+        .children()
+        .any(|c| c.kind() == SyntaxKind::ORDER_BY_CLAUSE);
     if !has_order {
         analyzer.emit(
             Diagnostic::warning("LIMIT/OFFSET without ORDER BY returns an arbitrary set of rows")
@@ -360,11 +356,14 @@ fn lint_unused_ctes(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>)
             continue;
         };
         let name = name_tok.text().to_ascii_lowercase();
-        if !referenced.iter().any(|r| *r == name) {
+        if !referenced.contains(&name) {
             analyzer.emit(
-                Diagnostic::warning(format!("CTE '{}' is defined but never used", name_tok.text()))
-                    .with_code(RuleCode::St03)
-                    .with_range(name_tok.text_range()),
+                Diagnostic::warning(format!(
+                    "CTE '{}' is defined but never used",
+                    name_tok.text()
+                ))
+                .with_code(RuleCode::St03)
+                .with_range(name_tok.text_range()),
             );
         }
     }
@@ -494,7 +493,7 @@ fn lint_missing_semicolons(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyz
     // statement. Walk top-level elements tracking the last unterminated stmt.
     let mut pending: Option<mold_syntax::SyntaxNode> = None;
     for element in root.children_with_tokens() {
-        if let Some(node) = element.clone().into_node() {
+        if let Some(node) = element.into_node() {
             if is_statement(node.kind()) {
                 if let Some(stmt) = pending.take() {
                     emit_missing_semicolon(&stmt, analyzer);
@@ -528,7 +527,10 @@ fn emit_missing_semicolon(stmt: &mold_syntax::SyntaxNode, analyzer: &mut Analyze
             .with_range(stmt.text_range())
             .with_fix(Fix::new(
                 "Add trailing semicolon",
-                vec![TextEdit::replace(text_size::TextRange::empty(insert_at), ";")],
+                vec![TextEdit::replace(
+                    text_size::TextRange::empty(insert_at),
+                    ";",
+                )],
             )),
     );
 }

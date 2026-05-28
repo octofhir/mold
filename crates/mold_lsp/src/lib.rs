@@ -15,14 +15,15 @@ use std::error::Error;
 
 use lsp_server::{Connection, ExtractError, Message, Request, RequestId, Response};
 use lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeActionProviderCapability,
-    CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic,
-    DocumentFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
-    DocumentSymbolResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
-    MarkupContent, MarkupKind, OneOf, Position, PublishDiagnosticsParams, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
-    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions, SignatureHelpParams,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams,
+    CodeActionProviderCapability, CompletionItem, CompletionOptions, CompletionParams,
+    CompletionResponse, Diagnostic, DocumentFormattingParams, DocumentRangeFormattingParams,
+    DocumentSymbolParams, DocumentSymbolResponse, Hover, HoverContents, HoverParams,
+    HoverProviderCapability, MarkupContent, MarkupKind, OneOf, Position, PublishDiagnosticsParams,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
+    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities,
+    SignatureHelpOptions, SignatureHelpParams, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextEdit, Url, WorkspaceEdit,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
         PublishDiagnostics,
@@ -32,23 +33,20 @@ use lsp_types::{
         RangeFormatting, SemanticTokensFullRequest, SignatureHelpRequest,
     },
 };
-use mold_config::MoldConfig;
 use mold_completion::providers::FunctionProvider;
+use mold_config::MoldConfig;
 use mold_hir::{
     Analysis, AnalysisOptions, BuiltinLintPack, Diagnostic as HirDiagnostic, NullSchemaProvider,
     Resolution, SchemaProvider, analyze_query_with_options, resolve::resolve_column,
 };
-use mold_syntax::ast::{AstNode, ColumnRef};
 use mold_schema::CachedSchemaProvider;
+use mold_syntax::ast::{AstNode, ColumnRef};
 use text_size::TextSize;
 
 use convert::LineIndex;
 
 /// Runs the language server over stdio until the client disconnects.
-pub fn run_stdio(
-    config: MoldConfig,
-    schema: Option<CachedSchemaProvider>,
-) -> anyhow::Result<()> {
+pub fn run_stdio(config: MoldConfig, schema: Option<CachedSchemaProvider>) -> anyhow::Result<()> {
     let (connection, io_threads) = Connection::stdio();
     let capabilities = serde_json::to_value(server_capabilities())?;
     let _init = connection.initialize(capabilities)?;
@@ -83,8 +81,8 @@ fn server_capabilities() -> ServerCapabilities {
             trigger_characters: Some(vec!["(".into(), ",".into()]),
             ..Default::default()
         }),
-        semantic_tokens_provider: Some(
-            SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+            SemanticTokensOptions {
                 legend: SemanticTokensLegend {
                     token_types: semantic_tokens::LEGEND.to_vec(),
                     token_modifiers: vec![],
@@ -92,8 +90,8 @@ fn server_capabilities() -> ServerCapabilities {
                 full: Some(SemanticTokensFullOptions::Bool(true)),
                 range: Some(false),
                 ..Default::default()
-            }),
-        ),
+            },
+        )),
         ..Default::default()
     }
 }
@@ -174,8 +172,7 @@ impl Server {
     fn handle_notification(&mut self, note: lsp_server::Notification) -> anyhow::Result<()> {
         match note.method.as_str() {
             DidOpenTextDocument::METHOD => {
-                let p: lsp_types::DidOpenTextDocumentParams =
-                    serde_json::from_value(note.params)?;
+                let p: lsp_types::DidOpenTextDocumentParams = serde_json::from_value(note.params)?;
                 let uri = p.text_document.uri.clone();
                 self.update_doc(uri.clone(), p.text_document.text);
                 self.publish_diagnostics(&uri)?;
@@ -191,8 +188,7 @@ impl Server {
                 }
             }
             DidCloseTextDocument::METHOD => {
-                let p: lsp_types::DidCloseTextDocumentParams =
-                    serde_json::from_value(note.params)?;
+                let p: lsp_types::DidCloseTextDocumentParams = serde_json::from_value(note.params)?;
                 self.docs.remove(&p.text_document.uri);
             }
             _ => {}
@@ -284,10 +280,7 @@ impl Server {
             .get(&uri)
             .map(|entry| self.completions(&entry.text, pos))
             .unwrap_or_default();
-        self.respond(Response::new_ok(
-            id,
-            CompletionResponse::Array(items),
-        ))
+        self.respond(Response::new_ok(id, CompletionResponse::Array(items)))
     }
 
     fn completions(&self, text: &str, pos: Position) -> Vec<CompletionItem> {
@@ -360,11 +353,7 @@ impl Server {
         self.respond(Response::new_ok(id, edits))
     }
 
-    fn on_code_action(
-        &mut self,
-        id: RequestId,
-        params: CodeActionParams,
-    ) -> anyhow::Result<()> {
+    fn on_code_action(&mut self, id: RequestId, params: CodeActionParams) -> anyhow::Result<()> {
         let uri = params.text_document.uri.clone();
         let actions = self
             .docs
@@ -389,7 +378,10 @@ impl Server {
                 symbols::document_symbols(&parse.syntax(), &index)
             })
             .unwrap_or_default();
-        self.respond(Response::new_ok(id, DocumentSymbolResponse::Nested(symbols)))
+        self.respond(Response::new_ok(
+            id,
+            DocumentSymbolResponse::Nested(symbols),
+        ))
     }
 
     fn on_signature_help(
@@ -454,7 +446,11 @@ impl Server {
 
 /// Builds quick-fix code actions from a document's cached diagnostics that
 /// overlap the requested range.
-fn code_actions(uri: &Url, entry: &DocEntry, params: &CodeActionParams) -> Vec<CodeActionOrCommand> {
+fn code_actions(
+    uri: &Url,
+    entry: &DocEntry,
+    params: &CodeActionParams,
+) -> Vec<CodeActionOrCommand> {
     let index = LineIndex::new(&entry.text);
     let want = params.range;
     let mut actions = Vec::new();
@@ -466,8 +462,11 @@ fn code_actions(uri: &Url, entry: &DocEntry, params: &CodeActionParams) -> Vec<C
             continue;
         }
         for fix in &diag.fixes {
-            let edits: Vec<TextEdit> =
-                fix.edits.iter().map(|e| convert::text_edit(&index, e)).collect();
+            let edits: Vec<TextEdit> = fix
+                .edits
+                .iter()
+                .map(|e| convert::text_edit(&index, e))
+                .collect();
             let mut changes = HashMap::new();
             changes.insert(uri.clone(), edits);
             actions.push(CodeActionOrCommand::CodeAction(CodeAction {
@@ -537,7 +536,11 @@ fn hover_at(entry: &DocEntry, pos: Position) -> Option<Hover> {
 
     let value = format!(
         "**{}** `{}`\n\ntype: `{}`\n\nfrom: `{}`",
-        if ambiguous { "column (ambiguous)" } else { "column" },
+        if ambiguous {
+            "column (ambiguous)"
+        } else {
+            "column"
+        },
         resolved.column.name,
         ty,
         table,
@@ -639,4 +642,3 @@ mod tests {
         assert!(hover_at(&entry, pos).is_none());
     }
 }
-

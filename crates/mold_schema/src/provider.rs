@@ -87,11 +87,20 @@ impl HirSchemaProvider for CachedSchemaProvider {
     }
 
     fn all_table_names(&self) -> Vec<String> {
-        self.snapshot.tables.iter().map(|t| t.name.clone()).collect()
+        self.snapshot
+            .tables
+            .iter()
+            .map(|t| t.name.clone())
+            .collect()
     }
 
     fn all_schema_names(&self) -> Vec<String> {
-        let mut names: Vec<String> = self.snapshot.tables.iter().map(|t| t.schema.clone()).collect();
+        let mut names: Vec<String> = self
+            .snapshot
+            .tables
+            .iter()
+            .map(|t| t.schema.clone())
+            .collect();
         names.sort();
         names.dedup();
         names
@@ -124,12 +133,7 @@ impl CompletionSchemaProvider for CachedSchemaProvider {
             .collect()
     }
 
-    fn jsonb_schema(
-        &self,
-        schema: Option<&str>,
-        table: &str,
-        column: &str,
-    ) -> Option<JsonbSchema> {
+    fn jsonb_schema(&self, schema: Option<&str>, table: &str, column: &str) -> Option<JsonbSchema> {
         let entry = self.find_table(schema, table)?;
         let col = entry
             .columns
@@ -169,7 +173,10 @@ impl FunctionProvider for CachedSchemaProvider {
         self.snapshot
             .functions
             .iter()
-            .map(|f| FunctionInfo::new(f.name.clone(), f.return_type.clone()).with_schema(f.schema.clone()))
+            .map(|f| {
+                FunctionInfo::new(f.name.clone(), f.return_type.clone())
+                    .with_schema(f.schema.clone())
+            })
             .collect()
     }
 }
