@@ -147,6 +147,14 @@ pub enum RuleCode {
     St01,
     /// CTE defined but never referenced.
     St03,
+    /// Subquery in `FROM`/`JOIN`; prefer a CTE.
+    St05,
+    /// Complex select expression without an alias.
+    Al03,
+    /// Table alias declared but never used as a qualifier.
+    Al05,
+    /// Inconsistent column qualification in a single-table query.
+    Rf03,
     /// `UPDATE` without `WHERE`.
     Sf01,
     /// `DELETE` without `WHERE`.
@@ -179,6 +187,10 @@ impl RuleCode {
             RuleCode::Am09 => "AM09",
             RuleCode::St01 => "ST01",
             RuleCode::St03 => "ST03",
+            RuleCode::St05 => "ST05",
+            RuleCode::Al03 => "AL03",
+            RuleCode::Al05 => "AL05",
+            RuleCode::Rf03 => "RF03",
             RuleCode::Sf01 => "SF01",
             RuleCode::Sf02 => "SF02",
             RuleCode::Jb01 => "JB01",
@@ -1841,6 +1853,60 @@ mod tests {
             core_diagnostics("SELECT CASE WHEN a THEN 1 ELSE 0 END FROM t")
                 .iter()
                 .all(|d| d.code != Some(RuleCode::St01))
+        );
+    }
+
+    #[test]
+    fn test_al03_unaliased_expression() {
+        let diags = core_diagnostics("SELECT count(*), id FROM t");
+        assert!(diags.iter().any(|d| d.code == Some(RuleCode::Al03)));
+        assert!(
+            core_diagnostics("SELECT count(*) AS total FROM t")
+                .iter()
+                .all(|d| d.code != Some(RuleCode::Al03))
+        );
+    }
+
+    #[test]
+    fn test_al05_unused_alias() {
+        assert!(
+            core_diagnostics("SELECT id FROM users a")
+                .iter()
+                .any(|d| d.code == Some(RuleCode::Al05))
+        );
+        assert!(
+            core_diagnostics("SELECT a.id FROM users a")
+                .iter()
+                .all(|d| d.code != Some(RuleCode::Al05))
+        );
+    }
+
+    #[test]
+    fn test_rf03_mixed_qualification() {
+        assert!(
+            core_diagnostics("SELECT a.id, name FROM users a")
+                .iter()
+                .any(|d| d.code == Some(RuleCode::Rf03))
+        );
+        // Multi-table query → RF03 does not apply.
+        assert!(
+            core_diagnostics("SELECT a.id, b.name FROM users a JOIN orders b ON a.id = b.id")
+                .iter()
+                .all(|d| d.code != Some(RuleCode::Rf03))
+        );
+    }
+
+    #[test]
+    fn test_st05_subquery_in_from() {
+        assert!(
+            core_diagnostics("SELECT * FROM (SELECT id FROM t) x")
+                .iter()
+                .any(|d| d.code == Some(RuleCode::St05))
+        );
+        assert!(
+            core_diagnostics("SELECT * FROM t")
+                .iter()
+                .all(|d| d.code != Some(RuleCode::St05))
         );
     }
 

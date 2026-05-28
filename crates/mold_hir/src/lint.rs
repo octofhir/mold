@@ -12,8 +12,8 @@
 
 use mold_syntax::SyntaxKind;
 use mold_syntax::ast::{
-    AstNode, BinaryExpr, DeleteStmt, Expr, FromClause, LiteralKind, SelectItem, SelectStmt,
-    TableRef, UpdateStmt,
+    AstNode, BinaryExpr, ColumnRef, DeleteStmt, Expr, FromClause, LiteralKind, SelectItem,
+    SelectStmt, TableRef, UpdateStmt,
 };
 
 use crate::analyze::{
@@ -60,12 +60,190 @@ fn apply_core_lints(root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>)
         if let Some(select) = SelectStmt::cast(node.clone()) {
             lint_limit_without_order(&select, analyzer);
             lint_set_op_modifier(&select, analyzer);
+            lint_aliasing_and_qualification(select.syntax(), analyzer);
+            lint_unaliased_select_items(&select, analyzer);
+        }
+        if let Some(update) = UpdateStmt::cast(node.clone()) {
+            lint_aliasing_and_qualification(update.syntax(), analyzer);
+        }
+        if let Some(delete) = DeleteStmt::cast(node.clone()) {
+            lint_aliasing_and_qualification(delete.syntax(), analyzer);
         }
         if node.kind() == SyntaxKind::CASE_EXPR {
             lint_redundant_else_null(&node, analyzer);
         }
+        if node.kind() == SyntaxKind::TABLE_REF {
+            lint_subquery_as_table(&node, analyzer);
+        }
     }
     lint_unused_ctes(root, analyzer);
+}
+
+/// AL05 (unused alias) and RF03 (mixed qualification) live together because
+/// they share the same scan of a statement's tables and column qualifiers.
+fn lint_aliasing_and_qualification(stmt: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    // Aliases declared in this statement (lowercased name + the alias token range).
+    let aliases: Vec<(String, text_size::TextRange)> = stmt
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::TABLE_REF)
+        .filter_map(|t| table_ref_alias(&t))
+        .map(|(name, range)| (name.to_ascii_lowercase(), range))
+        .collect();
+
+    // Qualifiers used by every column reference in the statement.
+    let qualifiers: Vec<String> = stmt
+        .descendants()
+        .filter_map(|n| ColumnRef::cast(n.clone()))
+        .filter_map(|c| c.table().map(|t| t.text().to_ascii_lowercase()))
+        .collect();
+
+    // AL05: alias declared but no column reference uses it as a qualifier.
+    for (name, range) in &aliases {
+        if !qualifiers.iter().any(|q| q == name) {
+            analyzer.emit(
+                Diagnostic::warning(format!("Table alias '{name}' is never used"))
+                    .with_code(RuleCode::Al05)
+                    .with_range(*range),
+            );
+        }
+    }
+
+    // RF03: a single-table statement either qualifies all columns or none.
+    let from = stmt
+        .descendants()
+        .find(|n| n.kind() == SyntaxKind::FROM_CLAUSE);
+    let Some(from) = from else { return };
+    let table_count = from
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::TABLE_REF)
+        .count();
+    let has_join = from
+        .descendants()
+        .any(|n| n.kind() == SyntaxKind::JOIN_EXPR);
+    if table_count != 1 || has_join {
+        return;
+    }
+    // Only column refs whose nearest enclosing SELECT_STMT is this statement,
+    // so subqueries/CTE bodies do not pollute the mixed-qualification check.
+    let col_refs: Vec<ColumnRef> = stmt
+        .descendants()
+        .filter_map(|n| ColumnRef::cast(n.clone()))
+        .filter(|c| {
+            c.syntax()
+                .ancestors()
+                .find(|a| is_statement(a.kind()))
+                .is_some_and(|a| a.text_range() == stmt.text_range())
+        })
+        .collect();
+    if col_refs.len() < 2 {
+        return;
+    }
+    let qualified = col_refs.iter().filter(|c| c.table().is_some()).count();
+    if qualified != 0 && qualified != col_refs.len() {
+        analyzer.emit(
+            Diagnostic::warning(
+                "Mixed column qualification in a single-table query; qualify all or none",
+            )
+            .with_code(RuleCode::Rf03)
+            .with_range(stmt.text_range()),
+        );
+    }
+}
+
+/// AL03 — a complex select expression should be aliased so the output column
+/// has a stable, named identity.
+fn lint_unaliased_select_items(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
+    for node in stmt.syntax().descendants() {
+        let Some(item) = SelectItem::cast(node.clone()) else { continue };
+        if has_select_item_alias(&item) {
+            continue;
+        }
+        let Some(expr) = item.expr() else { continue };
+        if needs_alias(&expr) {
+            analyzer.emit(
+                Diagnostic::warning("Complex select expression should be aliased with AS")
+                    .with_code(RuleCode::Al03)
+                    .with_range(item.syntax().text_range()),
+            );
+        }
+    }
+}
+
+fn needs_alias(expr: &Expr) -> bool {
+    !matches!(expr, Expr::ColumnRef(_) | Expr::Literal(_))
+}
+
+/// Whether a `SELECT_ITEM` carries an alias. The grammar represents both the
+/// `AS alias` and implicit `expr alias` forms as a trailing `AS_KW` / bare
+/// identifier directly under `SELECT_ITEM`, not as a separate `ALIAS` node.
+fn has_select_item_alias(item: &SelectItem) -> bool {
+    item.syntax()
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .any(|t| {
+            matches!(
+                t.kind(),
+                SyntaxKind::AS_KW | SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT
+            )
+        })
+}
+
+/// ST05 — a subquery used as a table source (a `TABLE_REF` containing a nested
+/// `SELECT_STMT`) is better expressed as a CTE.
+fn lint_subquery_as_table(table_ref: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let nested = table_ref
+        .children()
+        .any(|c| c.kind() == SyntaxKind::SELECT_STMT);
+    if !nested {
+        return;
+    }
+    analyzer.emit(
+        Diagnostic::warning(
+            "Subquery in FROM/JOIN; consider extracting it into a CTE for readability",
+        )
+        .with_code(RuleCode::St05)
+        .with_range(table_ref.text_range()),
+    );
+}
+
+/// Returns the alias `(name, range)` of a `TABLE_REF`, handling both
+/// `AS a` (an `ALIAS` node) and the implicit `users a` form (a bare second
+/// identifier that isn't part of a dotted qualifier).
+fn table_ref_alias(
+    table_ref: &mold_syntax::SyntaxNode,
+) -> Option<(String, text_size::TextRange)> {
+    // Explicit `AS alias` produces an ALIAS child whose first identifier is the
+    // name. Look for that first.
+    if let Some(alias) = table_ref
+        .children()
+        .find(|c| c.kind() == SyntaxKind::ALIAS)
+    {
+        if let Some(token) = alias
+            .descendants_with_tokens()
+            .filter_map(|e| e.into_token())
+            .find(|t| matches!(t.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT))
+        {
+            return Some((token.text().to_string(), token.text_range()));
+        }
+    }
+    // Implicit alias: count direct IDENT vs DOT tokens. An extra identifier
+    // beyond the qualified name (idents > dots + 1) is the alias.
+    let ident_info: Vec<(String, text_size::TextRange)> = table_ref
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| matches!(t.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT))
+        .map(|t| (t.text().to_string(), t.text_range()))
+        .collect();
+    let dots = table_ref
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| t.kind() == SyntaxKind::DOT)
+        .count();
+    if ident_info.len() > dots + 1 {
+        ident_info.into_iter().last()
+    } else {
+        None
+    }
 }
 
 /// ST01 — `ELSE NULL` in a `CASE` is redundant (the default result is NULL).
