@@ -1,0 +1,50 @@
+{
+  "name": "mold-vscode",
+  "displayName": "mold (PostgreSQL SQL)",
+  "description": "Diagnostics, completion, formatting and more for PostgreSQL SQL via the mold language server.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "octofhir",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/octofhir/mold"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages", "Linters", "Formatters"],
+  "activationEvents": ["onLanguage:sql"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "mold",
+      "properties": {
+        "mold.path": {
+          "type": "string",
+          "default": "mold",
+          "description": "Path to the mold executable. Defaults to `mold` on PATH."
+        },
+        "mold.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Trace the communication between VS Code and the language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}
