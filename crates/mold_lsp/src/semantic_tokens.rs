@@ -61,7 +61,7 @@ pub fn semantic_tokens(root: &SyntaxNode, index: &LineIndex) -> SemanticTokens {
         };
         let range = token.text_range();
         let start = index.position(u32::from(range.start()));
-        let length = (u32::from(range.end()) - u32::from(range.start())) as u32;
+        let length = u32::from(range.end()) - u32::from(range.start());
         // Multi-line tokens (block comments) are rare; encode against the start
         // line only, which is acceptable for highlighting.
         let line = start.line;

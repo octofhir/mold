@@ -205,8 +205,15 @@ async fn sample_jsonb_columns(
                 continue;
             }
             let value_expr = quote_ident(&col.name);
-            col.jsonb =
-                build_shape(pool, schema, &table.name, &value_expr, false, JSONB_MAX_DEPTH).await;
+            col.jsonb = build_shape(
+                pool,
+                schema,
+                &table.name,
+                &value_expr,
+                false,
+                JSONB_MAX_DEPTH,
+            )
+            .await;
         }
     }
 }
@@ -308,7 +315,9 @@ async fn collect_fields(pool: &sqlx::PgPool, sql: &str) -> Vec<(String, JsonbTyp
     for row in rows {
         let key: String = row.get("k");
         let ty: Option<String> = row.try_get("ty").ok();
-        let ty = ty.map(|t| JsonbType::from_typeof(&t)).unwrap_or(JsonbType::Null);
+        let ty = ty
+            .map(|t| JsonbType::from_typeof(&t))
+            .unwrap_or(JsonbType::Null);
         *counts.entry(key).or_default().entry(ty).or_insert(0) += 1;
     }
     counts

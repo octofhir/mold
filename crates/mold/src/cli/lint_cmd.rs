@@ -79,7 +79,10 @@ fn report_human(input: &InputFile, diags: &[Diagnostic]) {
     if diags.is_empty() {
         return;
     }
-    print!("{}", super::render::render(&input.label, &input.text, diags));
+    print!(
+        "{}",
+        super::render::render(&input.label, &input.text, diags)
+    );
 }
 
 fn report_github(input: &InputFile, diags: &[Diagnostic]) {

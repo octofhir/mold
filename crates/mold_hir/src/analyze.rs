@@ -1016,14 +1016,17 @@ pub fn analyze_query_with_options(
                         available_aliases,
                         range,
                     } => {
-                        let mut diag = Diagnostic::error(format!("Unknown table alias '{}'", alias))
-                            .with_code(RuleCode::Rf01);
+                        let mut diag =
+                            Diagnostic::error(format!("Unknown table alias '{}'", alias))
+                                .with_code(RuleCode::Rf01);
                         if let Some(r) = range {
                             diag = diag.with_range(r);
                         }
                         if !available_aliases.is_empty() {
-                            diag = diag
-                                .with_help(format!("available aliases: {}", available_aliases.join(", ")));
+                            diag = diag.with_help(format!(
+                                "available aliases: {}",
+                                available_aliases.join(", ")
+                            ));
                         }
                         analyzer.emit(diag);
                     }

@@ -148,7 +148,6 @@ impl MoldConfig {
     }
 
     /// Resolves the sqlstyle-engine formatter configuration.
-    #[must_use]
     pub fn format_config(&self) -> mold_format::FormatConfig {
         self.format.to_format_config()
     }

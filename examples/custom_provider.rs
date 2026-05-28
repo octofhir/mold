@@ -15,11 +15,16 @@ struct CustomProvider {
 
 impl CustomProvider {
     fn new() -> Self {
-        let inner = MemorySchemaProvider::new().add_table(TableInfo::new("users")).add_columns(
-            None,
-            "users",
-            vec![ColumnInfo::new("id", "integer"), ColumnInfo::new("email", "text")],
-        );
+        let inner = MemorySchemaProvider::new()
+            .add_table(TableInfo::new("users"))
+            .add_columns(
+                None,
+                "users",
+                vec![
+                    ColumnInfo::new("id", "integer"),
+                    ColumnInfo::new("email", "text"),
+                ],
+            );
         Self { inner }
     }
 }
@@ -33,7 +38,12 @@ impl SchemaProvider for CustomProvider {
         self.inner.columns(schema, table)
     }
 
-    fn jsonb_schema(&self, _schema: Option<&str>, _table: &str, _column: &str) -> Option<JsonbSchema> {
+    fn jsonb_schema(
+        &self,
+        _schema: Option<&str>,
+        _table: &str,
+        _column: &str,
+    ) -> Option<JsonbSchema> {
         None
     }
 }

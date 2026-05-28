@@ -47,7 +47,10 @@ pub fn run(args: &ParseArgs, _cli: &Cli) -> Result<u8> {
         for err in parse.errors() {
             had_errors = true;
             let (line, col) = line_col(&input.text, u32::from(err.range.start()));
-            eprintln!("{}:{}:{}: parse error: {}", input.label, line, col, err.message);
+            eprintln!(
+                "{}:{}:{}: parse error: {}",
+                input.label, line, col, err.message
+            );
         }
     }
 

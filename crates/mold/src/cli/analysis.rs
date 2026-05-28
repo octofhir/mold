@@ -22,11 +22,7 @@ pub struct Analyzed {
 /// diagnostics (unknown table/column) are false positives, so only keyed lint
 /// findings are kept. Once a schema provider is wired in, semantic diagnostics
 /// can be surfaced too.
-pub fn analyze(
-    text: &str,
-    config: &MoldConfig,
-    provider: Option<&dyn SchemaProvider>,
-) -> Analyzed {
+pub fn analyze(text: &str, config: &MoldConfig, provider: Option<&dyn SchemaProvider>) -> Analyzed {
     let parse = mold_parser::parse(text);
 
     let options = build_options(config);

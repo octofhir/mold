@@ -67,10 +67,10 @@ impl LintSettings {
         if !self.enabled {
             return false;
         }
-        if let Some(setting) = self.rules.get(code) {
-            if let Some(enabled) = setting.enabled {
-                return enabled;
-            }
+        if let Some(setting) = self.rules.get(code)
+            && let Some(enabled) = setting.enabled
+        {
+            return enabled;
         }
         if self.exclude.iter().any(|c| c == code) {
             return false;

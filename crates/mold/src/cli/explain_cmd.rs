@@ -21,11 +21,7 @@ pub fn run(args: &ExplainArgs) -> Result<u8> {
         return Ok(exit::ERROR);
     };
 
-    let fixable = if rule.fixable {
-        " (auto-fixable)"
-    } else {
-        ""
-    };
+    let fixable = if rule.fixable { " (auto-fixable)" } else { "" };
     println!("{}: {}{}\n", rule.code, rule.summary, fixable);
     println!("{}", rule.explanation);
     Ok(exit::OK)

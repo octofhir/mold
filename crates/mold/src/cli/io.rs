@@ -55,8 +55,8 @@ pub fn discovery_anchor(paths: &[PathBuf]) -> PathBuf {
 }
 
 fn read_file(path: &Path) -> Result<InputFile> {
-    let text =
-        std::fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    let text = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
     Ok(InputFile {
         label: path.display().to_string(),
         path: Some(path.to_path_buf()),

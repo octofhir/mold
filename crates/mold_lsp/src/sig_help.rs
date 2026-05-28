@@ -4,9 +4,7 @@
 //! signature with the active parameter highlighted, using built-in function
 //! metadata (and any function provider).
 
-use lsp_types::{
-    ParameterInformation, ParameterLabel, SignatureHelp, SignatureInformation,
-};
+use lsp_types::{ParameterInformation, ParameterLabel, SignatureHelp, SignatureInformation};
 use mold_completion::providers::FunctionProvider;
 use mold_syntax::{SyntaxKind, SyntaxNode};
 
@@ -61,7 +59,7 @@ fn enclosing_call(root: &SyntaxNode, offset: u32) -> Option<(SyntaxNode, u32)> {
         if node.kind() != SyntaxKind::FUNC_CALL {
             continue;
         }
-        let Some(open_end) = l_paren_end(&node) else {
+        let Some(open_end) = l_paren_end(node) else {
             continue;
         };
         let node_end = u32::from(node.text_range().end());

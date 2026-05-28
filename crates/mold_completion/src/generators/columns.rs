@@ -54,7 +54,7 @@ pub fn complete_columns(
     }
 
     // Sort by name
-    items.sort_by(|a, b| a.label.to_lowercase().cmp(&b.label.to_lowercase()));
+    items.sort_by_key(|i| i.label.to_lowercase());
 
     items
 }

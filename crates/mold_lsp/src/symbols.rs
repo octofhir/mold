@@ -16,7 +16,7 @@ pub fn document_symbols(root: &SyntaxNode, index: &LineIndex) -> Vec<DocumentSym
             continue;
         };
 
-        let target = first_table_name(&child);
+        let target = first_table_name(child);
         let name = match &target {
             Some(t) => format!("{label} {t}"),
             None => label.to_string(),
@@ -25,9 +25,9 @@ pub fn document_symbols(root: &SyntaxNode, index: &LineIndex) -> Vec<DocumentSym
         symbols.push(make_symbol(
             name,
             SymbolKind::FUNCTION,
-            &child,
+            child,
             index,
-            statement_children(&child, index),
+            statement_children(child, index),
         ));
     }
     symbols
@@ -49,13 +49,19 @@ fn statement_children(stmt: &SyntaxNode, index: &LineIndex) -> Vec<DocumentSymbo
     for node in stmt.descendants() {
         match node.kind() {
             SyntaxKind::CTE => {
-                if let Some(name) = first_ident(&node) {
-                    children.push(make_symbol(name, SymbolKind::NAMESPACE, &node, index, vec![]));
+                if let Some(name) = first_ident(node) {
+                    children.push(make_symbol(
+                        name,
+                        SymbolKind::NAMESPACE,
+                        node,
+                        index,
+                        vec![],
+                    ));
                 }
             }
             SyntaxKind::TABLE_REF => {
-                if let Some(name) = first_ident(&node) {
-                    children.push(make_symbol(name, SymbolKind::CLASS, &node, index, vec![]));
+                if let Some(name) = first_ident(node) {
+                    children.push(make_symbol(name, SymbolKind::CLASS, node, index, vec![]));
                 }
             }
             _ => {}
@@ -99,5 +105,5 @@ fn first_ident(node: &SyntaxNode) -> Option<String> {
 fn first_table_name(stmt: &SyntaxNode) -> Option<String> {
     stmt.descendants()
         .find(|n| n.kind() == SyntaxKind::TABLE_REF)
-        .and_then(|n| first_ident(&n))
+        .and_then(first_ident)
 }
