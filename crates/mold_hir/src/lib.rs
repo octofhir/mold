@@ -7,6 +7,14 @@
 //! - SELECT alias tracking for ORDER BY
 //! - JSONB column type tracking
 //!
+//! # Stability
+//!
+//! Pre-1.0. The intended public surface is the crate-root re-exports —
+//! notably `analyze_query` / `analyze_query_with_options`, `SchemaProvider`,
+//! `Diagnostic`, `RuleCode`, `Fix`, `TextEdit`, `Severity`, and the binding /
+//! resolution types. Internals of the `analyze`, `lint` and `resolve` modules
+//! may change without a semver bump.
+//!
 //! # Architecture
 //!
 //! The HIR crate is organized into several modules:
