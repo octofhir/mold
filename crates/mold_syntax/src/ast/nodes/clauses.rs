@@ -230,11 +230,11 @@ impl AstNode for JoinExpr {
 pub enum JoinType {
     /// INNER JOIN - only matching rows
     Inner,
-    /// LEFT [OUTER] JOIN - all left rows, matching right rows
+    /// LEFT \[OUTER\] JOIN - all left rows, matching right rows
     Left,
-    /// RIGHT [OUTER] JOIN - all right rows, matching left rows
+    /// RIGHT \[OUTER\] JOIN - all right rows, matching left rows
     Right,
-    /// FULL [OUTER] JOIN - all rows from both sides
+    /// FULL \[OUTER\] JOIN - all rows from both sides
     Full,
     /// CROSS JOIN - cartesian product
     Cross,
@@ -342,17 +342,17 @@ impl JoinExpr {
         self.join_type().is_inner()
     }
 
-    /// Returns true if this is a left join (LEFT [OUTER] JOIN).
+    /// Returns true if this is a left join (LEFT \[OUTER\] JOIN).
     pub fn is_left_join(&self) -> bool {
         matches!(self.join_type(), JoinType::Left)
     }
 
-    /// Returns true if this is a right join (RIGHT [OUTER] JOIN).
+    /// Returns true if this is a right join (RIGHT \[OUTER\] JOIN).
     pub fn is_right_join(&self) -> bool {
         matches!(self.join_type(), JoinType::Right)
     }
 
-    /// Returns true if this is a full join (FULL [OUTER] JOIN).
+    /// Returns true if this is a full join (FULL \[OUTER\] JOIN).
     pub fn is_full_join(&self) -> bool {
         matches!(self.join_type(), JoinType::Full)
     }

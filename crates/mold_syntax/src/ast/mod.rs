@@ -36,9 +36,9 @@
 //!
 //! # Module Structure
 //!
-//! - [`traits`] - Core `AstNode` and `AstToken` traits
-//! - [`support`] - Helper functions for node traversal
-//! - [`nodes`] - All AST node definitions organized by category
+//! - `traits` - Core `AstNode` and `AstToken` traits
+//! - `support` - Helper functions for node traversal
+//! - `nodes` - All AST node definitions organized by category
 
 mod nodes;
 mod support;

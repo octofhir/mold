@@ -1,0 +1,25 @@
+# pre-commit hooks provided by mold.
+# Consumers reference this repo in their .pre-commit-config.yaml, e.g.:
+#
+#   repos:
+#     - repo: https://github.com/octofhir/mold
+#       rev: <tag-or-sha>
+#       hooks:
+#         - id: mold-format
+#         - id: mold-lint
+#
+# Both hooks expect a `mold` binary on PATH.
+
+- id: mold-format
+  name: mold format (check)
+  description: Fail if any SQL file is not formatted.
+  entry: mold format --check
+  language: system
+  types: [sql]
+
+- id: mold-lint
+  name: mold lint
+  description: Lint staged SQL files.
+  entry: mold lint
+  language: system
+  types: [sql]
