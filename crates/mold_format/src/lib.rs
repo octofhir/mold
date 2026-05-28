@@ -3,6 +3,14 @@
 //! This crate provides SQL formatting that preserves the structure of the
 //! original code while applying consistent style rules.
 //!
+//! # Stability
+//!
+//! Pre-1.0. The intended public surface is the `format` / `format_sqlstyle` /
+//! `format_with_pgformatter` entry points, the edit helpers (`format_edits`,
+//! `format_range`, `diff_edits`, `TextEdit`) and the config types
+//! (`FormatConfig`, `PgFormatterConfig`, …). Printer internals may change
+//! without a semver bump.
+//!
 //! # Features
 //!
 //! - River alignment for keyword alignment

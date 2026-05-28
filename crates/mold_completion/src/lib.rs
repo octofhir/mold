@@ -3,6 +3,13 @@
 //! This crate provides context-aware completion that is decoupled from LSP types.
 //! It can be used to implement completion in any editor or IDE.
 //!
+//! # Stability
+//!
+//! Pre-1.0. The intended public surface is `complete` / `CompletionRequest` /
+//! `CompletionResult`, the `providers` traits (`SchemaProvider`,
+//! `FunctionProvider`) and the `types` module. Other reachable items may
+//! change without a semver bump.
+//!
 //! # Features
 //!
 //! - Table and column completion from schema providers

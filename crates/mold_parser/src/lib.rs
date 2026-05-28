@@ -3,6 +3,11 @@
 //! The parser builds a concrete syntax tree with error recovery. Consumers
 //! can inspect `Parse::errors()` while still traversing the tree.
 //!
+//! # Stability
+//!
+//! Pre-1.0. The intended public surface is the `parse` entry point; the
+//! grammar internals are not a stable API.
+//!
 //! # Usage
 //!
 //! ```ignore

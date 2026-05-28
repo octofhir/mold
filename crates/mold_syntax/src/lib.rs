@@ -3,6 +3,13 @@
 //! This crate defines syntax kinds, tokens, and the `Parse` container that
 //! wraps a CST plus parse errors.
 //!
+//! # Stability
+//!
+//! Pre-1.0. The intended public surface is the crate-root re-exports
+//! (`Parse`, `ParseError`, `SyntaxKind`, `SyntaxNode`, `SyntaxToken`, `Token`)
+//! and the `ast` module. Anything else reachable may change without a semver
+//! bump.
+//!
 //! # Usage
 //!
 //! ```ignore
