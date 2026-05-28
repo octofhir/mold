@@ -42,8 +42,19 @@ pub struct Cli {
     #[arg(long, global = true, value_name = "FILE")]
     config: Option<PathBuf>,
 
+    /// Disable colored output (also honored via the NO_COLOR env var).
+    #[arg(long, global = true)]
+    no_color: bool,
+
     #[command(subcommand)]
     command: Command,
+}
+
+impl Cli {
+    /// Whether colored output should be produced for this invocation.
+    pub fn use_color(&self) -> bool {
+        render::use_color(self.no_color)
+    }
 }
 
 #[derive(Subcommand, Debug)]
