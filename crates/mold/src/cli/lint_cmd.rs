@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Args;
 use mold_hir::{Diagnostic, Severity};
+use rayon::prelude::*;
 
 use super::io::{self, InputFile, gather_inputs, line_col};
 use super::{Cli, ReportFormat, exit};
@@ -17,6 +18,10 @@ pub struct LintArgs {
     /// Output format.
     #[arg(long, value_enum, default_value_t = ReportFormat::Human)]
     format: ReportFormat,
+
+    /// Suppress the summary line (findings are still printed).
+    #[arg(long)]
+    quiet: bool,
 }
 
 pub fn run(args: &LintArgs, cli: &Cli) -> Result<u8> {
@@ -27,37 +32,38 @@ pub fn run(args: &LintArgs, cli: &Cli) -> Result<u8> {
         .as_ref()
         .map(|p| p as &dyn mold_hir::SchemaProvider);
 
-    let mut total = 0usize;
-    // SARIF is a single aggregated document, so collect rather than stream.
-    let sarif = matches!(args.format, ReportFormat::Sarif);
-    let mut analyzed_all: Vec<(&InputFile, Vec<Diagnostic>)> = Vec::new();
+    // Analyze in parallel (the provider is Sync), then report in input order so
+    // output is deterministic and never interleaved.
+    let per_file: Vec<Vec<Diagnostic>> = inputs
+        .par_iter()
+        .map(|input| super::analysis::analyze(&input.text, &config, provider_ref).diagnostics)
+        .collect();
+    let total: usize = per_file.iter().map(Vec::len).sum();
 
-    for input in &inputs {
-        let analyzed = super::analysis::analyze(&input.text, &config, provider_ref);
-        total += analyzed.diagnostics.len();
-        if sarif {
-            analyzed_all.push((input, analyzed.diagnostics));
-        } else {
-            report(args.format, input, &analyzed.diagnostics);
-        }
-    }
-
-    if sarif {
+    let color = cli.use_color();
+    if matches!(args.format, ReportFormat::Sarif) {
+        let analyzed_all: Vec<(&InputFile, Vec<Diagnostic>)> =
+            inputs.iter().zip(per_file).collect();
         print!("{}", super::render::render_sarif(&analyzed_all));
-    } else if matches!(args.format, ReportFormat::Human) {
-        if total == 0 {
-            eprintln!("No issues found.");
-        } else {
-            eprintln!("{total} issue(s) found.");
+    } else {
+        for (input, diags) in inputs.iter().zip(&per_file) {
+            report(args.format, input, diags, color);
+        }
+        if !args.quiet && matches!(args.format, ReportFormat::Human) {
+            if total == 0 {
+                eprintln!("No issues found.");
+            } else {
+                eprintln!("{total} issue(s) found.");
+            }
         }
     }
 
     Ok(if total > 0 { exit::FINDINGS } else { exit::OK })
 }
 
-fn report(format: ReportFormat, input: &InputFile, diags: &[Diagnostic]) {
+fn report(format: ReportFormat, input: &InputFile, diags: &[Diagnostic], color: bool) {
     match format {
-        ReportFormat::Human => report_human(input, diags),
+        ReportFormat::Human => report_human(input, diags, color),
         ReportFormat::Json => report_json(input, diags),
         ReportFormat::Github => report_github(input, diags),
         // Aggregated separately in `run`.
@@ -75,13 +81,13 @@ fn severity_label(s: Severity) -> &'static str {
     }
 }
 
-fn report_human(input: &InputFile, diags: &[Diagnostic]) {
+fn report_human(input: &InputFile, diags: &[Diagnostic], color: bool) {
     if diags.is_empty() {
         return;
     }
     print!(
         "{}",
-        super::render::render(&input.label, &input.text, diags)
+        super::render::render(&input.label, &input.text, diags, color)
     );
 }
 

@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Args;
 use mold_hir::TextEdit;
+use rayon::prelude::*;
 
 use super::analysis;
 use super::io::{self, apply_edits, gather_inputs};
@@ -22,6 +23,10 @@ pub struct FixArgs {
     /// Write changes to files. Implied unless `--diff` or stdin is used.
     #[arg(long)]
     write: bool,
+
+    /// Do not print the per-file "fixed:" lines.
+    #[arg(long)]
+    quiet: bool,
 }
 
 pub fn run(args: &FixArgs, cli: &Cli) -> Result<u8> {
@@ -32,35 +37,41 @@ pub fn run(args: &FixArgs, cli: &Cli) -> Result<u8> {
         .as_ref()
         .map(|p| p as &dyn mold_hir::SchemaProvider);
 
-    let mut fixed_files = 0usize;
-    for input in &inputs {
-        let analyzed = analysis::analyze(&input.text, &config, provider_ref);
-        let edits: Vec<TextEdit> = analyzed
-            .diagnostics
-            .iter()
-            .flat_map(|d| d.fixes.iter())
-            .flat_map(|f| f.edits.iter().cloned())
-            .collect();
+    // Compute the fixed text per file in parallel; `None` means unchanged.
+    let fixed: Vec<Option<String>> = inputs
+        .par_iter()
+        .map(|input| {
+            let analyzed = analysis::analyze(&input.text, &config, provider_ref);
+            let edits: Vec<TextEdit> = analyzed
+                .diagnostics
+                .iter()
+                .flat_map(|d| d.fixes.iter())
+                .flat_map(|f| f.edits.iter().cloned())
+                .collect();
+            if edits.is_empty() {
+                return None;
+            }
+            let out = apply_edits(&input.text, edits);
+            (out != input.text).then_some(out)
+        })
+        .collect();
 
-        if edits.is_empty() {
+    let mut fixed_files = 0usize;
+    for (input, fixed) in inputs.iter().zip(&fixed) {
+        let Some(fixed) = fixed else {
+            // Nothing to fix: pass stdin through unchanged.
             if input.path.is_none() && !args.diff {
-                // Stdin passthrough when nothing to fix.
                 print!("{}", input.text);
             }
             continue;
-        }
-
-        let fixed = apply_edits(&input.text, edits);
-        if fixed == input.text {
-            continue;
-        }
+        };
         fixed_files += 1;
 
         if args.diff {
-            print_diff(&input.label, &input.text, &fixed);
+            print_diff(&input.label, &input.text, fixed);
         } else if let Some(path) = &input.path {
-            if args.write || !args.diff {
-                std::fs::write(path, &fixed)?;
+            std::fs::write(path, fixed)?;
+            if !args.quiet {
                 eprintln!("fixed: {}", input.label);
             }
         } else {

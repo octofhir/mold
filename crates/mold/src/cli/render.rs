@@ -22,10 +22,19 @@ fn level_of(severity: Severity) -> Level {
     }
 }
 
+/// Whether colored output should be used: a TTY, `NO_COLOR` unset, and not
+/// explicitly disabled by the caller.
+pub fn use_color(force_no_color: bool) -> bool {
+    if force_no_color || std::env::var_os("NO_COLOR").is_some() {
+        return false;
+    }
+    std::io::stdout().is_terminal()
+}
+
 /// Renders all diagnostics for one source file as a single string.
 #[must_use]
-pub fn render(origin: &str, source: &str, diagnostics: &[Diagnostic]) -> String {
-    let renderer = if std::io::stdout().is_terminal() {
+pub fn render(origin: &str, source: &str, diagnostics: &[Diagnostic], color: bool) -> String {
+    let renderer = if color {
         Renderer::styled()
     } else {
         Renderer::plain()

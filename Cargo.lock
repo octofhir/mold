@@ -1037,6 +1037,7 @@ dependencies = [
  "mold_parser",
  "mold_schema",
  "mold_syntax",
+ "rayon",
  "sqlparser",
  "text-size",
  "tokio",
