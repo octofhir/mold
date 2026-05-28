@@ -68,6 +68,42 @@ is redundant. Removed automatically.
   good: CASE WHEN x THEN 1 END",
     },
     RuleDoc {
+        code: "ST05",
+        fixable: false,
+        summary: "Subquery in FROM/JOIN; prefer a CTE",
+        explanation: "\
+A subquery embedded in `FROM` or `JOIN` is harder to read and reuse than the
+same query factored into a `WITH` clause. Extract it into a CTE.",
+    },
+    RuleDoc {
+        code: "AL03",
+        fixable: false,
+        summary: "Complex select expression should be aliased",
+        explanation: "\
+A select target that is a function call, arithmetic expression, CASE, etc. has
+no inherent name, so the resulting column gets an opaque auto-generated label.
+Name it with `AS`.
+
+  bad:  SELECT count(*) FROM t
+  good: SELECT count(*) AS total FROM t",
+    },
+    RuleDoc {
+        code: "AL05",
+        fixable: false,
+        summary: "Table alias declared but never used",
+        explanation: "\
+The query introduces a table alias that no column reference uses to qualify a
+name. Drop the alias, or use it.",
+    },
+    RuleDoc {
+        code: "RF03",
+        fixable: false,
+        summary: "Inconsistent column qualification in a single-table query",
+        explanation: "\
+Within a single-table query, either qualify every column with the table/alias
+or qualify none. Mixing the two makes the code noisy and inconsistent.",
+    },
+    RuleDoc {
         code: "ST03",
         fixable: false,
         summary: "CTE is defined but never used",
@@ -191,7 +227,7 @@ pub(crate) fn find(code: &str) -> Option<&'static RuleDoc> {
 
 pub fn run() -> Result<u8> {
     println!(
-        "Prefixes: AM = ambiguity, ST = structure, SF = safety, JB = JSONB, CV = convention, CP = capitalisation, RF = references\n"
+        "Prefixes: AL = aliasing, AM = ambiguity, ST = structure, SF = safety, JB = JSONB, CV = convention, CP = capitalisation, RF = references\n"
     );
     println!("{:<6} {:<8} {}", "CODE", "FIXABLE", "DESCRIPTION");
     for r in RULES {

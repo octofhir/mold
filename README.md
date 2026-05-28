@@ -80,12 +80,15 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 
 | Code | Fixable | Description |
 |------|---------|-------------|
+| AL03 | —       | Complex select expression should be aliased with `AS` |
+| AL05 | —       | Table alias declared but never used |
 | AM02 | —       | Set operators (`UNION`/`EXCEPT`/`INTERSECT`) should state `ALL`/`DISTINCT` |
 | AM04 | yes\*   | Avoid `SELECT *`; expand to columns (\*fix needs schema) |
 | AM05 | —       | Implicit cross join; use an explicit `JOIN` |
 | AM09 | —       | `LIMIT`/`OFFSET` without `ORDER BY` is non-deterministic |
 | ST01 | yes     | Redundant `ELSE NULL` in `CASE` |
 | ST03 | —       | CTE defined but never used |
+| ST05 | —       | Subquery in `FROM`/`JOIN`; prefer a CTE |
 | SF01 | —       | `UPDATE` without `WHERE` affects all rows |
 | SF02 | —       | `DELETE` without `WHERE` affects all rows |
 | JB01 | yes     | Use `->>` when comparing a JSONB value to text |
@@ -96,9 +99,10 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 | CP02 | yes     | Unquoted identifiers should be lower case |
 | RF01 | —       | Unknown table/column/alias (needs schema) |
 | RF02 | —       | Ambiguous column; qualify it (needs schema) |
+| RF03 | —       | Inconsistent column qualification in a single-table query |
 
-Prefixes: `AM` ambiguity, `ST` structure, `SF` safety, `JB` JSONB, `CV`
-convention, `CP` capitalisation, `RF` references.
+Prefixes: `AL` aliasing, `AM` ambiguity, `ST` structure, `SF` safety, `JB`
+JSONB, `CV` convention, `CP` capitalisation, `RF` references.
 
 `mold fix` applies every available autofix; `mold explain <CODE>` prints the
 rationale and a before/after example. Reference checks (RF\*) only run when a
