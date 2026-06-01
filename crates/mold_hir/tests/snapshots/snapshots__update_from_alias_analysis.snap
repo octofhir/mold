@@ -1,9 +1,10 @@
 ---
 source: crates/mold_hir/tests/snapshots.rs
+assertion_line: 196
 expression: render_analysis(&analysis)
 ---
 diagnostics:
-- <none>
+- Warning | Table alias 'o' should be introduced with AS | 45..46
 tables:
 - <none>
 columns:

@@ -45,7 +45,10 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         &ambiguity::ImplicitCrossJoin,
         &ambiguity::SetOpModifier,
         &ambiguity::LimitWithoutOrder,
+        &ambiguity::OrderByDirection,
         // Aliasing / references (Core)
+        &aliasing::TableAliasAs,
+        &aliasing::ColumnAliasAs,
         &aliasing::UnaliasedSelectItem,
         &aliasing::AliasingAndQualification,
         // Structure (Core)
@@ -63,6 +66,7 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         &convention::NeSpelling,
         &convention::NullComparison,
         &convention::MissingSemicolons,
+        &convention::RightJoin,
     ]
 }
 

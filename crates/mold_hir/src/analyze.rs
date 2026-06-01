@@ -143,12 +143,18 @@ pub enum RuleCode {
     Am02,
     /// `LIMIT`/`OFFSET` without `ORDER BY` (non-deterministic).
     Am09,
+    /// `ORDER BY` mixes explicit and implicit sort directions.
+    Am03,
     /// Redundant `ELSE NULL` in a `CASE` expression.
     St01,
     /// CTE defined but never referenced.
     St03,
     /// Subquery in `FROM`/`JOIN`; prefer a CTE.
     St05,
+    /// Table alias defined without the `AS` keyword.
+    Al01,
+    /// Column/expression alias defined without the `AS` keyword.
+    Al02,
     /// Complex select expression without an alias.
     Al03,
     /// Table alias declared but never used as a qualifier.
@@ -167,6 +173,8 @@ pub enum RuleCode {
     Cv05,
     /// Statement not terminated with a semicolon.
     Cv06,
+    /// `RIGHT JOIN` used where a `LEFT JOIN` reads more naturally.
+    Cv08,
     /// Keyword capitalisation.
     Cp01,
     /// Unquoted identifier capitalisation.
@@ -185,6 +193,9 @@ impl RuleCode {
             RuleCode::Am05 => "AM05",
             RuleCode::Am02 => "AM02",
             RuleCode::Am09 => "AM09",
+            RuleCode::Am03 => "AM03",
+            RuleCode::Al01 => "AL01",
+            RuleCode::Al02 => "AL02",
             RuleCode::St01 => "ST01",
             RuleCode::St03 => "ST03",
             RuleCode::St05 => "ST05",
@@ -197,6 +208,7 @@ impl RuleCode {
             RuleCode::Cv01 => "CV01",
             RuleCode::Cv05 => "CV05",
             RuleCode::Cv06 => "CV06",
+            RuleCode::Cv08 => "CV08",
             RuleCode::Cp01 => "CP01",
             RuleCode::Cp02 => "CP02",
             RuleCode::Rf01 => "RF01",

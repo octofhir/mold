@@ -1,0 +1,47 @@
+# AL01/AL02 explicit-AS aliasing, AM03 order direction, CV08 right join.
+
+- name: table_alias_without_as_flagged_and_fixed
+  rule: AL01
+  fail: "SELECT x FROM users u"
+  fix: "SELECT x FROM users AS u"
+
+- name: table_alias_with_as_ok
+  rule: AL01
+  pass: "SELECT x FROM users AS u"
+
+- name: table_without_alias_ok
+  rule: AL01
+  pass: "SELECT x FROM users"
+
+- name: column_alias_without_as_flagged_and_fixed
+  rule: AL02
+  fail: "SELECT a b FROM t"
+  fix: "SELECT a AS b FROM t"
+
+- name: column_alias_with_as_ok
+  rule: AL02
+  pass: "SELECT a AS b FROM t"
+
+- name: plain_columns_ok
+  rule: AL02
+  pass: "SELECT a, b FROM t"
+
+- name: mixed_order_directions_flagged
+  rule: AM03
+  fail: "SELECT x FROM t ORDER BY a, b DESC"
+
+- name: all_implicit_order_ok
+  rule: AM03
+  pass: "SELECT x FROM t ORDER BY a, b"
+
+- name: all_explicit_order_ok
+  rule: AM03
+  pass: "SELECT x FROM t ORDER BY a ASC, b DESC"
+
+- name: right_join_flagged
+  rule: CV08
+  fail: "SELECT x FROM a RIGHT JOIN b ON a.id = b.id"
+
+- name: left_join_ok
+  rule: CV08
+  pass: "SELECT x FROM a LEFT JOIN b ON a.id = b.id"
