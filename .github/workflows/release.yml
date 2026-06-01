@@ -1,0 +1,99 @@
+name: Release (rolling)
+
+# Every push to main rebuilds the `mold` binary for each platform and republishes
+# them under a single moving pre-release tagged `latest`. No manual versioning:
+# the release name carries the short commit SHA so each build is identifiable.
+
+on:
+  push:
+    branches: [main]
+
+# Only the newest main build matters; cancel any in-flight one.
+concurrency:
+  group: release-rolling
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          - os: macos-13
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Build
+        run: cargo build --release -p mold --features db --target ${{ matrix.target }}
+      - name: Package (unix)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          staging="mold-${{ matrix.target }}"
+          mkdir "$staging"
+          cp "target/${{ matrix.target }}/release/mold" "$staging/"
+          cp README.md LICENSE "$staging/" 2>/dev/null || true
+          tar czf "$staging.tar.gz" "$staging"
+      - name: Package (windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $staging = "mold-${{ matrix.target }}"
+          New-Item -ItemType Directory -Path $staging | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/mold.exe" $staging
+          Copy-Item README.md, LICENSE $staging -ErrorAction SilentlyContinue
+          Compress-Archive -Path $staging -DestinationPath "$staging.zip"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mold-${{ matrix.target }}
+          path: |
+            mold-${{ matrix.target }}.tar.gz
+            mold-${{ matrix.target }}.zip
+          if-no-files-found: ignore
+
+  publish:
+    name: publish rolling release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish to `latest` release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Rolling build (${{ github.sha }})"
+          body: |
+            Rolling pre-release built from `main` at ${{ github.sha }}.
+            Overwritten on every push to `main` — not a stable version.
+          prerelease: true
+          make_latest: false
+          files: dist/*
