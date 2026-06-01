@@ -2,12 +2,14 @@
 //!
 //! Each rule is a zero-sized type implementing [`Rule`]. A rule walks the CST
 //! (and, where useful, consults the analyzer's resolved scope) and emits
-//! [`Diagnostic`]s tagged with a stable [`RuleCode`]. Rules that can
-//! mechanically repair the source attach a [`Fix`].
+//! [`Diagnostic`](crate::analyze::Diagnostic)s tagged with a stable
+//! [`RuleCode`]. Rules that can mechanically repair the source attach a
+//! [`Fix`](crate::analyze::Fix).
 //!
-//! Rules are grouped into [`BuiltinLintPack`]s; [`apply_lints`] runs every rule
-//! whose pack is enabled. New rules are added by implementing [`Rule`] and
-//! listing the value in [`builtin_rules`] — no central dispatch to edit.
+//! Rules are grouped into [`BuiltinLintPack`]s;
+//! `apply_lints` runs every rule whose pack is enabled. New rules are added by
+//! implementing [`Rule`] and listing the value in `builtin_rules` — no central
+//! dispatch to edit.
 //!
 //! Rule code prefixes: `AM` ambiguity · `AL` aliasing · `ST` structure ·
 //! `SF` safety · `RF` references · `CV` convention · `CP` capitalisation ·
