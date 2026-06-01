@@ -1,0 +1,46 @@
+# CV** convention, CP** capitalisation, and JB** JSONB rules.
+
+- name: ne_bang_equals_flagged_and_fixed
+  rule: CV01
+  fail: "SELECT id FROM users WHERE a != 1"
+  fix: "SELECT id FROM users WHERE a <> 1"
+
+- name: ne_angle_ok
+  rule: CV01
+  pass: "SELECT id FROM users WHERE a <> 1"
+
+- name: null_equality_flagged_and_fixed
+  rule: CV05
+  fail: "SELECT id FROM users WHERE a = NULL"
+  fix: "SELECT id FROM users WHERE a IS NULL"
+
+- name: is_null_ok
+  rule: CV05
+  pass: "SELECT id FROM users WHERE a IS NULL"
+
+- name: missing_semicolon_flagged_and_fixed
+  rule: CV06
+  fail: "SELECT id FROM users"
+  fix: "SELECT id FROM users;"
+
+- name: terminated_statement_ok
+  rule: CV06
+  pass: "SELECT id FROM users;"
+
+- name: lowercase_keyword_flagged_and_fixed
+  rule: CP01
+  fail: "select id from users;"
+  fix: "SELECT id FROM users;"
+
+- name: upper_keyword_ok
+  rule: CP01
+  pass: "SELECT id FROM users;"
+
+- name: jsonb_text_comparison_flagged_and_fixed
+  rule: JB01
+  fail: "SELECT id FROM t WHERE data -> 'k' = 'v'"
+  fix: "SELECT id FROM t WHERE data ->> 'k' = 'v'"
+
+- name: jsonb_text_arrow_ok
+  rule: JB01
+  pass: "SELECT id FROM t WHERE data ->> 'k' = 'v'"

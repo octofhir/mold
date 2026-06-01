@@ -1,0 +1,46 @@
+# ST** structure and SF** safety rules.
+
+- name: redundant_else_null_flagged_and_fixed
+  rule: ST01
+  fail: "SELECT CASE WHEN x THEN 1 ELSE NULL END FROM t"
+  fix: "SELECT CASE WHEN x THEN 1 END FROM t"
+
+- name: case_without_else_ok
+  rule: ST01
+  pass: "SELECT CASE WHEN x THEN 1 END FROM t"
+
+- name: case_else_value_ok
+  rule: ST01
+  pass: "SELECT CASE WHEN x THEN 1 ELSE 2 END FROM t"
+
+- name: unused_cte_flagged
+  rule: ST03
+  fail: "WITH unused AS (SELECT 1) SELECT id FROM users"
+
+- name: used_cte_ok
+  rule: ST03
+  pass: "WITH c AS (SELECT 1 AS n) SELECT n FROM c"
+
+- name: subquery_as_table_flagged
+  rule: ST05
+  fail: "SELECT x FROM (SELECT 1 AS x) sub"
+
+- name: plain_table_ok
+  rule: ST05
+  pass: "SELECT id FROM users"
+
+- name: update_without_where_flagged
+  rule: SF01
+  fail: "UPDATE users SET name = 'x'"
+
+- name: update_with_where_ok
+  rule: SF01
+  pass: "UPDATE users SET name = 'x' WHERE id = 1"
+
+- name: delete_without_where_flagged
+  rule: SF02
+  fail: "DELETE FROM users"
+
+- name: delete_with_where_ok
+  rule: SF02
+  pass: "DELETE FROM users WHERE id = 1"
