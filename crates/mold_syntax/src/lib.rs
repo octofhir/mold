@@ -34,6 +34,10 @@ use text_size::{TextRange, TextSize};
 pub type SyntaxNode = ResolvedNode<SyntaxKind>;
 pub type SyntaxToken = ResolvedToken<SyntaxKind>;
 
+/// A node-or-token element of the syntax tree (re-exported for consumers that
+/// walk `descendants_with_tokens` without depending on `cstree` directly).
+pub use cstree::util::NodeOrToken;
+
 #[must_use]
 #[derive(Clone)]
 pub struct Parse {

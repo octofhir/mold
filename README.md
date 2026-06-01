@@ -110,6 +110,26 @@ JSONB, `CV` convention, `CP` capitalisation, `RF` references.
 rationale and a before/after example. Reference checks (RF\*) only run when a
 schema is available, so they never produce false positives offline.
 
+### Suppressing diagnostics inline
+
+A `noqa` comment silences findings without touching `mold.toml`. It uses the
+familiar `-- noqa` convention, so existing suppressions carry over:
+
+```sql
+SELECT * FROM t;              -- noqa               suppress everything on this line
+SELECT * FROM t;              -- noqa: AM04         suppress only AM04 on this line
+SELECT * FROM t;              -- noqa: AM,RF01      a group prefix or explicit codes
+
+-- range form: suppress until a matching enable (or end of file)
+SELECT * FROM a;              -- noqa: disable=AM04
+SELECT * FROM b;              --   (AM04 stays silent here)
+SELECT * FROM c;              -- noqa: enable=AM04
+```
+
+Use `disable=all` / `enable=all` to gate every rule. Suppression is applied by
+the engine, so the LSP honours it too. An alphabetic token (`AM`) matches every
+code in that family; a full code (`AM04`) matches only itself.
+
 ## Schema-aware features
 
 With `[database]` configured and a `db` build, mold introspects

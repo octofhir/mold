@@ -1201,7 +1201,10 @@ pub fn analyze_query_with_options(
     // Final pass: lint rules (non-fatal quality/safety diagnostics)
     crate::lint::apply_lints(&root, &mut analyzer, options);
 
-    analyzer.finish(scope, Vec::new())
+    let mut analysis = analyzer.finish(scope, Vec::new());
+    // Honour inline `-- noqa` suppression comments.
+    crate::noqa::apply(&root, &mut analysis.diagnostics);
+    analysis
 }
 
 fn build_root_scope(
