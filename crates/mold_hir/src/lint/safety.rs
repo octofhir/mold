@@ -1,6 +1,7 @@
 //! Safety rules (Core pack): `SF01` `UPDATE` without `WHERE`, `SF02` `DELETE`
 //! without `WHERE`.
 
+use mold_syntax::SyntaxKind;
 use mold_syntax::ast::{AstNode, DeleteStmt, UpdateStmt};
 
 use super::Rule;
@@ -42,6 +43,55 @@ impl Rule for DeleteWithoutWhere {
             }
         }
     }
+}
+
+/// SF03 — `INSERT` without an explicit column list.
+pub(super) struct InsertWithoutColumns;
+
+impl Rule for InsertWithoutColumns {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Sf03]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Core
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::INSERT_STMT {
+                lint_insert_without_columns(node, analyzer);
+            }
+        }
+    }
+}
+
+/// SF03 — `INSERT INTO t VALUES (...)` binds values positionally, so adding,
+/// dropping or reordering a column silently corrupts the insert. List the
+/// target columns explicitly. `DEFAULT VALUES` is exempt.
+fn lint_insert_without_columns(stmt: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    if stmt
+        .children()
+        .any(|c| c.kind() == SyntaxKind::INSERT_COLUMNS)
+    {
+        return;
+    }
+    // `INSERT INTO t DEFAULT VALUES` names no columns by design.
+    let has_default = stmt
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .any(|t| t.kind() == SyntaxKind::DEFAULT_KW);
+    if has_default {
+        return;
+    }
+    let range = stmt
+        .children()
+        .find(|c| c.kind() == SyntaxKind::TABLE_REF)
+        .map(|t| t.text_range())
+        .unwrap_or_else(|| stmt.text_range());
+    analyzer.emit(
+        Diagnostic::warning("INSERT without an explicit column list binds values positionally")
+            .with_code(RuleCode::Sf03)
+            .with_range(range),
+    );
 }
 
 /// SF01 — `UPDATE` without `WHERE` rewrites every row.

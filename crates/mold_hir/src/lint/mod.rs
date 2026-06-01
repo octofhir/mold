@@ -24,6 +24,7 @@ mod ambiguity;
 mod capitalisation;
 mod convention;
 mod jsonb;
+mod references;
 mod safety;
 mod structure;
 
@@ -57,9 +58,14 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         &structure::RedundantElseNull,
         &structure::SubqueryAsTable,
         &structure::UnusedCtes,
+        &structure::NaturalJoin,
+        &structure::DistinctOnWithoutOrder,
+        // References (Core)
+        &references::UnnecessaryQuotes,
         // Safety (Core)
         &safety::UpdateWithoutWhere,
         &safety::DeleteWithoutWhere,
+        &safety::InsertWithoutColumns,
         // JSONB
         &jsonb::JsonbTextComparison,
         // Capitalisation
@@ -69,6 +75,7 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         &convention::NullComparison,
         &convention::MissingSemicolons,
         &convention::RightJoin,
+        &convention::LikeWithoutWildcard,
     ]
 }
 

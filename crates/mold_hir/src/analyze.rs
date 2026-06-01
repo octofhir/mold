@@ -151,6 +151,10 @@ pub enum RuleCode {
     St03,
     /// Subquery in `FROM`/`JOIN`; prefer a CTE.
     St05,
+    /// `NATURAL JOIN` relies on implicit, fragile join columns.
+    St07,
+    /// `DISTINCT ON` without `ORDER BY` is non-deterministic.
+    St08,
     /// Table alias defined without the `AS` keyword.
     Al01,
     /// Column/expression alias defined without the `AS` keyword.
@@ -165,6 +169,8 @@ pub enum RuleCode {
     Sf01,
     /// `DELETE` without `WHERE`.
     Sf02,
+    /// `INSERT` without an explicit column list.
+    Sf03,
     /// JSONB text comparison via `->`.
     Jb01,
     /// Inconsistent `!=` / `<>` spelling.
@@ -175,6 +181,8 @@ pub enum RuleCode {
     Cv06,
     /// `RIGHT JOIN` used where a `LEFT JOIN` reads more naturally.
     Cv08,
+    /// `LIKE` with no wildcard behaves like `=`.
+    Cv10,
     /// Keyword capitalisation.
     Cp01,
     /// Unquoted identifier capitalisation.
@@ -183,6 +191,8 @@ pub enum RuleCode {
     Rf01,
     /// Ambiguous column reference (needs schema).
     Rf02,
+    /// Identifier quoted unnecessarily.
+    Rf06,
 }
 
 impl RuleCode {
@@ -199,20 +209,25 @@ impl RuleCode {
             RuleCode::St01 => "ST01",
             RuleCode::St03 => "ST03",
             RuleCode::St05 => "ST05",
+            RuleCode::St07 => "ST07",
+            RuleCode::St08 => "ST08",
             RuleCode::Al03 => "AL03",
             RuleCode::Al05 => "AL05",
             RuleCode::Rf03 => "RF03",
             RuleCode::Sf01 => "SF01",
             RuleCode::Sf02 => "SF02",
+            RuleCode::Sf03 => "SF03",
             RuleCode::Jb01 => "JB01",
             RuleCode::Cv01 => "CV01",
             RuleCode::Cv05 => "CV05",
             RuleCode::Cv06 => "CV06",
             RuleCode::Cv08 => "CV08",
+            RuleCode::Cv10 => "CV10",
             RuleCode::Cp01 => "CP01",
             RuleCode::Cp02 => "CP02",
             RuleCode::Rf01 => "RF01",
             RuleCode::Rf02 => "RF02",
+            RuleCode::Rf06 => "RF06",
         }
     }
 
