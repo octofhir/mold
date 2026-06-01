@@ -4,8 +4,8 @@ assertion_line: 176
 expression: render_analysis(&analysis)
 ---
 diagnostics:
-- Error | Table 'missing_table' does not exist | 14..27
 - Warning | Avoid SELECT *; list columns explicitly | 7..9
+- Error | Table 'missing_table' does not exist | 14..27
 tables:
 - <none>
 columns:

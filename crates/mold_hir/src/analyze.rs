@@ -1202,6 +1202,17 @@ pub fn analyze_query_with_options(
     crate::lint::apply_lints(&root, &mut analyzer, options);
 
     let mut analysis = analyzer.finish(scope, Vec::new());
+    // Rules run in registry order, so sort diagnostics into source order for a
+    // deterministic, rule-order-independent result. Ties break on the rule
+    // code so output is fully stable.
+    analysis.diagnostics.sort_by(|a, b| {
+        let key = |d: &Diagnostic| {
+            let start = d.range.map(|r| u32::from(r.start())).unwrap_or(u32::MAX);
+            let end = d.range.map(|r| u32::from(r.end())).unwrap_or(u32::MAX);
+            (start, end, d.code.map(|c| c.as_str()).unwrap_or(""))
+        };
+        key(a).cmp(&key(b))
+    });
     // Honour inline `-- noqa` suppression comments.
     crate::noqa::apply(&root, &mut analysis.diagnostics);
     analysis
