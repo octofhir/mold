@@ -15,7 +15,9 @@ the latest stable Rust toolchain.
   `ORDER BY` directions), CV08 (prefer `LEFT JOIN`), CV10 (`LIKE` without a
   wildcard, fixable), ST07 (avoid `NATURAL JOIN`), ST08 (`DISTINCT ON` without
   `ORDER BY`), SF03 (`INSERT` without a column list), RF06 (unnecessary
-  identifier quotes, fixable) — 27 lint codes total.
+  identifier quotes, fixable), AL04 (duplicate table alias), AL08 (duplicate
+  column alias), AM01 (`DISTINCT` redundant with `GROUP BY`), CV04
+  (`count(1)`/`count(0)` → `count(*)`, fixable) — 31 lint codes total.
 - **Placeholder templating** (`mold_templater`): substitute `:name`, `?` and
   `%(name)s` placeholders (configurable via `[templater] style`) so app SQL
   parses and lints; diagnostics map back to the source and fixes that would

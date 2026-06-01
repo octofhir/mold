@@ -141,6 +141,8 @@ pub enum RuleCode {
     Am05,
     /// `UNION`/`EXCEPT`/`INTERSECT` without explicit `ALL`/`DISTINCT`.
     Am02,
+    /// `DISTINCT` is redundant alongside `GROUP BY`.
+    Am01,
     /// `LIMIT`/`OFFSET` without `ORDER BY` (non-deterministic).
     Am09,
     /// `ORDER BY` mixes explicit and implicit sort directions.
@@ -161,8 +163,12 @@ pub enum RuleCode {
     Al02,
     /// Complex select expression without an alias.
     Al03,
+    /// Two tables in one statement share an alias.
+    Al04,
     /// Table alias declared but never used as a qualifier.
     Al05,
+    /// Two select items share an output alias.
+    Al08,
     /// Inconsistent column qualification in a single-table query.
     Rf03,
     /// `UPDATE` without `WHERE`.
@@ -175,6 +181,8 @@ pub enum RuleCode {
     Jb01,
     /// Inconsistent `!=` / `<>` spelling.
     Cv01,
+    /// `count(1)`/`count(0)` where `count(*)` is idiomatic.
+    Cv04,
     /// Relational operator used to compare with NULL.
     Cv05,
     /// Statement not terminated with a semicolon.
@@ -202,6 +210,7 @@ impl RuleCode {
             RuleCode::Am04 => "AM04",
             RuleCode::Am05 => "AM05",
             RuleCode::Am02 => "AM02",
+            RuleCode::Am01 => "AM01",
             RuleCode::Am09 => "AM09",
             RuleCode::Am03 => "AM03",
             RuleCode::Al01 => "AL01",
@@ -212,13 +221,16 @@ impl RuleCode {
             RuleCode::St07 => "ST07",
             RuleCode::St08 => "ST08",
             RuleCode::Al03 => "AL03",
+            RuleCode::Al04 => "AL04",
             RuleCode::Al05 => "AL05",
+            RuleCode::Al08 => "AL08",
             RuleCode::Rf03 => "RF03",
             RuleCode::Sf01 => "SF01",
             RuleCode::Sf02 => "SF02",
             RuleCode::Sf03 => "SF03",
             RuleCode::Jb01 => "JB01",
             RuleCode::Cv01 => "CV01",
+            RuleCode::Cv04 => "CV04",
             RuleCode::Cv05 => "CV05",
             RuleCode::Cv06 => "CV06",
             RuleCode::Cv08 => "CV08",
