@@ -5,7 +5,7 @@ use mold_syntax::SyntaxKind;
 use mold_syntax::ast::{AstNode, FromClause, SelectItem, SelectStmt, TableRef};
 
 use super::Rule;
-use crate::analyze::{Analyzer, BuiltinLintPack, Diagnostic, Fix, RuleCode, TextEdit};
+use crate::analyze::{Analyzer, BuiltinLintPack, Diagnostic, Fix, RelatedInfo, RuleCode, TextEdit};
 
 /// AM04 — `SELECT *`.
 pub(super) struct SelectStar;
@@ -83,6 +83,59 @@ impl Rule for LimitWithoutOrder {
     }
 }
 
+/// AM03 — `ORDER BY` should set a direction on every term or none.
+pub(super) struct OrderByDirection;
+
+impl Rule for OrderByDirection {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Am03]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Core
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::ORDER_BY_CLAUSE {
+                lint_order_by_direction(node, analyzer);
+            }
+        }
+    }
+}
+
+/// AM03 — once any `ORDER BY` term is given an explicit `ASC`/`DESC`, leaving
+/// the others implicit is ambiguous; state the direction on all of them.
+fn lint_order_by_direction(clause: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let items: Vec<_> = clause
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::ORDER_BY_ITEM)
+        .collect();
+    if items.len() < 2 {
+        return;
+    }
+    let has_dir = |item: &mold_syntax::SyntaxNode| {
+        item.children_with_tokens()
+            .filter_map(|e| e.into_token())
+            .any(|t| matches!(t.kind(), SyntaxKind::ASC_KW | SyntaxKind::DESC_KW))
+    };
+    let explicit = items.iter().filter(|i| has_dir(i)).count();
+    // Consistent when all or none specify a direction.
+    if explicit == 0 || explicit == items.len() {
+        return;
+    }
+    let mut diag = Diagnostic::warning(
+        "Inconsistent ORDER BY directions; specify ASC/DESC on every term or none",
+    )
+    .with_code(RuleCode::Am03)
+    .with_range(clause.text_range());
+    for item in items.iter().filter(|i| !has_dir(i)) {
+        diag = diag.with_related(RelatedInfo {
+            message: "this term has no explicit direction".to_string(),
+            range: Some(item.text_range()),
+        });
+    }
+    analyzer.emit(diag);
+}
+
 fn lint_select_star(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
     let expansion = single_table_column_list(stmt, analyzer);
     for node in stmt.syntax().descendants() {
@@ -143,18 +196,26 @@ fn lint_implicit_cross_join(from: &FromClause, analyzer: &mut Analyzer<'_>) {
     if from.table_refs().count() < 2 {
         return;
     }
-    let has_top_level_comma = from
+    // Point the primary span at the offending comma (the implicit join
+    // operator) and mark each joined table as related, rustc-style.
+    let Some(comma) = from
         .syntax()
         .children_with_tokens()
         .filter_map(|c| c.into_token())
-        .any(|t| t.kind() == SyntaxKind::COMMA);
-    if has_top_level_comma {
-        analyzer.emit(
-            Diagnostic::warning("Implicit cross join; use an explicit JOIN clause")
-                .with_code(RuleCode::Am05)
-                .with_range(from.syntax().text_range()),
-        );
+        .find(|t| t.kind() == SyntaxKind::COMMA)
+    else {
+        return;
+    };
+    let mut diag = Diagnostic::warning("Implicit cross join; use an explicit JOIN clause")
+        .with_code(RuleCode::Am05)
+        .with_range(comma.text_range());
+    for table in from.table_refs().take(2) {
+        diag = diag.with_related(RelatedInfo {
+            message: "table joined here".to_string(),
+            range: Some(table.syntax().text_range()),
+        });
     }
+    analyzer.emit(diag);
 }
 
 /// AM02 — a set operator should state `ALL` or `DISTINCT` explicitly.

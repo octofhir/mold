@@ -60,6 +60,42 @@ impl Rule for MissingSemicolons {
     }
 }
 
+/// CV08 — prefer `LEFT JOIN` over `RIGHT JOIN`.
+pub(super) struct RightJoin;
+
+impl Rule for RightJoin {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Cv08]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Convention
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::JOIN_EXPR {
+                lint_right_join(node, analyzer);
+            }
+        }
+    }
+}
+
+/// CV08 — a `RIGHT JOIN` can always be rewritten as a `LEFT JOIN` by swapping
+/// the operands, which most readers find easier to follow.
+fn lint_right_join(join: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let Some(right_kw) = join
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .find(|t| t.kind() == SyntaxKind::RIGHT_KW)
+    else {
+        return;
+    };
+    analyzer.emit(
+        Diagnostic::warning("Prefer LEFT JOIN over RIGHT JOIN; swap the joined tables")
+            .with_code(RuleCode::Cv08)
+            .with_range(right_kw.text_range()),
+    );
+}
+
 /// CV01 — prefer `<>` over the `!=` spelling.
 fn lint_ne_spelling(expr: &BinaryExpr, analyzer: &mut Analyzer<'_>) {
     let Some(op) = expr.op_token() else { return };

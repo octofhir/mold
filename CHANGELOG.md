@@ -8,6 +8,18 @@ the latest stable Rust toolchain.
 
 ### Added
 
+- **Inline suppression** (`mold_hir`): `-- noqa` comments suppress diagnostics
+  per line or across `disable=`/`enable=` ranges (codes, alphabetic group
+  prefixes, or `all`); applied in the engine so the CLI and LSP both honour it.
+- **Lint rules**: AL01/AL02 (explicit `AS` aliasing, fixable), AM03 (consistent
+  `ORDER BY` directions), CV08 (prefer `LEFT JOIN`) — 22 lint codes total.
+- **Rule registry** (`mold_hir`): a `Rule` trait with a `builtin_rules()`
+  registry replaces hardcoded dispatch; diagnostics are emitted in source order.
+- **Declarative rule fixtures**: `tests/rule_cases/*.yaml` drive pass/fail/fix
+  assertions per rule code.
+- **Distribution**: rolling pre-release of the `mold` binary (built with the
+  `db` feature) for Linux/macOS/Windows on every push to `main`.
+
 - **Configuration** (`mold_config`): unified `mold.toml` schema covering the
   formatter, linter, completion and database connection, with walk-up
   discovery and an env-var-based connection string.

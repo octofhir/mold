@@ -57,6 +57,18 @@ Without `ORDER BY`, `LIMIT`/`OFFSET` return an arbitrary subset of rows that can
 change between runs. Add an `ORDER BY` to make the result deterministic.",
     },
     RuleDoc {
+        code: "AM03",
+        fixable: false,
+        summary: "ORDER BY mixes explicit and implicit sort directions",
+        explanation: "\
+Once one `ORDER BY` term states `ASC`/`DESC`, omitting it on the others is
+ambiguous — readers cannot tell whether the default was intended. State a
+direction on every term or on none.
+
+  bad:  ORDER BY a, b DESC
+  good: ORDER BY a ASC, b DESC",
+    },
+    RuleDoc {
         code: "ST01",
         fixable: true,
         summary: "Redundant ELSE NULL in CASE",
@@ -74,6 +86,28 @@ is redundant. Removed automatically.
         explanation: "\
 A subquery embedded in `FROM` or `JOIN` is harder to read and reuse than the
 same query factored into a `WITH` clause. Extract it into a CTE.",
+    },
+    RuleDoc {
+        code: "AL01",
+        fixable: true,
+        summary: "Table alias should be introduced with AS",
+        explanation: "\
+An implicit table alias (`users u`) is easy to misread as two separate tables.
+Spelling it `users AS u` is unambiguous. Inserted automatically.
+
+  bad:  SELECT u.id FROM users u
+  good: SELECT u.id FROM users AS u",
+    },
+    RuleDoc {
+        code: "AL02",
+        fixable: true,
+        summary: "Column alias should be introduced with AS",
+        explanation: "\
+An implicit column alias (`a b`) reads like a typo or a missing comma. Spelling
+it `a AS b` is unambiguous. Inserted automatically.
+
+  bad:  SELECT total t FROM s
+  good: SELECT total AS t FROM s",
     },
     RuleDoc {
         code: "AL03",
@@ -172,6 +206,18 @@ the right-hand side.
         explanation: "\
 A trailing semicolon terminates each statement, avoiding ambiguity when
 statements are concatenated. Added automatically.",
+    },
+    RuleDoc {
+        code: "CV08",
+        fixable: false,
+        summary: "Prefer LEFT JOIN over RIGHT JOIN",
+        explanation: "\
+A `RIGHT JOIN` can always be rewritten as a `LEFT JOIN` by swapping the joined
+tables, which keeps the reading order (left-to-right) aligned with the join
+direction and is easier to follow.
+
+  bad:  FROM a RIGHT JOIN b ON a.id = b.a_id
+  good: FROM b LEFT JOIN a ON a.id = b.a_id",
     },
     RuleDoc {
         code: "CP01",

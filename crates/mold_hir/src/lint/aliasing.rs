@@ -5,7 +5,45 @@ use mold_syntax::SyntaxKind;
 use mold_syntax::ast::{AstNode, ColumnRef, Expr, SelectItem, SelectStmt};
 
 use super::{Rule, is_statement};
-use crate::analyze::{Analyzer, BuiltinLintPack, Diagnostic, RuleCode};
+use crate::analyze::{Analyzer, BuiltinLintPack, Diagnostic, Fix, RuleCode, TextEdit};
+
+/// AL01 — a table alias should be introduced with `AS`.
+pub(super) struct TableAliasAs;
+
+impl Rule for TableAliasAs {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Al01]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Core
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::TABLE_REF {
+                lint_table_alias_as(node, analyzer);
+            }
+        }
+    }
+}
+
+/// AL02 — a column/expression alias should be introduced with `AS`.
+pub(super) struct ColumnAliasAs;
+
+impl Rule for ColumnAliasAs {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Al02]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Core
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if let Some(item) = SelectItem::cast(node.clone()) {
+                lint_column_alias_as(&item, analyzer);
+            }
+        }
+    }
+}
 
 /// AL03 — a complex select expression should be aliased.
 pub(super) struct UnaliasedSelectItem;
@@ -69,6 +107,72 @@ fn lint_unaliased_select_items(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
 
 fn needs_alias(expr: &Expr) -> bool {
     !matches!(expr, Expr::ColumnRef(_) | Expr::Literal(_))
+}
+
+/// AL01 — a `TABLE_REF` carrying an implicit alias (`users u`) reads better as
+/// `users AS u`. Fixable by inserting the keyword.
+fn lint_table_alias_as(table_ref: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let Some((name, range)) = table_ref_alias(table_ref) else {
+        return;
+    };
+    // Explicit `AS` anywhere in the table ref means the alias is already keyed.
+    let has_as = table_ref
+        .descendants_with_tokens()
+        .filter_map(|e| e.into_token())
+        .any(|t| t.kind() == SyntaxKind::AS_KW);
+    if has_as {
+        return;
+    }
+    analyzer.emit(
+        Diagnostic::warning(format!("Table alias '{name}' should be introduced with AS"))
+            .with_code(RuleCode::Al01)
+            .with_range(range)
+            .with_fix(Fix::new(
+                "Insert AS",
+                vec![TextEdit::replace(
+                    text_size::TextRange::empty(range.start()),
+                    "AS ",
+                )],
+            )),
+    );
+}
+
+/// AL02 — a `SELECT_ITEM` with an implicit alias (`a b`) reads better as
+/// `a AS b`. Fixable by inserting the keyword before the alias.
+fn lint_column_alias_as(item: &SelectItem, analyzer: &mut Analyzer<'_>) {
+    let direct_tokens: Vec<_> = item
+        .syntax()
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .collect();
+    // An `AS` already present means the alias is keyed.
+    if direct_tokens.iter().any(|t| t.kind() == SyntaxKind::AS_KW) {
+        return;
+    }
+    // A bare trailing identifier directly under the item is the implicit alias
+    // (the aliased expression itself lives in a child node, e.g. COLUMN_REF).
+    let Some(alias) = direct_tokens
+        .iter()
+        .find(|t| matches!(t.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT))
+    else {
+        return;
+    };
+    let range = alias.text_range();
+    analyzer.emit(
+        Diagnostic::warning(format!(
+            "Column alias '{}' should be introduced with AS",
+            alias.text()
+        ))
+        .with_code(RuleCode::Al02)
+        .with_range(range)
+        .with_fix(Fix::new(
+            "Insert AS",
+            vec![TextEdit::replace(
+                text_size::TextRange::empty(range.start()),
+                "AS ",
+            )],
+        )),
+    );
 }
 
 /// Whether a `SELECT_ITEM` carries an alias. The grammar represents both the

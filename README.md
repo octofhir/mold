@@ -82,9 +82,12 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 
 | Code | Fixable | Description |
 |------|---------|-------------|
+| AL01 | yes     | Table alias should be introduced with `AS` |
+| AL02 | yes     | Column/expression alias should be introduced with `AS` |
 | AL03 | —       | Complex select expression should be aliased with `AS` |
 | AL05 | —       | Table alias declared but never used |
 | AM02 | —       | Set operators (`UNION`/`EXCEPT`/`INTERSECT`) should state `ALL`/`DISTINCT` |
+| AM03 | —       | `ORDER BY` mixes explicit and implicit sort directions |
 | AM04 | yes\*   | Avoid `SELECT *`; expand to columns (\*fix needs schema) |
 | AM05 | —       | Implicit cross join; use an explicit `JOIN` |
 | AM09 | —       | `LIMIT`/`OFFSET` without `ORDER BY` is non-deterministic |

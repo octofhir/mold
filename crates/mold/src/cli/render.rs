@@ -51,10 +51,21 @@ pub fn render(origin: &str, source: &str, diagnostics: &[Diagnostic], color: boo
         let start = start.min(source.len());
         let end = end.min(source.len()).max(start);
 
-        let snippet = Snippet::source(source)
+        let mut snippet = Snippet::source(source)
             .origin(origin)
             .fold(true)
             .annotation(level.span(start..end).label(&diag.message));
+
+        // Render related info that points into the same source as secondary
+        // caret spans (rustc-style "note: ... defined here"). Related entries
+        // without a range fall through to a footer below.
+        for rel in &diag.related {
+            if let Some(r) = rel.range {
+                let rs = (u32::from(r.start()) as usize).min(source.len());
+                let re = (u32::from(r.end()) as usize).min(source.len()).max(rs);
+                snippet = snippet.annotation(Level::Info.span(rs..re).label(&rel.message));
+            }
+        }
 
         let mut message = level.title(&diag.message).snippet(snippet);
         if let Some(code) = diag.code {
@@ -67,10 +78,25 @@ pub fn render(origin: &str, source: &str, diagnostics: &[Diagnostic], color: boo
             message = message.footer(help_note);
         }
 
+        // Related info without a span becomes a plain note line.
+        for rel in diag.related.iter().filter(|rel| rel.range.is_none()) {
+            message = message.footer(Level::Note.title(rel.message.as_str()));
+        }
+
+        let fix_text;
         let fix_note;
-        if !diag.fixes.is_empty() {
-            fix_note = Level::Note.title("a fix is available; run `mold fix`");
+        if let Some(fix) = diag.fixes.first() {
+            fix_text = format!("{} — run `mold fix`", fix.title);
+            fix_note = Level::Note.title(&fix_text);
             message = message.footer(fix_note);
+        }
+
+        let explain_text;
+        let explain_note;
+        if let Some(code) = diag.code {
+            explain_text = format!("run `mold explain {}` for details", code.as_str());
+            explain_note = Level::Note.title(&explain_text);
+            message = message.footer(explain_note);
         }
 
         out.push_str(&renderer.render(message).to_string());
