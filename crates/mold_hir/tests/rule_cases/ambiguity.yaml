@@ -1,0 +1,39 @@
+# AM** ambiguity rules.
+
+- name: select_star_flagged
+  rule: AM04
+  fail: "SELECT * FROM users"
+
+- name: explicit_columns_ok
+  rule: AM04
+  pass: "SELECT id, name FROM users"
+
+- name: star_expands_to_columns_with_schema
+  rule: AM04
+  schema: true
+  fail: "SELECT * FROM users"
+  fix: "SELECT id, name, active FROM users"
+
+- name: implicit_cross_join_flagged
+  rule: AM05
+  fail: "SELECT a.x FROM a, b"
+
+- name: explicit_join_ok
+  rule: AM05
+  pass: "SELECT a.x FROM a JOIN b ON a.id = b.a_id"
+
+- name: union_without_modifier_flagged
+  rule: AM02
+  fail: "SELECT 1 UNION SELECT 2"
+
+- name: union_all_ok
+  rule: AM02
+  pass: "SELECT 1 UNION ALL SELECT 2"
+
+- name: limit_without_order_flagged
+  rule: AM09
+  fail: "SELECT id FROM users LIMIT 10"
+
+- name: limit_with_order_ok
+  rule: AM09
+  pass: "SELECT id FROM users ORDER BY id LIMIT 10"

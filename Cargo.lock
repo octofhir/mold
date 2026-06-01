@@ -865,6 +865,8 @@ checksum = "0ad4bb2b565bca0645f4d68c5c9af97fba094e9791da685bf83cb5f3ce74acf2"
 dependencies = [
  "equivalent",
  "hashbrown 0.16.1",
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -1084,6 +1086,8 @@ dependencies = [
  "insta",
  "mold_parser",
  "mold_syntax",
+ "noyalib",
+ "serde",
  "text-size",
 ]
 
@@ -1147,6 +1151,22 @@ dependencies = [
  "insta",
  "phf",
  "text-size",
+]
+
+[[package]]
+name = "noyalib"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c4d40221dba649ed01664957d3e0248511fa7b01fd2fb77e6b9041593258f6e"
+dependencies = [
+ "indexmap",
+ "itoa",
+ "memchr",
+ "rustc-hash",
+ "ryu",
+ "serde",
+ "serde_ignored",
+ "smallvec",
 ]
 
 [[package]]
@@ -1680,6 +1700,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "serde_ignored"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "115dffd5f3853e06e746965a20dcbae6ee747ae30b543d91b0e089668bb07798"
+dependencies = [
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
