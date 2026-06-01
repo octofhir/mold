@@ -13,5 +13,6 @@ description = "Unified, serde-based configuration for the mold SQL toolchain."
 serde = { workspace = true }
 toml = { workspace = true }
 mold_format = { workspace = true }
+mold_templater = { workspace = true }
 
 [dev-dependencies]

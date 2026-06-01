@@ -53,7 +53,7 @@ pub fn run(args: &LintArgs, cli: &Cli) -> Result<u8> {
             if total == 0 {
                 eprintln!("No issues found.");
             } else {
-                eprintln!("{total} issue(s) found.");
+                eprintln!("{}", summary_line(per_file.iter().flatten()));
             }
         }
     }
@@ -69,6 +69,31 @@ fn report(format: ReportFormat, input: &InputFile, diags: &[Diagnostic], color: 
         // Aggregated separately in `run`.
         ReportFormat::Sarif => {}
     }
+}
+
+/// A rustc-style summary, e.g. `found 1 error, 2 warnings`, counting findings
+/// by severity instead of a flat `N issue(s)` total.
+fn summary_line<'a>(diags: impl Iterator<Item = &'a Diagnostic>) -> String {
+    let (mut errors, mut warnings, mut notes) = (0usize, 0usize, 0usize);
+    for d in diags {
+        match d.severity {
+            Severity::Error => errors += 1,
+            Severity::Warning => warnings += 1,
+            _ => notes += 1,
+        }
+    }
+    let plural = |n: usize, word: &str| format!("{n} {word}{}", if n == 1 { "" } else { "s" });
+    let mut parts = Vec::new();
+    if errors > 0 {
+        parts.push(plural(errors, "error"));
+    }
+    if warnings > 0 {
+        parts.push(plural(warnings, "warning"));
+    }
+    if notes > 0 {
+        parts.push(plural(notes, "note"));
+    }
+    format!("found {}", parts.join(", "))
 }
 
 fn severity_label(s: Severity) -> &'static str {

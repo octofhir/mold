@@ -23,7 +23,15 @@ pub struct Analyzed {
 /// findings are kept. Once a schema provider is wired in, semantic diagnostics
 /// can be surfaced too.
 pub fn analyze(text: &str, config: &MoldConfig, provider: Option<&dyn SchemaProvider>) -> Analyzed {
-    let parse = mold_parser::parse(text);
+    // Substitute placeholders first, when a templater style is configured, so
+    // parameterised SQL parses. Diagnostics are mapped back to `text` below.
+    let templated = config
+        .templater
+        .style
+        .map(|style| mold_templater::render(text, style));
+    let input: &str = templated.as_ref().map_or(text, |t| t.text());
+
+    let parse = mold_parser::parse(input);
 
     let options = build_options(config);
     let null = NullSchemaProvider;
@@ -57,6 +65,26 @@ pub fn analyze(text: &str, config: &MoldConfig, provider: Option<&dyn SchemaProv
     // Surface syntax errors alongside lint findings so they render too.
     for err in parse.errors() {
         diagnostics.push(Diagnostic::error(err.message.clone()).with_range(err.range));
+    }
+
+    // Translate ranges from the rendered text back to the original source, and
+    // drop any fix that would edit across a substituted placeholder.
+    if let Some(t) = &templated {
+        for d in &mut diagnostics {
+            if let Some(range) = d.range {
+                d.range = Some(t.map_range(range));
+            }
+            for related in &mut d.related {
+                related.range = related.range.map(|r| t.map_range(r));
+            }
+            d.fixes
+                .retain(|fix| fix.edits.iter().all(|e| !t.touches_placeholder(e.range)));
+            for fix in &mut d.fixes {
+                for edit in &mut fix.edits {
+                    edit.range = t.map_range(edit.range);
+                }
+            }
+        }
     }
 
     Analyzed { diagnostics }

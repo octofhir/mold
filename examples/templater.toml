@@ -1,0 +1,5 @@
+# Example config for examples/templater.sql.
+# Enables placeholder substitution so parameterised SQL can be linted.
+
+[templater]
+style = "colon"   # colon | question-mark | percent

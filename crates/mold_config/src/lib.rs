@@ -39,6 +39,7 @@ pub use format::{
     PgFormatSettings, StylePreset,
 };
 pub use lint::{LintSettings, RuleSetting, SeverityLevel};
+pub use mold_templater::PlaceholderStyle;
 
 /// Standard config file name discovered by [`MoldConfig::discover`].
 pub const CONFIG_FILE_NAME: &str = "mold.toml";
@@ -73,6 +74,23 @@ pub struct MoldConfig {
     pub lint: LintSettings,
     pub completion: CompletionSettings,
     pub database: DatabaseSettings,
+    pub templater: TemplaterSettings,
+}
+
+/// Placeholder templating settings.
+///
+/// When `style` is set, parameter placeholders are substituted before parsing
+/// so that app SQL (`:name`, `?`, `%(name)s`) can be linted. Off by default.
+///
+/// ```toml
+/// [templater]
+/// style = "colon"   # colon | question-mark | percent
+/// ```
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", default)]
+pub struct TemplaterSettings {
+    /// The placeholder syntax to substitute; `None` disables templating.
+    pub style: Option<mold_templater::PlaceholderStyle>,
 }
 
 /// Errors raised while loading configuration.

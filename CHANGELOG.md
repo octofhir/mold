@@ -13,6 +13,11 @@ the latest stable Rust toolchain.
   prefixes, or `all`); applied in the engine so the CLI and LSP both honour it.
 - **Lint rules**: AL01/AL02 (explicit `AS` aliasing, fixable), AM03 (consistent
   `ORDER BY` directions), CV08 (prefer `LEFT JOIN`) — 22 lint codes total.
+- **Placeholder templating** (`mold_templater`): substitute `:name`, `?` and
+  `%(name)s` placeholders (configurable via `[templater] style`) so app SQL
+  parses and lints; diagnostics map back to the source and fixes that would
+  edit a placeholder are dropped. Native `$1`/`$name` and placeholders in
+  strings/comments are left untouched.
 - **Rule registry** (`mold_hir`): a `Rule` trait with a `builtin_rules()`
   registry replaces hardcoded dispatch; diagnostics are emitted in source order.
 - **Declarative rule fixtures**: `tests/rule_cases/*.yaml` drive pass/fail/fix
