@@ -133,6 +133,22 @@ Use `disable=all` / `enable=all` to gate every rule. Suppression is applied by
 the engine, so the LSP honours it too. An alphabetic token (`AM`) matches every
 code in that family; a full code (`AM04`) matches only itself.
 
+## Templating
+
+Application SQL often contains parameter placeholders that are not valid
+PostgreSQL on their own (`:name`, `?`, `%(name)s`). Enable the templater to
+substitute them before parsing so the statement still lints; findings map back
+to the original text and the placeholders survive `mold fix` untouched.
+
+```toml
+[templater]
+style = "colon"        # colon (:name / :1) | question-mark (?) | percent (%s, %(name)s)
+```
+
+Native Postgres parameters (`$1`, `$name`) are already valid and are never
+touched, and placeholders inside strings, dollar-quotes and comments are left
+alone. See [`examples/templater.sql`](examples/templater.sql).
+
 ## Schema-aware features
 
 With `[database]` configured and a `db` build, mold introspects

@@ -55,6 +55,7 @@ mold_hir.workspace = true
 mold_completion.workspace = true
 mold_format.workspace = true
 mold_config.workspace = true
+mold_templater.workspace = true
 mold_schema.workspace = true
 mold_lsp.workspace = true
 clap = { workspace = true }

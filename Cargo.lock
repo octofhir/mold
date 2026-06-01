@@ -1039,6 +1039,7 @@ dependencies = [
  "mold_parser",
  "mold_schema",
  "mold_syntax",
+ "mold_templater",
  "rayon",
  "sqlparser",
  "text-size",
@@ -1062,6 +1063,7 @@ name = "mold_config"
 version = "0.1.0"
 dependencies = [
  "mold_format",
+ "mold_templater",
  "serde",
  "toml",
 ]
@@ -1150,6 +1152,14 @@ dependencies = [
  "cstree",
  "insta",
  "phf",
+ "text-size",
+]
+
+[[package]]
+name = "mold_templater"
+version = "0.1.0"
+dependencies = [
+ "serde",
  "text-size",
 ]
 

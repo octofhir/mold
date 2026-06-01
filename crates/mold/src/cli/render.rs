@@ -51,10 +51,13 @@ pub fn render(origin: &str, source: &str, diagnostics: &[Diagnostic], color: boo
         let start = start.min(source.len());
         let end = end.min(source.len()).max(start);
 
+        // Primary span carries no label: the message is already on the title
+        // line, so repeating it under the caret is noise. Secondary (related)
+        // spans below DO carry labels, since they add new information.
         let mut snippet = Snippet::source(source)
             .origin(origin)
             .fold(true)
-            .annotation(level.span(start..end).label(&diag.message));
+            .annotation(level.span(start..end));
 
         // Render related info that points into the same source as secondary
         // caret spans (rustc-style "note: ... defined here"). Related entries
@@ -91,17 +94,31 @@ pub fn render(origin: &str, source: &str, diagnostics: &[Diagnostic], color: boo
             message = message.footer(fix_note);
         }
 
-        let explain_text;
-        let explain_note;
-        if let Some(code) = diag.code {
-            explain_text = format!("run `mold explain {}` for details", code.as_str());
-            explain_note = Level::Note.title(&explain_text);
-            message = message.footer(explain_note);
-        }
-
         out.push_str(&renderer.render(message).to_string());
         out.push('\n');
     }
+
+    // rustc-style trailer: list each distinct rule code once and point at
+    // `mold explain` for the first, instead of repeating a hint per finding.
+    let mut codes: Vec<&'static str> = Vec::new();
+    for diag in diagnostics {
+        if let Some(code) = diag.code {
+            let code = code.as_str();
+            if !codes.contains(&code) {
+                codes.push(code);
+            }
+        }
+    }
+    if let Some(first) = codes.first() {
+        let summary = format!(
+            "Some lints have detailed explanations: {}.\nFor more information, try `mold explain {}`.",
+            codes.join(", "),
+            first
+        );
+        out.push_str(&renderer.render(Level::Note.title(&summary)).to_string());
+        out.push('\n');
+    }
+
     out
 }
 
