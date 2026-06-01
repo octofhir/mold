@@ -1,0 +1,60 @@
+# RF06 quoting, ST07 natural join, ST08 distinct on, SF03 insert columns,
+# CV10 like-without-wildcard.
+
+- name: unnecessary_quotes_flagged_and_fixed
+  rule: RF06
+  fail: 'SELECT "id" FROM t'
+  fix: "SELECT id FROM t"
+
+- name: mixed_case_quotes_ok
+  rule: RF06
+  pass: 'SELECT "myCol" FROM t'
+
+- name: keyword_quotes_ok
+  rule: RF06
+  pass: 'SELECT "select" FROM t'
+
+- name: natural_join_flagged
+  rule: ST07
+  fail: "SELECT x FROM a NATURAL JOIN b"
+
+- name: explicit_join_ok
+  rule: ST07
+  pass: "SELECT x FROM a JOIN b ON a.id = b.id"
+
+- name: distinct_on_without_order_flagged
+  rule: ST08
+  fail: "SELECT DISTINCT ON (a) a, b FROM t"
+
+- name: distinct_on_with_order_ok
+  rule: ST08
+  pass: "SELECT DISTINCT ON (a) a, b FROM t ORDER BY a"
+
+- name: plain_distinct_ok
+  rule: ST08
+  pass: "SELECT DISTINCT a FROM t"
+
+- name: insert_without_columns_flagged
+  rule: SF03
+  fail: "INSERT INTO t VALUES (1, 2)"
+
+- name: insert_with_columns_ok
+  rule: SF03
+  pass: "INSERT INTO t (a, b) VALUES (1, 2)"
+
+- name: insert_default_values_ok
+  rule: SF03
+  pass: "INSERT INTO t DEFAULT VALUES"
+
+- name: like_without_wildcard_flagged_and_fixed
+  rule: CV10
+  fail: "SELECT x FROM t WHERE a LIKE 'foo'"
+  fix: "SELECT x FROM t WHERE a = 'foo'"
+
+- name: like_with_wildcard_ok
+  rule: CV10
+  pass: "SELECT x FROM t WHERE a LIKE 'fo%'"
+
+- name: ilike_ok
+  rule: CV10
+  pass: "SELECT x FROM t WHERE a ILIKE 'foo'"

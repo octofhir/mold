@@ -88,6 +88,30 @@ A subquery embedded in `FROM` or `JOIN` is harder to read and reuse than the
 same query factored into a `WITH` clause. Extract it into a CTE.",
     },
     RuleDoc {
+        code: "ST07",
+        fixable: false,
+        summary: "Avoid NATURAL JOIN",
+        explanation: "\
+`NATURAL JOIN` joins on every column the two tables happen to share by name, so
+adding or renaming a column silently changes the join. State the columns with
+`ON` or `USING`.
+
+  bad:  FROM a NATURAL JOIN b
+  good: FROM a JOIN b ON a.id = b.a_id",
+    },
+    RuleDoc {
+        code: "ST08",
+        fixable: false,
+        summary: "DISTINCT ON without ORDER BY is non-deterministic",
+        explanation: "\
+`DISTINCT ON (...)` keeps one row per group, but which row survives is arbitrary
+unless an `ORDER BY` pins it down. Add an `ORDER BY` covering the `DISTINCT ON`
+expressions.
+
+  bad:  SELECT DISTINCT ON (user_id) * FROM events
+  good: SELECT DISTINCT ON (user_id) * FROM events ORDER BY user_id, ts DESC",
+    },
+    RuleDoc {
         code: "AL01",
         fixable: true,
         summary: "Table alias should be introduced with AS",
@@ -169,6 +193,18 @@ truly intend to remove every row (in which case TRUNCATE is usually clearer).
   safe:  DELETE FROM sessions WHERE expires_at < now();",
     },
     RuleDoc {
+        code: "SF03",
+        fixable: false,
+        summary: "INSERT without an explicit column list",
+        explanation: "\
+`INSERT INTO t VALUES (...)` binds values to columns positionally, so adding,
+dropping or reordering a column silently corrupts the insert. List the target
+columns. `INSERT ... DEFAULT VALUES` is exempt.
+
+  risky: INSERT INTO patient VALUES (1, 'Ann');
+  safe:  INSERT INTO patient (id, name) VALUES (1, 'Ann');",
+    },
+    RuleDoc {
         code: "JB01",
         fixable: true,
         summary: "Use ->> when comparing a JSONB value to text",
@@ -220,6 +256,18 @@ direction and is easier to follow.
   good: FROM b LEFT JOIN a ON a.id = b.a_id",
     },
     RuleDoc {
+        code: "CV10",
+        fixable: true,
+        summary: "LIKE without a wildcard is just =",
+        explanation: "\
+A `LIKE` pattern with no `%` or `_` matches exactly one string, so it is an
+equality test written the slow way. `=` is clearer and index-friendly. Only
+plain `LIKE` is rewritten (`ILIKE`/`NOT LIKE` differ from `=`).
+
+  bad:  WHERE status LIKE 'active'
+  good: WHERE status = 'active'",
+    },
+    RuleDoc {
         code: "CP01",
         fixable: true,
         summary: "Keywords should be upper case",
@@ -263,6 +311,19 @@ ambiguous. Qualify it with the table name or alias.
 
   bad:  SELECT id FROM patient JOIN orders ON ...
   good: SELECT patient.id FROM patient JOIN orders ON ...",
+    },
+    RuleDoc {
+        code: "RF06",
+        fixable: true,
+        summary: "Identifier quoted unnecessarily",
+        explanation: "\
+Double quotes only matter when the identifier would otherwise be folded or
+rejected — mixed case, special characters, or a reserved word. A plain
+lower-case name does not need them, and the quotes just add noise. Removed
+automatically.
+
+  bad:  SELECT \"id\" FROM \"patient\"
+  good: SELECT id FROM patient",
     },
 ];
 

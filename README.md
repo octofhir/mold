@@ -94,17 +94,23 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 | ST01 | yes     | Redundant `ELSE NULL` in `CASE` |
 | ST03 | —       | CTE defined but never used |
 | ST05 | —       | Subquery in `FROM`/`JOIN`; prefer a CTE |
+| ST07 | —       | Avoid `NATURAL JOIN`; state the join columns |
+| ST08 | —       | `DISTINCT ON` without `ORDER BY` is non-deterministic |
 | SF01 | —       | `UPDATE` without `WHERE` affects all rows |
 | SF02 | —       | `DELETE` without `WHERE` affects all rows |
+| SF03 | —       | `INSERT` without an explicit column list |
 | JB01 | yes     | Use `->>` when comparing a JSONB value to text |
 | CV01 | yes     | Use `<>` instead of `!=` for inequality |
 | CV05 | yes     | Compare with NULL using `IS NULL` / `IS NOT NULL` |
 | CV06 | yes     | Statements should end with a semicolon |
+| CV08 | —       | Prefer `LEFT JOIN` over `RIGHT JOIN` |
+| CV10 | yes     | `LIKE` without a wildcard is just `=` |
 | CP01 | yes     | Keywords should be upper case |
 | CP02 | yes     | Unquoted identifiers should be lower case |
 | RF01 | —       | Unknown table/column/alias (needs schema) |
 | RF02 | —       | Ambiguous column; qualify it (needs schema) |
 | RF03 | —       | Inconsistent column qualification in a single-table query |
+| RF06 | yes     | Identifier quoted unnecessarily |
 
 Prefixes: `AL` aliasing, `AM` ambiguity, `ST` structure, `SF` safety, `JB`
 JSONB, `CV` convention, `CP` capitalisation, `RF` references.

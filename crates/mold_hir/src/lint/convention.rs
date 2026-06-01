@@ -60,6 +60,69 @@ impl Rule for MissingSemicolons {
     }
 }
 
+/// CV10 — `LIKE` with no wildcard behaves like `=`.
+pub(super) struct LikeWithoutWildcard;
+
+impl Rule for LikeWithoutWildcard {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Cv10]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Convention
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::LIKE_EXPR {
+                lint_like_without_wildcard(node, analyzer);
+            }
+        }
+    }
+}
+
+/// CV10 — a plain `LIKE` whose pattern has no `%`/`_` wildcard is just an
+/// equality test; `=` says so and lets the planner use an index. Only plain
+/// `LIKE` (not `ILIKE`/`NOT LIKE`) is rewritten, since `=` differs otherwise.
+fn lint_like_without_wildcard(expr: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let tokens: Vec<_> = expr
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .collect();
+    if tokens
+        .iter()
+        .any(|t| matches!(t.kind(), SyntaxKind::ILIKE_KW | SyntaxKind::NOT_KW))
+    {
+        return;
+    }
+    let Some(like) = tokens.iter().find(|t| t.kind() == SyntaxKind::LIKE_KW) else {
+        return;
+    };
+    // The pattern is a string literal somewhere in the right operand.
+    let Some(string) = expr
+        .descendants_with_tokens()
+        .filter_map(|e| e.into_token())
+        .find(|t| t.kind() == SyntaxKind::STRING)
+    else {
+        return;
+    };
+    let text = string.text();
+    let inner = text
+        .strip_prefix('\'')
+        .and_then(|t| t.strip_suffix('\''))
+        .unwrap_or(text);
+    if inner.contains('%') || inner.contains('_') {
+        return;
+    }
+    analyzer.emit(
+        Diagnostic::warning("LIKE without a wildcard is equivalent to =; use = instead")
+            .with_code(RuleCode::Cv10)
+            .with_range(like.text_range())
+            .with_fix(Fix::new(
+                "Replace LIKE with =",
+                vec![TextEdit::replace(like.text_range(), "=")],
+            )),
+    );
+}
+
 /// CV08 — prefer `LEFT JOIN` over `RIGHT JOIN`.
 pub(super) struct RightJoin;
 

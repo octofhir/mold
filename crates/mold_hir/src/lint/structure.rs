@@ -59,6 +59,94 @@ impl Rule for UnusedCtes {
     }
 }
 
+/// ST07 — `NATURAL JOIN` relies on implicit shared-name columns.
+pub(super) struct NaturalJoin;
+
+impl Rule for NaturalJoin {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::St07]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Core
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::JOIN_EXPR {
+                lint_natural_join(node, analyzer);
+            }
+        }
+    }
+}
+
+/// ST08 — `DISTINCT ON` without `ORDER BY`.
+pub(super) struct DistinctOnWithoutOrder;
+
+impl Rule for DistinctOnWithoutOrder {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::St08]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Core
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::SELECT_STMT {
+                lint_distinct_on_without_order(node, analyzer);
+            }
+        }
+    }
+}
+
+/// ST07 — `NATURAL JOIN` joins on every column that happens to share a name, so
+/// adding a column silently changes the join. Spell the condition with `ON`.
+fn lint_natural_join(join: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let Some(natural) = join
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .find(|t| t.kind() == SyntaxKind::NATURAL_KW)
+    else {
+        return;
+    };
+    analyzer.emit(
+        Diagnostic::warning("Avoid NATURAL JOIN; state the join columns with ON or USING")
+            .with_code(RuleCode::St07)
+            .with_range(natural.text_range()),
+    );
+}
+
+/// ST08 — `DISTINCT ON (...)` keeps one row per group, but which row is
+/// arbitrary unless an `ORDER BY` pins it down.
+fn lint_distinct_on_without_order(stmt: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let tokens: Vec<_> = stmt
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| !t.kind().is_trivia())
+        .collect();
+    let distinct = tokens
+        .iter()
+        .position(|t| t.kind() == SyntaxKind::DISTINCT_KW);
+    let Some(d) = distinct else { return };
+    // `DISTINCT ON`: the next token after DISTINCT is ON.
+    if tokens.get(d + 1).map(|t| t.kind()) != Some(SyntaxKind::ON_KW) {
+        return;
+    }
+    if stmt
+        .children()
+        .any(|c| c.kind() == SyntaxKind::ORDER_BY_CLAUSE)
+    {
+        return;
+    }
+    let range = text_size::TextRange::new(
+        tokens[d].text_range().start(),
+        tokens[d + 1].text_range().end(),
+    );
+    analyzer.emit(
+        Diagnostic::warning("DISTINCT ON without ORDER BY keeps an arbitrary row from each group")
+            .with_code(RuleCode::St08)
+            .with_range(range),
+    );
+}
+
 /// ST01 — `ELSE NULL` in a `CASE` is redundant (the default result is NULL).
 fn lint_redundant_else_null(case: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
     let Some(else_body) = case.children().find(|c| c.kind() == SyntaxKind::CASE_ELSE) else {
