@@ -49,6 +49,7 @@
 pub mod analyze;
 pub mod binding;
 pub mod lint;
+pub mod noqa;
 pub mod resolve;
 pub mod scope;
 
