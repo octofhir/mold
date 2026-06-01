@@ -49,11 +49,14 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         &ambiguity::SetOpModifier,
         &ambiguity::LimitWithoutOrder,
         &ambiguity::OrderByDirection,
+        &ambiguity::DistinctWithGroupBy,
         // Aliasing / references (Core)
         &aliasing::TableAliasAs,
         &aliasing::ColumnAliasAs,
         &aliasing::UnaliasedSelectItem,
         &aliasing::AliasingAndQualification,
+        &aliasing::DuplicateTableAlias,
+        &aliasing::DuplicateColumnAlias,
         // Structure (Core)
         &structure::RedundantElseNull,
         &structure::SubqueryAsTable,
@@ -71,6 +74,7 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         // Capitalisation
         &capitalisation::Capitalisation,
         // Convention
+        &convention::CountLiteral,
         &convention::NeSpelling,
         &convention::NullComparison,
         &convention::MissingSemicolons,

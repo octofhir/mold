@@ -41,6 +41,18 @@ missing.
   good: SELECT * FROM patient JOIN orders ON orders.patient_id = patient.id;",
     },
     RuleDoc {
+        code: "AM01",
+        fixable: false,
+        summary: "DISTINCT is redundant with GROUP BY",
+        explanation: "\
+`GROUP BY` already yields one row per group, so a leading `DISTINCT` only adds a
+needless sort. Drop the `DISTINCT`. (`DISTINCT ON` is a different feature — see
+ST08.)
+
+  bad:  SELECT DISTINCT a FROM t GROUP BY a
+  good: SELECT a FROM t GROUP BY a",
+    },
+    RuleDoc {
         code: "AM02",
         fixable: false,
         summary: "Set operators (UNION/EXCEPT/INTERSECT) should state ALL or DISTINCT",
@@ -146,12 +158,35 @@ Name it with `AS`.
   good: SELECT count(*) AS total FROM t",
     },
     RuleDoc {
+        code: "AL04",
+        fixable: false,
+        summary: "Duplicate table alias in one FROM",
+        explanation: "\
+Two tables in the same `FROM` share an alias, so any qualified reference to it
+is ambiguous. Give each table a distinct alias.
+
+  bad:  FROM orders o JOIN order_items o ON ...
+  good: FROM orders o JOIN order_items i ON ...",
+    },
+    RuleDoc {
         code: "AL05",
         fixable: false,
         summary: "Table alias declared but never used",
         explanation: "\
 The query introduces a table alias that no column reference uses to qualify a
 name. Drop the alias, or use it.",
+    },
+    RuleDoc {
+        code: "AL08",
+        fixable: false,
+        summary: "Duplicate column alias in a SELECT list",
+        explanation: "\
+Two select items resolve to the same output name, so any consumer addressing
+the column by name gets an ambiguous or surprising result. Give each a distinct
+alias.
+
+  bad:  SELECT a AS x, b AS x FROM t
+  good: SELECT a AS x, b AS y FROM t",
     },
     RuleDoc {
         code: "RF03",
@@ -222,6 +257,17 @@ matches. Use ->> to extract the value as `text` for the comparison.
         explanation: "\
 Both `<>` and `!=` mean inequality in Postgres; `<>` is the SQL standard
 spelling. This rule rewrites `!=` to `<>` for consistency.",
+    },
+    RuleDoc {
+        code: "CV04",
+        fixable: true,
+        summary: "Use count(*) instead of count(1)/count(0)",
+        explanation: "\
+`count(1)` and `count(0)` count rows exactly like `count(*)`, which states the
+intent directly and is the idiomatic spelling. Rewrites the literal to `*`.
+
+  bad:  SELECT count(1) FROM t
+  good: SELECT count(*) FROM t",
     },
     RuleDoc {
         code: "CV05",

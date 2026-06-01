@@ -83,6 +83,57 @@ impl Rule for LimitWithoutOrder {
     }
 }
 
+/// AM01 — `DISTINCT` is redundant when the query already has `GROUP BY`.
+pub(super) struct DistinctWithGroupBy;
+
+impl Rule for DistinctWithGroupBy {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Am01]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Core
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::SELECT_STMT {
+                lint_distinct_with_group_by(node, analyzer);
+            }
+        }
+    }
+}
+
+/// AM01 — `GROUP BY` already collapses each group to one row, so a leading
+/// `DISTINCT` does nothing but cost a sort. `DISTINCT ON` is a different feature
+/// and is left to ST08.
+fn lint_distinct_with_group_by(stmt: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let tokens: Vec<_> = stmt
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| !t.kind().is_trivia())
+        .collect();
+    let Some(d) = tokens
+        .iter()
+        .position(|t| t.kind() == SyntaxKind::DISTINCT_KW)
+    else {
+        return;
+    };
+    // `DISTINCT ON (...)` is not plain DISTINCT.
+    if tokens.get(d + 1).map(|t| t.kind()) == Some(SyntaxKind::ON_KW) {
+        return;
+    }
+    if !stmt
+        .children()
+        .any(|c| c.kind() == SyntaxKind::GROUP_BY_CLAUSE)
+    {
+        return;
+    }
+    analyzer.emit(
+        Diagnostic::warning("DISTINCT is redundant when the query has GROUP BY")
+            .with_code(RuleCode::Am01)
+            .with_range(tokens[d].text_range()),
+    );
+}
+
 /// AM03 — `ORDER BY` should set a direction on every term or none.
 pub(super) struct OrderByDirection;
 

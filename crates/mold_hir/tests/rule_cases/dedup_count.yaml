@@ -1,0 +1,48 @@
+# AL04 duplicate table alias, AL08 duplicate column alias, AM01 distinct+group
+# by, CV04 count(1)/count(0).
+
+- name: duplicate_table_alias_flagged
+  rule: AL04
+  fail: "SELECT x FROM a t, b t"
+
+- name: distinct_table_aliases_ok
+  rule: AL04
+  pass: "SELECT x FROM a s, b t"
+
+- name: duplicate_column_alias_flagged
+  rule: AL08
+  fail: "SELECT a AS x, b AS x FROM t"
+
+- name: distinct_column_aliases_ok
+  rule: AL08
+  pass: "SELECT a AS x, b AS y FROM t"
+
+- name: distinct_with_group_by_flagged
+  rule: AM01
+  fail: "SELECT DISTINCT a FROM t GROUP BY a"
+
+- name: distinct_without_group_by_ok
+  rule: AM01
+  pass: "SELECT DISTINCT a FROM t"
+
+- name: group_by_without_distinct_ok
+  rule: AM01
+  pass: "SELECT a FROM t GROUP BY a"
+
+- name: count_one_flagged_and_fixed
+  rule: CV04
+  fail: "SELECT count(1) FROM t"
+  fix: "SELECT count(*) FROM t"
+
+- name: count_zero_flagged_and_fixed
+  rule: CV04
+  fail: "SELECT count(0) FROM t"
+  fix: "SELECT count(*) FROM t"
+
+- name: count_star_ok
+  rule: CV04
+  pass: "SELECT count(*) FROM t"
+
+- name: count_column_ok
+  rule: CV04
+  pass: "SELECT count(id) FROM t"

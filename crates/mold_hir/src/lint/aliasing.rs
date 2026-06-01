@@ -45,6 +45,44 @@ impl Rule for ColumnAliasAs {
     }
 }
 
+/// AL04 — two tables in one `FROM` share an alias.
+pub(super) struct DuplicateTableAlias;
+
+impl Rule for DuplicateTableAlias {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Al04]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Core
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::FROM_CLAUSE {
+                lint_duplicate_table_alias(node, analyzer);
+            }
+        }
+    }
+}
+
+/// AL08 — two select items share an output alias.
+pub(super) struct DuplicateColumnAlias;
+
+impl Rule for DuplicateColumnAlias {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Al08]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Core
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::SELECT_STMT {
+                lint_duplicate_column_alias(node, analyzer);
+            }
+        }
+    }
+}
+
 /// AL03 — a complex select expression should be aliased.
 pub(super) struct UnaliasedSelectItem;
 
@@ -107,6 +145,81 @@ fn lint_unaliased_select_items(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
 
 fn needs_alias(expr: &Expr) -> bool {
     !matches!(expr, Expr::ColumnRef(_) | Expr::Literal(_))
+}
+
+/// AL04 — a duplicate alias in one `FROM` makes qualified references ambiguous.
+/// Only tables belonging directly to `from` (not a nested subquery's `FROM`)
+/// are considered.
+fn lint_duplicate_table_alias(from: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let mut seen: Vec<String> = Vec::new();
+    for tref in from
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::TABLE_REF)
+    {
+        // Skip tables that belong to a nested subquery's FROM.
+        let owner = tref
+            .ancestors()
+            .find(|a| a.kind() == SyntaxKind::FROM_CLAUSE);
+        if owner.map(|o| o.text_range()) != Some(from.text_range()) {
+            continue;
+        }
+        let Some((name, range)) = table_ref_alias(tref) else {
+            continue;
+        };
+        let lname = name.to_ascii_lowercase();
+        if seen.contains(&lname) {
+            analyzer.emit(
+                Diagnostic::warning(format!("Duplicate table alias '{name}' in FROM"))
+                    .with_code(RuleCode::Al04)
+                    .with_range(range),
+            );
+        } else {
+            seen.push(lname);
+        }
+    }
+}
+
+/// AL08 — two select items resolving to the same output name collide for any
+/// consumer referring to the column by name.
+fn lint_duplicate_column_alias(stmt: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let mut seen: Vec<String> = Vec::new();
+    for item in stmt
+        .descendants()
+        .filter_map(|n| SelectItem::cast(n.clone()))
+    {
+        // Only the items belonging directly to this SELECT.
+        let owner = item
+            .syntax()
+            .ancestors()
+            .find(|a| a.kind() == SyntaxKind::SELECT_STMT);
+        if owner.map(|o| o.text_range()) != Some(stmt.text_range()) {
+            continue;
+        }
+        let Some((name, range)) = select_item_alias(&item) else {
+            continue;
+        };
+        let lname = name.to_ascii_lowercase();
+        if seen.contains(&lname) {
+            analyzer.emit(
+                Diagnostic::warning(format!("Duplicate column alias '{name}'"))
+                    .with_code(RuleCode::Al08)
+                    .with_range(range),
+            );
+        } else {
+            seen.push(lname);
+        }
+    }
+}
+
+/// The explicit output alias of a `SELECT_ITEM` (`AS x` or implicit `expr x`),
+/// as `(name, range)`. The aliased expression itself lives in a child node, so
+/// a bare identifier token directly under the item is the alias.
+fn select_item_alias(item: &SelectItem) -> Option<(String, text_size::TextRange)> {
+    item.syntax()
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .find(|t| matches!(t.kind(), SyntaxKind::IDENT | SyntaxKind::QUOTED_IDENT))
+        .map(|t| (t.text().to_string(), t.text_range()))
 }
 
 /// AL01 — a `TABLE_REF` carrying an implicit alias (`users u`) reads better as

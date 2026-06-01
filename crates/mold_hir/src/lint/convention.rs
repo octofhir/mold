@@ -60,6 +60,68 @@ impl Rule for MissingSemicolons {
     }
 }
 
+/// CV04 — `count(1)`/`count(0)` where `count(*)` is idiomatic.
+pub(super) struct CountLiteral;
+
+impl Rule for CountLiteral {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Cv04]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Convention
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::FUNC_CALL {
+                lint_count_literal(node, analyzer);
+            }
+        }
+    }
+}
+
+/// CV04 — `count(1)` and `count(0)` count rows exactly like `count(*)`, which
+/// states the intent directly. Rewrites the literal argument to `*`.
+fn lint_count_literal(func: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let is_count = func
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .any(|t| t.kind() == SyntaxKind::COUNT_KW);
+    if !is_count {
+        return;
+    }
+    // Reject more than one argument.
+    if func
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .any(|t| t.kind() == SyntaxKind::COMMA)
+    {
+        return;
+    }
+    let Some(literal) = func.children().find(|c| c.kind() == SyntaxKind::LITERAL) else {
+        return;
+    };
+    let int_tokens: Vec<_> = literal
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .filter(|t| !t.kind().is_trivia())
+        .collect();
+    let is_zero_or_one = int_tokens.len() == 1
+        && int_tokens[0].kind() == SyntaxKind::INTEGER
+        && matches!(int_tokens[0].text(), "0" | "1");
+    if !is_zero_or_one {
+        return;
+    }
+    analyzer.emit(
+        Diagnostic::warning("Use count(*) instead of count(0)/count(1)")
+            .with_code(RuleCode::Cv04)
+            .with_range(literal.text_range())
+            .with_fix(Fix::new(
+                "Replace with *",
+                vec![TextEdit::replace(literal.text_range(), "*")],
+            )),
+    );
+}
+
 /// CV10 — `LIKE` with no wildcard behaves like `=`.
 pub(super) struct LikeWithoutWildcard;
 

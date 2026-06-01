@@ -85,7 +85,10 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 | AL01 | yes     | Table alias should be introduced with `AS` |
 | AL02 | yes     | Column/expression alias should be introduced with `AS` |
 | AL03 | —       | Complex select expression should be aliased with `AS` |
+| AL04 | —       | Duplicate table alias in one `FROM` |
 | AL05 | —       | Table alias declared but never used |
+| AL08 | —       | Duplicate column alias in a `SELECT` list |
+| AM01 | —       | `DISTINCT` is redundant with `GROUP BY` |
 | AM02 | —       | Set operators (`UNION`/`EXCEPT`/`INTERSECT`) should state `ALL`/`DISTINCT` |
 | AM03 | —       | `ORDER BY` mixes explicit and implicit sort directions |
 | AM04 | yes\*   | Avoid `SELECT *`; expand to columns (\*fix needs schema) |
