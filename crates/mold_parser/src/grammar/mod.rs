@@ -1,3 +1,5 @@
+pub mod commands;
+pub mod ddl;
 pub mod delete;
 pub mod expressions;
 pub mod insert;
@@ -5,6 +7,7 @@ pub mod jsonpath;
 pub mod jsonpath_lexer;
 pub mod select;
 pub mod update;
+pub mod util;
 
 use crate::parser::Parser;
 use mold_syntax::SyntaxKind;
@@ -21,7 +24,7 @@ pub fn root(p: &mut Parser<'_>) {
     m.complete(p, SyntaxKind::SOURCE_FILE);
 }
 
-fn statement(p: &mut Parser<'_>) {
+pub(super) fn statement(p: &mut Parser<'_>) {
     // WITH can start a CTE for SELECT, INSERT, UPDATE, or DELETE
     if p.at(SyntaxKind::WITH_KW) {
         // Look ahead to determine which statement follows the CTE
@@ -30,7 +33,7 @@ fn statement(p: &mut Parser<'_>) {
     }
 
     match p.current() {
-        SyntaxKind::SELECT_KW => {
+        SyntaxKind::SELECT_KW | SyntaxKind::VALUES_KW | SyntaxKind::TABLE_KW | SyntaxKind::L_PAREN => {
             select::select_stmt(p);
         }
         SyntaxKind::INSERT_KW => {
@@ -41,6 +44,67 @@ fn statement(p: &mut Parser<'_>) {
         }
         SyntaxKind::DELETE_KW => {
             delete::delete_stmt(p);
+        }
+        SyntaxKind::CREATE_KW => {
+            ddl::create_stmt(p);
+        }
+        SyntaxKind::ALTER_KW => {
+            ddl::alter_stmt(p);
+        }
+        SyntaxKind::DROP_KW => {
+            ddl::drop_stmt(p);
+        }
+        SyntaxKind::TRUNCATE_KW => {
+            ddl::truncate_stmt(p);
+        }
+        SyntaxKind::BEGIN_KW
+        | SyntaxKind::START_KW
+        | SyntaxKind::COMMIT_KW
+        | SyntaxKind::END_KW
+        | SyntaxKind::ROLLBACK_KW
+        | SyntaxKind::ABORT_KW
+        | SyntaxKind::SAVEPOINT_KW
+        | SyntaxKind::RELEASE_KW => {
+            util::transaction_stmt(p);
+        }
+        SyntaxKind::SET_KW => {
+            util::set_stmt(p);
+        }
+        SyntaxKind::SHOW_KW => {
+            util::show_stmt(p);
+        }
+        SyntaxKind::RESET_KW => {
+            util::reset_stmt(p);
+        }
+        SyntaxKind::EXPLAIN_KW => {
+            util::explain_stmt(p);
+        }
+        SyntaxKind::COMMENT_KW => {
+            util::comment_stmt(p);
+        }
+        SyntaxKind::CALL_KW => {
+            commands::call_stmt(p);
+        }
+        SyntaxKind::DO_KW => {
+            commands::do_stmt(p);
+        }
+        SyntaxKind::VACUUM_KW => {
+            commands::vacuum_stmt(p);
+        }
+        SyntaxKind::ANALYZE_KW | SyntaxKind::ANALYSE_KW => {
+            commands::analyze_stmt(p);
+        }
+        SyntaxKind::COPY_KW => {
+            commands::copy_stmt(p);
+        }
+        SyntaxKind::GRANT_KW => {
+            commands::grant_stmt(p);
+        }
+        SyntaxKind::REVOKE_KW => {
+            commands::revoke_stmt(p);
+        }
+        SyntaxKind::MERGE_KW => {
+            commands::merge_stmt(p);
         }
         _ => {
             if !p.at_end() {
@@ -86,6 +150,10 @@ pub const STMT_RECOVERY: TokenSet = TokenSet::new(&[
     SyntaxKind::INSERT_KW,
     SyntaxKind::UPDATE_KW,
     SyntaxKind::DELETE_KW,
+    SyntaxKind::CREATE_KW,
+    SyntaxKind::ALTER_KW,
+    SyntaxKind::DROP_KW,
+    SyntaxKind::TRUNCATE_KW,
     SyntaxKind::SEMICOLON,
 ]);
 

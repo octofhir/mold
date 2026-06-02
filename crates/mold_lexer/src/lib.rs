@@ -72,6 +72,25 @@ fn scan_token(c: &mut Cursor<'_>) -> SyntaxKind {
         return scan_hex_string(c);
     }
 
+    // Escape string: E'...\n...'
+    if (first == 'e' || first == 'E') && c.second() == '\'' {
+        return scan_escape_string(c);
+    }
+
+    // Unicode string/identifier: U&'...' / U&"..."
+    if (first == 'u' || first == 'U') && c.second() == '&' {
+        if c.third() == '\'' {
+            c.bump(); // U
+            c.bump(); // &
+            return scan_string(c);
+        }
+        if c.third() == '"' {
+            c.bump(); // U
+            c.bump(); // &
+            return scan_quoted_ident(c);
+        }
+    }
+
     // Dollar handling: dollar-quoted strings or parameters
     if first == '$' {
         // Check for dollar-quoted string: $$...$$ or $tag$...$tag$
@@ -187,6 +206,35 @@ fn scan_quoted_ident(c: &mut Cursor<'_>) -> SyntaxKind {
         }
     }
     SyntaxKind::QUOTED_IDENT
+}
+
+fn scan_escape_string(c: &mut Cursor<'_>) -> SyntaxKind {
+    c.bump(); // E
+    c.bump(); // opening '
+    loop {
+        match c.first() {
+            '\\' => {
+                c.bump(); // backslash
+                if !c.is_eof() {
+                    c.bump(); // escaped char
+                }
+            }
+            '\'' => {
+                c.bump();
+                // Check for escaped quote ''
+                if c.first() == '\'' {
+                    c.bump();
+                    continue;
+                }
+                break;
+            }
+            '\0' => break, // EOF - unterminated
+            _ => {
+                c.bump();
+            }
+        }
+    }
+    SyntaxKind::STRING
 }
 
 fn scan_bit_string(c: &mut Cursor<'_>) -> SyntaxKind {
@@ -308,11 +356,12 @@ fn scan_ident_or_keyword(c: &mut Cursor<'_>) -> SyntaxKind {
 }
 
 fn is_ident_start(ch: char) -> bool {
-    ch.is_ascii_alphabetic() || ch == '_'
+    // PostgreSQL allows letters (incl. non-ASCII via UTF-8) and underscore.
+    ch.is_alphabetic() || ch == '_'
 }
 
 fn is_ident_continue(ch: char) -> bool {
-    ch.is_ascii_alphanumeric() || ch == '_' || ch == '$'
+    ch.is_alphanumeric() || ch == '_' || ch == '$'
 }
 
 fn scan_operator_or_punct(c: &mut Cursor<'_>) -> SyntaxKind {
@@ -407,6 +456,18 @@ fn scan_operator_or_punct(c: &mut Cursor<'_>) -> SyntaxKind {
             c.advance_by(2);
             return SyntaxKind::BANG_TILDE;
         }
+        ('<', '<') => {
+            c.advance_by(2);
+            return SyntaxKind::SHL;
+        }
+        ('>', '>') => {
+            c.advance_by(2);
+            return SyntaxKind::SHR;
+        }
+        ('=', '>') => {
+            c.advance_by(2);
+            return SyntaxKind::FAT_ARROW;
+        }
         _ => {}
     }
 
@@ -423,6 +484,9 @@ fn scan_operator_or_punct(c: &mut Cursor<'_>) -> SyntaxKind {
         '%' => SyntaxKind::PERCENT,
         '^' => SyntaxKind::CARET,
         '~' => SyntaxKind::TILDE,
+        '&' => SyntaxKind::AMP,
+        '|' => SyntaxKind::PIPE,
+        '#' => SyntaxKind::HASH,
         '?' => SyntaxKind::QUESTION,
         ';' => SyntaxKind::SEMICOLON,
         ',' => SyntaxKind::COMMA,
@@ -552,6 +616,35 @@ mod tests {
     #[test]
     fn test_cast_operator() {
         assert_eq!(token_kinds("foo::int"), vec![IDENT, DOUBLE_COLON, INT_KW]);
+    }
+
+    #[test]
+    fn test_bitwise_and_shift_operators() {
+        assert_eq!(token_kinds("&"), vec![AMP]);
+        assert_eq!(token_kinds("|"), vec![PIPE]);
+        assert_eq!(token_kinds("#"), vec![HASH]);
+        assert_eq!(token_kinds("<<"), vec![SHL]);
+        assert_eq!(token_kinds(">>"), vec![SHR]);
+        assert_eq!(token_kinds("=>"), vec![FAT_ARROW]);
+        // Existing multi-char operators must still win over the new single ones.
+        assert_eq!(token_kinds("#>"), vec![HASH_ARROW]);
+        assert_eq!(token_kinds("||"), vec![PIPE_PIPE]);
+        assert_eq!(token_kinds(">="), vec![GE]);
+    }
+
+    #[test]
+    fn test_escape_and_unicode_strings() {
+        assert_eq!(token_kinds("E'a\\nb'"), vec![STRING]);
+        assert_eq!(token_kinds("E'it\\'s'"), vec![STRING]); // escaped quote via backslash
+        assert_eq!(token_kinds("U&'d\\0061t'"), vec![STRING]);
+        assert_eq!(token_kinds("U&\"d\\0061t\""), vec![QUOTED_IDENT]);
+    }
+
+    #[test]
+    fn test_unicode_identifiers() {
+        assert_eq!(token_kinds("имя"), vec![IDENT]);
+        assert_eq!(token_kinds("café"), vec![IDENT]);
+        assert_eq!(token_kinds("日本語"), vec![IDENT]);
     }
 
     fn format_tokens(source: &str) -> String {

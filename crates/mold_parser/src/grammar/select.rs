@@ -20,6 +20,20 @@ pub fn expect_ident(p: &mut Parser<'_>, recovery: TokenSet) {
     }
 }
 
+/// True at the start of a query: SELECT, WITH, VALUES, or TABLE.
+pub fn at_query_start(p: &Parser<'_>) -> bool {
+    matches!(
+        p.current(),
+        SyntaxKind::SELECT_KW | SyntaxKind::WITH_KW | SyntaxKind::VALUES_KW | SyntaxKind::TABLE_KW
+    )
+}
+
+/// True when the current identifier matches `word` (case-insensitive). Used for
+/// PostgreSQL words that are not reserved keywords (ROLLUP, CUBE, TABLESAMPLE…).
+fn at_ident_text(p: &Parser<'_>, word: &str) -> bool {
+    at_ident(p) && p.current_text().eq_ignore_ascii_case(word)
+}
+
 pub fn select_stmt(p: &mut Parser<'_>) {
     let m = p.start();
 
@@ -28,7 +42,7 @@ pub fn select_stmt(p: &mut Parser<'_>) {
         with_clause(p);
     }
 
-    select_core(p);
+    query_primary(p);
 
     // Set operations: UNION, INTERSECT, EXCEPT
     while p.at(SyntaxKind::UNION_KW)
@@ -37,7 +51,7 @@ pub fn select_stmt(p: &mut Parser<'_>) {
     {
         p.bump();
         let _ = p.eat(SyntaxKind::ALL_KW) || p.eat(SyntaxKind::DISTINCT_KW);
-        select_core(p);
+        query_primary(p);
     }
 
     // ORDER BY (for the whole query)
@@ -64,6 +78,57 @@ pub fn select_stmt(p: &mut Parser<'_>) {
     }
 
     m.complete(p, SyntaxKind::SELECT_STMT);
+}
+
+/// One query term: a parenthesized query, VALUES, TABLE, or a SELECT core.
+fn query_primary(p: &mut Parser<'_>) {
+    match p.current() {
+        SyntaxKind::L_PAREN => {
+            p.bump(); // (
+            p.push_context(ParseContext::Subquery);
+            select_stmt(p);
+            p.pop_context();
+            p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+        }
+        SyntaxKind::VALUES_KW => values_query(p),
+        SyntaxKind::TABLE_KW => table_query(p),
+        _ => select_core(p),
+    }
+}
+
+/// `VALUES (…), (…)` as a query term.
+fn values_query(p: &mut Parser<'_>) {
+    let m = p.start();
+    p.bump(); // VALUES
+    values_row(p);
+    while p.eat(SyntaxKind::COMMA) {
+        values_row(p);
+    }
+    m.complete(p, SyntaxKind::VALUES_CLAUSE);
+}
+
+fn values_row(p: &mut Parser<'_>) {
+    let m = p.start();
+    p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
+    if !p.at(SyntaxKind::R_PAREN) {
+        expr(p);
+        while p.eat(SyntaxKind::COMMA) {
+            expr(p);
+        }
+    }
+    p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+    m.complete(p, SyntaxKind::VALUES_ROW);
+}
+
+/// `TABLE name` — shorthand for `SELECT * FROM name`.
+fn table_query(p: &mut Parser<'_>) {
+    p.bump(); // TABLE
+    let m = p.start();
+    expect_ident(p, CLAUSE_RECOVERY);
+    if p.eat(SyntaxKind::DOT) {
+        expect_ident(p, CLAUSE_RECOVERY);
+    }
+    m.complete(p, SyntaxKind::TABLE_REF);
 }
 
 fn select_core(p: &mut Parser<'_>) {
@@ -154,7 +219,11 @@ fn cte(p: &mut Parser<'_>) {
 
     // CTE body: SELECT, INSERT, UPDATE, or DELETE
     match p.current() {
-        SyntaxKind::SELECT_KW | SyntaxKind::WITH_KW => {
+        SyntaxKind::SELECT_KW
+        | SyntaxKind::WITH_KW
+        | SyntaxKind::VALUES_KW
+        | SyntaxKind::TABLE_KW
+        | SyntaxKind::L_PAREN => {
             select_stmt(p);
         }
         SyntaxKind::INSERT_KW => {
@@ -228,7 +297,7 @@ pub fn table_ref(p: &mut Parser<'_>) {
     // Table or subquery or function call
     if p.at(SyntaxKind::L_PAREN) {
         p.bump();
-        if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
+        if at_query_start(p) {
             // Subquery with isolated recovery
             p.push_context(ParseContext::Subquery);
             parse_subquery_in_from(p);
@@ -258,6 +327,37 @@ pub fn table_ref(p: &mut Parser<'_>) {
                 }
             }
             p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+
+            // WITH ORDINALITY (set-returning function in FROM). At this point a
+            // WITH can only introduce ORDINALITY.
+            if p.at(SyntaxKind::WITH_KW) {
+                p.bump(); // WITH
+                if at_ident_text(p, "ORDINALITY") {
+                    p.bump();
+                } else {
+                    p.error("expected ORDINALITY after WITH");
+                }
+            }
+        }
+
+        // TABLESAMPLE method ( args ) [ REPEATABLE ( seed ) ]
+        if at_ident_text(p, "TABLESAMPLE") {
+            p.bump(); // TABLESAMPLE
+            expect_ident(p, JOIN_RECOVERY); // sampling method
+            p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
+            if !p.at(SyntaxKind::R_PAREN) {
+                expr(p);
+                while p.eat(SyntaxKind::COMMA) {
+                    expr(p);
+                }
+            }
+            p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+            if at_ident_text(p, "REPEATABLE") {
+                p.bump();
+                p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
+                expr(p);
+                p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+            }
         }
     }
 
@@ -398,12 +498,65 @@ fn group_by_clause(p: &mut Parser<'_>) {
     p.bump(); // GROUP
     p.expect(SyntaxKind::BY_KW);
 
-    expr(p);
+    // Optional ALL / DISTINCT (grouping over the whole list).
+    let _ = p.eat(SyntaxKind::ALL_KW) || p.eat(SyntaxKind::DISTINCT_KW);
+
+    group_by_elem(p);
     while p.eat(SyntaxKind::COMMA) {
-        expr(p);
+        group_by_elem(p);
     }
 
     m.complete(p, SyntaxKind::GROUP_BY_CLAUSE);
+}
+
+/// A GROUP BY element: a plain expression, ROLLUP/CUBE (…), or GROUPING SETS (…).
+/// ROLLUP/CUBE/GROUPING/SETS are non-reserved words, matched by text.
+fn group_by_elem(p: &mut Parser<'_>) {
+    if at_ident_text(p, "ROLLUP") || at_ident_text(p, "CUBE") {
+        p.bump(); // ROLLUP / CUBE
+        p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
+        grouping_set_list(p);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+    } else if at_ident_text(p, "GROUPING") {
+        p.bump(); // GROUPING
+        if at_ident_text(p, "SETS") {
+            p.bump(); // SETS
+        } else {
+            p.error("expected SETS after GROUPING");
+        }
+        p.expect_recover(SyntaxKind::L_PAREN, PAREN_RECOVERY);
+        grouping_set_list(p);
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+    } else {
+        expr(p);
+    }
+}
+
+/// Comma-separated grouping set members: plain expressions, parenthesized
+/// column groups, the empty group `()`, or nested ROLLUP/CUBE/GROUPING SETS.
+fn grouping_set_list(p: &mut Parser<'_>) {
+    grouping_set_member(p);
+    while p.eat(SyntaxKind::COMMA) {
+        grouping_set_member(p);
+    }
+}
+
+fn grouping_set_member(p: &mut Parser<'_>) {
+    if at_ident_text(p, "ROLLUP") || at_ident_text(p, "CUBE") || at_ident_text(p, "GROUPING") {
+        group_by_elem(p);
+    } else if p.at(SyntaxKind::L_PAREN) {
+        // ( ) empty group, or ( expr, … )
+        p.bump();
+        if !p.at(SyntaxKind::R_PAREN) {
+            expr(p);
+            while p.eat(SyntaxKind::COMMA) {
+                expr(p);
+            }
+        }
+        p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+    } else {
+        expr(p);
+    }
 }
 
 fn having_clause(p: &mut Parser<'_>) {

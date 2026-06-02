@@ -59,6 +59,12 @@ pub enum SyntaxKind {
     TILDE_STAR,      // ~*  Case-insensitive regex
     BANG_TILDE,      // !~  Regex not match
     BANG_TILDE_STAR, // !~* Case-insensitive regex not match
+    AMP,             // &   Bitwise AND
+    PIPE,            // |   Bitwise OR
+    HASH,            // #   Bitwise XOR
+    SHL,             // <<  Bitwise shift left
+    SHR,             // >>  Bitwise shift right
+    FAT_ARROW,       // =>  Named argument
     SIMILAR_TO,      // SIMILAR TO (parsed as keyword sequence)
     LIKE,            // LIKE (parsed as keyword)
 
@@ -82,6 +88,7 @@ pub enum SyntaxKind {
     // Keywords (PostgreSQL, alphabetically sorted)
     // ==========================================================================
     ABS_KW,
+    ABORT_KW,
     ACTION_KW,
     ADD_KW,
     AGGREGATE_KW,
@@ -98,6 +105,7 @@ pub enum SyntaxKind {
     AT_KW,
     AUTHORIZATION_KW,
     AVG_KW,
+    BEGIN_KW,
     BETWEEN_KW,
     BIGINT_KW,
     BINARY_KW,
@@ -110,12 +118,14 @@ pub enum SyntaxKind {
     CASCADE_KW,
     CASE_KW,
     CAST_KW,
+    CHAIN_KW,
     CHAR_KW,
     CHARACTER_KW,
     CHECK_KW,
     COALESCE_KW,
     COLLATE_KW,
     COLUMN_KW,
+    COMMENT_KW,
     COMMIT_KW,
     CONCURRENTLY_KW,
     CONFLICT_KW,
@@ -151,6 +161,7 @@ pub enum SyntaxKind {
     EXCLUDING_KW,
     EXISTS_KW,
     EXPLAIN_KW,
+    EXTENSION_KW,
     EXTRACT_KW,
     FALSE_KW,
     FETCH_KW,
@@ -207,9 +218,11 @@ pub enum SyntaxKind {
     LOCK_KW,
     LOCKED_KW,
     MATCH_KW,
+    MATCHED_KW,
     MATERIALIZED_KW,
     MAX_KW,
     MAXVALUE_KW,
+    MERGE_KW,
     MIN_KW,
     MINVALUE_KW,
     NATURAL_KW,
@@ -250,9 +263,11 @@ pub enum SyntaxKind {
     RECURSIVE_KW,
     REFERENCES_KW,
     REFRESH_KW,
+    RELEASE_KW,
     RENAME_KW,
     REPLACE_KW,
     REPLICA_KW,
+    RESET_KW,
     RESTART_KW,
     RESTRICT_KW,
     RETURNING_KW,
@@ -262,6 +277,7 @@ pub enum SyntaxKind {
     ROLLBACK_KW,
     ROW_KW,
     ROWS_KW,
+    SAVEPOINT_KW,
     SCHEMA_KW,
     SELECT_KW,
     SEQUENCE_KW,
@@ -335,9 +351,30 @@ pub enum SyntaxKind {
     CREATE_TABLE_STMT,
     DROP_STMT,
     ALTER_STMT,
+    ALTER_TABLE_ACTION,
     CREATE_INDEX_STMT,
     TRUNCATE_STMT,
     EXPLAIN_STMT,
+    CREATE_VIEW_STMT,
+    CREATE_SEQUENCE_STMT,
+    CREATE_SCHEMA_STMT,
+    CREATE_EXTENSION_STMT,
+    COMMENT_STMT,
+    TRANSACTION_STMT,
+    SET_STMT,
+    SHOW_STMT,
+    RESET_STMT,
+    CALL_STMT,
+    DO_STMT,
+    VACUUM_STMT,
+    ANALYZE_STMT,
+    COPY_STMT,
+    GRANT_STMT,
+    REVOKE_STMT,
+    MERGE_STMT,
+    CREATE_TYPE_STMT,
+    CREATE_FUNCTION_STMT,
+    CREATE_TRIGGER_STMT,
 
     // SELECT clauses
     SELECT_CLAUSE,
@@ -393,6 +430,9 @@ pub enum SyntaxKind {
     LEAST_EXPR,
     ANY_EXPR, // expr op ANY (array/subquery)
     ALL_EXPR, // expr op ALL (array/subquery)
+    AT_TIME_ZONE_EXPR, // expr AT TIME ZONE zone
+    COLLATE_EXPR,      // expr COLLATE collation
+    ARRAY_SLICE_EXPR,  // expr[lower:upper]
 
     // JSONB access expressions
     JSONB_ACCESS_EXPR,
@@ -650,6 +690,12 @@ impl cstree::Syntax for SyntaxKind {
             Self::CARET => Some("^"),
             Self::PIPE_PIPE => Some("||"),
             Self::TILDE => Some("~"),
+            Self::AMP => Some("&"),
+            Self::PIPE => Some("|"),
+            Self::HASH => Some("#"),
+            Self::SHL => Some("<<"),
+            Self::SHR => Some(">>"),
+            Self::FAT_ARROW => Some("=>"),
             // JSONB operators
             Self::ARROW => Some("->"),
             Self::ARROW_TEXT => Some("->>"),
@@ -674,6 +720,7 @@ pub fn keyword_from_str(s: &str) -> Option<SyntaxKind> {
 }
 
 static KEYWORD_MAP: phf::Map<&'static str, SyntaxKind> = phf::phf_map! {
+    "ABORT" => SyntaxKind::ABORT_KW,
     "ABS" => SyntaxKind::ABS_KW,
     "ACTION" => SyntaxKind::ACTION_KW,
     "ADD" => SyntaxKind::ADD_KW,
@@ -691,6 +738,7 @@ static KEYWORD_MAP: phf::Map<&'static str, SyntaxKind> = phf::phf_map! {
     "AT" => SyntaxKind::AT_KW,
     "AUTHORIZATION" => SyntaxKind::AUTHORIZATION_KW,
     "AVG" => SyntaxKind::AVG_KW,
+    "BEGIN" => SyntaxKind::BEGIN_KW,
     "BETWEEN" => SyntaxKind::BETWEEN_KW,
     "BIGINT" => SyntaxKind::BIGINT_KW,
     "BINARY" => SyntaxKind::BINARY_KW,
@@ -703,12 +751,14 @@ static KEYWORD_MAP: phf::Map<&'static str, SyntaxKind> = phf::phf_map! {
     "CASCADE" => SyntaxKind::CASCADE_KW,
     "CASE" => SyntaxKind::CASE_KW,
     "CAST" => SyntaxKind::CAST_KW,
+    "CHAIN" => SyntaxKind::CHAIN_KW,
     "CHAR" => SyntaxKind::CHAR_KW,
     "CHARACTER" => SyntaxKind::CHARACTER_KW,
     "CHECK" => SyntaxKind::CHECK_KW,
     "COALESCE" => SyntaxKind::COALESCE_KW,
     "COLLATE" => SyntaxKind::COLLATE_KW,
     "COLUMN" => SyntaxKind::COLUMN_KW,
+    "COMMENT" => SyntaxKind::COMMENT_KW,
     "COMMIT" => SyntaxKind::COMMIT_KW,
     "CONCURRENTLY" => SyntaxKind::CONCURRENTLY_KW,
     "CONFLICT" => SyntaxKind::CONFLICT_KW,
@@ -744,6 +794,7 @@ static KEYWORD_MAP: phf::Map<&'static str, SyntaxKind> = phf::phf_map! {
     "EXCLUDING" => SyntaxKind::EXCLUDING_KW,
     "EXISTS" => SyntaxKind::EXISTS_KW,
     "EXPLAIN" => SyntaxKind::EXPLAIN_KW,
+    "EXTENSION" => SyntaxKind::EXTENSION_KW,
     "EXTRACT" => SyntaxKind::EXTRACT_KW,
     "FALSE" => SyntaxKind::FALSE_KW,
     "FETCH" => SyntaxKind::FETCH_KW,
@@ -800,9 +851,11 @@ static KEYWORD_MAP: phf::Map<&'static str, SyntaxKind> = phf::phf_map! {
     "LOCK" => SyntaxKind::LOCK_KW,
     "LOCKED" => SyntaxKind::LOCKED_KW,
     "MATCH" => SyntaxKind::MATCH_KW,
+    "MATCHED" => SyntaxKind::MATCHED_KW,
     "MATERIALIZED" => SyntaxKind::MATERIALIZED_KW,
     "MAX" => SyntaxKind::MAX_KW,
     "MAXVALUE" => SyntaxKind::MAXVALUE_KW,
+    "MERGE" => SyntaxKind::MERGE_KW,
     "MIN" => SyntaxKind::MIN_KW,
     "MINVALUE" => SyntaxKind::MINVALUE_KW,
     "NATURAL" => SyntaxKind::NATURAL_KW,
@@ -843,9 +896,11 @@ static KEYWORD_MAP: phf::Map<&'static str, SyntaxKind> = phf::phf_map! {
     "RECURSIVE" => SyntaxKind::RECURSIVE_KW,
     "REFERENCES" => SyntaxKind::REFERENCES_KW,
     "REFRESH" => SyntaxKind::REFRESH_KW,
+    "RELEASE" => SyntaxKind::RELEASE_KW,
     "RENAME" => SyntaxKind::RENAME_KW,
     "REPLACE" => SyntaxKind::REPLACE_KW,
     "REPLICA" => SyntaxKind::REPLICA_KW,
+    "RESET" => SyntaxKind::RESET_KW,
     "RESTART" => SyntaxKind::RESTART_KW,
     "RESTRICT" => SyntaxKind::RESTRICT_KW,
     "RETURNING" => SyntaxKind::RETURNING_KW,
@@ -855,6 +910,7 @@ static KEYWORD_MAP: phf::Map<&'static str, SyntaxKind> = phf::phf_map! {
     "ROLLBACK" => SyntaxKind::ROLLBACK_KW,
     "ROW" => SyntaxKind::ROW_KW,
     "ROWS" => SyntaxKind::ROWS_KW,
+    "SAVEPOINT" => SyntaxKind::SAVEPOINT_KW,
     "SCHEMA" => SyntaxKind::SCHEMA_KW,
     "SELECT" => SyntaxKind::SELECT_KW,
     "SEQUENCE" => SyntaxKind::SEQUENCE_KW,

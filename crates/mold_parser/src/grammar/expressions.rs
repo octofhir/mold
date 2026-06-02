@@ -1,7 +1,7 @@
 use crate::parser::{CompletedMarker, ParseContext, Parser};
 use mold_syntax::SyntaxKind;
 
-use super::select::{at_ident, expect_ident};
+use super::select::{at_ident, at_query_start, expect_ident};
 use super::{CASE_RECOVERY, EXPR_LIST_RECOVERY, PAREN_RECOVERY, SUBQUERY_RECOVERY};
 
 pub fn expr(p: &mut Parser<'_>) -> Option<CompletedMarker> {
@@ -56,7 +56,7 @@ fn expr_bp(p: &mut Parser<'_>, min_bp: u8) -> Option<CompletedMarker> {
             p.expect(SyntaxKind::L_PAREN);
 
             // Can be an array expression or subquery
-            if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
+            if at_query_start(p) {
                 p.push_context(ParseContext::Subquery);
                 parse_subquery_with_recovery(p);
                 p.pop_context();
@@ -92,7 +92,9 @@ fn lhs(p: &mut Parser<'_>) -> Option<CompletedMarker> {
         SyntaxKind::NOT_KW => {
             let m = p.start();
             p.bump();
-            expr_bp(p, PREFIX_BP);
+            // NOT binds looser than comparison but tighter than AND/OR, so
+            // `NOT a = b` parses as `NOT (a = b)`.
+            expr_bp(p, NOT_BP);
             m.complete(p, SyntaxKind::UNARY_EXPR)
         }
         SyntaxKind::MINUS | SyntaxKind::PLUS => {
@@ -183,13 +185,28 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
                 m.complete(p, SyntaxKind::CAST_EXPR)
             }
 
-            // Array subscript: expr[index]
+            // Array subscript or slice: expr[index] / expr[lo:hi] / expr[:hi] / expr[lo:]
             SyntaxKind::L_BRACKET => {
                 let m = lhs.precede(p);
                 p.bump();
-                expr(p);
+                // Lower bound (may be omitted in a slice)
+                if !p.at(SyntaxKind::COLON) && !p.at(SyntaxKind::R_BRACKET) {
+                    expr(p);
+                }
+                let is_slice = p.eat(SyntaxKind::COLON);
+                if is_slice {
+                    // Upper bound (may be omitted)
+                    if !p.at(SyntaxKind::R_BRACKET) {
+                        expr(p);
+                    }
+                }
                 p.expect(SyntaxKind::R_BRACKET);
-                m.complete(p, SyntaxKind::JSONB_ACCESS_EXPR)
+                let kind = if is_slice {
+                    SyntaxKind::ARRAY_SLICE_EXPR
+                } else {
+                    SyntaxKind::JSONB_ACCESS_EXPR
+                };
+                m.complete(p, kind)
             }
 
             // OVER clause for window functions
@@ -231,7 +248,7 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
                 let m = lhs.precede(p);
                 p.bump();
                 p.expect(SyntaxKind::L_PAREN);
-                if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
+                if at_query_start(p) {
                     // subquery with isolated recovery
                     p.push_context(ParseContext::Subquery);
                     parse_subquery_with_recovery(p);
@@ -253,7 +270,7 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
                 p.bump(); // NOT
                 p.bump(); // IN
                 p.expect(SyntaxKind::L_PAREN);
-                if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
+                if at_query_start(p) {
                     // subquery with isolated recovery
                     p.push_context(ParseContext::Subquery);
                     parse_subquery_with_recovery(p);
@@ -314,6 +331,63 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
                 m.complete(p, SyntaxKind::LIKE_EXPR)
             }
 
+            // SIMILAR TO / NOT SIMILAR TO
+            SyntaxKind::SIMILAR_KW if p.nth(1) == SyntaxKind::TO_KW => {
+                let m = lhs.precede(p);
+                p.bump(); // SIMILAR
+                p.bump(); // TO
+                expr_bp(p, LIKE_BP);
+                if p.eat(SyntaxKind::ESCAPE_KW) {
+                    expr_bp(p, LIKE_BP);
+                }
+                m.complete(p, SyntaxKind::LIKE_EXPR)
+            }
+            SyntaxKind::NOT_KW
+                if p.nth(1) == SyntaxKind::SIMILAR_KW && p.nth(2) == SyntaxKind::TO_KW =>
+            {
+                let m = lhs.precede(p);
+                p.bump(); // NOT
+                p.bump(); // SIMILAR
+                p.bump(); // TO
+                expr_bp(p, LIKE_BP);
+                if p.eat(SyntaxKind::ESCAPE_KW) {
+                    expr_bp(p, LIKE_BP);
+                }
+                m.complete(p, SyntaxKind::LIKE_EXPR)
+            }
+
+            // expr AT TIME ZONE zone
+            SyntaxKind::AT_KW
+                if p.nth(1) == SyntaxKind::TIME_KW && p.nth(2) == SyntaxKind::ZONE_KW =>
+            {
+                let m = lhs.precede(p);
+                p.bump(); // AT
+                p.bump(); // TIME
+                p.bump(); // ZONE
+                expr_bp(p, BETWEEN_BP);
+                m.complete(p, SyntaxKind::AT_TIME_ZONE_EXPR)
+            }
+
+            // expr COLLATE collation
+            SyntaxKind::COLLATE_KW => {
+                let m = lhs.precede(p);
+                p.bump(); // COLLATE
+                // Collation name: ident, "quoted", or schema-qualified
+                expect_ident(p, EXPR_LIST_RECOVERY);
+                if p.at(SyntaxKind::DOT) {
+                    p.bump();
+                    expect_ident(p, EXPR_LIST_RECOVERY);
+                }
+                m.complete(p, SyntaxKind::COLLATE_EXPR)
+            }
+
+            // Postfix null tests: expr ISNULL / expr NOTNULL
+            SyntaxKind::ISNULL_KW | SyntaxKind::NOTNULL_KW => {
+                let m = lhs.precede(p);
+                p.bump();
+                m.complete(p, SyntaxKind::IS_EXPR)
+            }
+
             _ => return lhs,
         };
     }
@@ -372,9 +446,9 @@ fn func_call_args(p: &mut Parser<'_>, m: crate::parser::Marker) -> CompletedMark
             p.bump();
         } else {
             // Arguments
-            expr(p);
+            func_arg(p);
             while p.eat(SyntaxKind::COMMA) {
-                expr(p);
+                func_arg(p);
             }
         }
 
@@ -401,6 +475,21 @@ fn func_call_args(p: &mut Parser<'_>, m: crate::parser::Marker) -> CompletedMark
     }
 
     m.complete(p, SyntaxKind::FUNC_CALL)
+}
+
+/// A function-call argument, optionally named (`name => value`) or VARIADIC.
+fn func_arg(p: &mut Parser<'_>) {
+    p.eat(SyntaxKind::VARIADIC_KW);
+
+    if at_ident(p) && p.nth(1) == SyntaxKind::FAT_ARROW {
+        let m = p.start();
+        p.bump(); // name
+        p.bump(); // =>
+        expr(p);
+        m.complete(p, SyntaxKind::NAMED_ARG);
+    } else {
+        expr(p);
+    }
 }
 
 fn order_by_in_aggregate(p: &mut Parser<'_>) {
@@ -539,7 +628,7 @@ fn paren_expr(p: &mut Parser<'_>) -> CompletedMarker {
     p.bump(); // (
 
     // Check for subquery
-    if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
+    if at_query_start(p) {
         p.push_context(ParseContext::Subquery);
         parse_subquery_with_recovery(p);
         p.pop_context();
@@ -802,10 +891,11 @@ fn array_expr(p: &mut Parser<'_>) -> CompletedMarker {
     m.complete(p, SyntaxKind::ARRAY_EXPR)
 }
 
-fn type_name(p: &mut Parser<'_>, context: &str) {
+pub(super) fn type_name(p: &mut Parser<'_>, context: &str) {
     let m = p.start();
 
     // Handle simple types and schema-qualified types
+    let first = p.current();
     match p.current() {
         SyntaxKind::IDENT
         | SyntaxKind::QUOTED_IDENT
@@ -823,6 +913,7 @@ fn type_name(p: &mut Parser<'_>, context: &str) {
         | SyntaxKind::VARCHAR_KW
         | SyntaxKind::CHAR_KW
         | SyntaxKind::CHARACTER_KW
+        | SyntaxKind::BIT_KW
         | SyntaxKind::DATE_KW
         | SyntaxKind::TIME_KW
         | SyntaxKind::TIMESTAMP_KW
@@ -836,6 +927,18 @@ fn type_name(p: &mut Parser<'_>, context: &str) {
         _ => {
             p.error(format!("expected type name {context}"));
         }
+    }
+
+    // Multi-word type names without a trailing modifier:
+    //   DOUBLE PRECISION, CHARACTER/CHAR/BIT VARYING
+    match first {
+        SyntaxKind::DOUBLE_KW => {
+            p.eat(SyntaxKind::PRECISION_KW);
+        }
+        SyntaxKind::CHARACTER_KW | SyntaxKind::CHAR_KW | SyntaxKind::BIT_KW => {
+            p.eat(SyntaxKind::VARYING_KW);
+        }
+        _ => {}
     }
 
     // Schema qualification
@@ -852,6 +955,16 @@ fn type_name(p: &mut Parser<'_>, context: &str) {
             expr(p);
         }
         p.expect_recover(SyntaxKind::R_PAREN, PAREN_RECOVERY);
+    }
+
+    // Trailing WITH/WITHOUT TIME ZONE for TIME / TIMESTAMP (may follow a
+    // precision modifier, e.g. `timestamp(3) with time zone`).
+    if matches!(first, SyntaxKind::TIME_KW | SyntaxKind::TIMESTAMP_KW)
+        && (p.at(SyntaxKind::WITH_KW) || p.at(SyntaxKind::WITHOUT_KW))
+    {
+        p.bump(); // WITH / WITHOUT
+        p.expect(SyntaxKind::TIME_KW);
+        p.expect(SyntaxKind::ZONE_KW);
     }
 
     // Array type: type[]
@@ -871,11 +984,18 @@ fn type_name(p: &mut Parser<'_>, context: &str) {
 const PREFIX_BP: u8 = 15;
 const BETWEEN_BP: u8 = 7;
 const LIKE_BP: u8 = 7;
+/// Operand binding power for prefix `NOT`: above AND (4) so it captures a full
+/// comparison, below comparison (6) so `NOT a = b` is `NOT (a = b)`.
+const NOT_BP: u8 = 5;
 
 fn infix_binding_power(op: SyntaxKind) -> Option<(u8, u8)> {
     let bp = match op {
         // Cast (highest, left-associative handled via postfix)
         // SyntaxKind::DOUBLE_COLON => (14, 15), // Handled in postfix
+
+        // Exponentiation: binds tighter than unary +/- (PREFIX_BP), left-associative.
+        // PostgreSQL: `-2 ^ 2` evaluates as `-(2 ^ 2)`.
+        SyntaxKind::CARET => (21, 22),
 
         // JSONB access operators (right-associative for chaining)
         SyntaxKind::ARROW | SyntaxKind::ARROW_TEXT => (12, 11),
@@ -890,6 +1010,13 @@ fn infix_binding_power(op: SyntaxKind) -> Option<(u8, u8)> {
         // Additive
         SyntaxKind::PLUS | SyntaxKind::MINUS => (8, 9),
 
+        // Bitwise and shift operators (below additive, above comparison).
+        SyntaxKind::AMP
+        | SyntaxKind::PIPE
+        | SyntaxKind::HASH
+        | SyntaxKind::SHL
+        | SyntaxKind::SHR => (7, 8),
+
         // JSONB containment and existence
         SyntaxKind::AT_GT | SyntaxKind::LT_AT => (6, 7),
         SyntaxKind::QUESTION | SyntaxKind::QUESTION_PIPE | SyntaxKind::QUESTION_AMP => (6, 7),
@@ -903,6 +1030,12 @@ fn infix_binding_power(op: SyntaxKind) -> Option<(u8, u8)> {
         | SyntaxKind::LE
         | SyntaxKind::GT
         | SyntaxKind::GE => (6, 7),
+
+        // Pattern-match operators (regex). Same level as comparison.
+        SyntaxKind::TILDE
+        | SyntaxKind::TILDE_STAR
+        | SyntaxKind::BANG_TILDE
+        | SyntaxKind::BANG_TILDE_STAR => (6, 7),
 
         // Logical AND
         SyntaxKind::AND_KW => (4, 5),
