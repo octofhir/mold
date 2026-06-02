@@ -48,3 +48,26 @@
   rule: CV09
   options: { CV09: { blocked: "secret,password" } }
   pass: "SELECT name FROM t"
+
+# CP01 default = upper; policy=lower flips it.
+- name: cp01_default_upper_ok
+  rule: CP01
+  pass: "SELECT id FROM t"
+
+- name: cp01_policy_lower_flags_and_fixes
+  rule: CP01
+  options: { CP01: { policy: "lower" } }
+  fail: "SELECT id FROM t"
+  fix: "select id from t"
+
+# CP02 default = lower; policy=upper flips it.
+- name: cp02_default_lower_flags_and_fixes
+  rule: CP02
+  fail: "SELECT FOO FROM t"
+  fix: "SELECT foo FROM t"
+
+- name: cp02_policy_upper_flags_and_fixes
+  rule: CP02
+  options: { CP02: { policy: "upper" } }
+  fail: "SELECT foo FROM bar"
+  fix: "SELECT FOO FROM BAR"

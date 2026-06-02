@@ -34,6 +34,10 @@ enabled = true
 # prefer = "consistent"    # consistent | shorthand | functional — cast style
 # [lint.rules.CV09]
 # blocked = ["old_status", "sysdate"]   # forbid these words (off until set)
+# [lint.rules.CP01]
+# policy = "upper"         # upper | lower — keyword case
+# [lint.rules.CP02]
+# policy = "lower"         # lower | upper — unquoted identifier case
 
 [database]
 # Connection string is read from this environment variable (preferred over an

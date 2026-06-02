@@ -355,7 +355,8 @@ one and stick to it.
         summary: "Keywords should be upper case",
         explanation: "\
 Upper-casing keywords visually separates SQL structure from identifiers and
-literals. This rule is auto-fixable: run `mold fix` to apply.
+literals. This rule is auto-fixable: run `mold fix` to apply. Set
+`policy = \"lower\"` to require lower case instead (default `upper`).
 
   bad:  select id from patient
   good: SELECT id FROM patient",
@@ -367,7 +368,8 @@ literals. This rule is auto-fixable: run `mold fix` to apply.
         explanation: "\
 Postgres folds unquoted identifiers to lower case, so a mixed- or upper-case
 unquoted name is misleading. This rule lower-cases it (auto-fixable). Quoted
-identifiers are left untouched.
+identifiers are left untouched. Set `policy = \"upper\"` to require upper case
+instead (default `lower`).
 
   bad:  SELECT Id FROM Patient
   good: SELECT id FROM patient",

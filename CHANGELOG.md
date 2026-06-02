@@ -22,8 +22,9 @@ the latest stable Rust toolchain.
   (configurable blocked words) — 34 lint codes total.
 - **Configurable rules**: per-rule options in `mold.toml` (`[lint.rules.<CODE>]`)
   now reach the engine. `CV04` takes `prefer = star|1|0`, `CV11` takes
-  `prefer = consistent|shorthand|functional`, and `CV09` takes a `blocked` word
-  list.
+  `prefer = consistent|shorthand|functional`, `CV09` takes a `blocked` word
+  list, and `CP01`/`CP02` take `policy = upper|lower`.
+- **CLI**: `mold rules` gains `--format json` and `--group <category|prefix>`.
 - **Placeholder templating** (`mold_templater`): substitute `:name`, `?` and
   `%(name)s` placeholders (configurable via `[templater] style`) so app SQL
   parses and lints; diagnostics map back to the source and fixes that would

@@ -77,6 +77,10 @@ enabled = true
 # prefer = "consistent"      # consistent | shorthand | functional
 # [lint.rules.CV09]
 # blocked = ["old_status", "sysdate"]   # words to forbid (off until set)
+# [lint.rules.CP01]
+# policy = "upper"           # upper | lower — keyword case
+# [lint.rules.CP02]
+# policy = "lower"           # lower | upper — identifier case
 
 [database]
 url-env = "DATABASE_URL"  # read the connection string from this env var
