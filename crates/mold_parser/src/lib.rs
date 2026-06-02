@@ -830,6 +830,28 @@ mod tests {
     }
 
     #[test]
+    fn test_unsupported_ddl_recovers_without_hang() {
+        // Unsupported CREATE/ALTER objects must error and make progress, never
+        // stall the top-level loop, and must not swallow the following statement.
+        for sql in [
+            "CREATE VIEW v AS SELECT 1",
+            "CREATE SEQUENCE s",
+            "ALTER VIEW v RENAME TO w",
+        ] {
+            let parse = parse(sql);
+            assert!(!parse.errors().is_empty(), "{sql}: expected an error");
+        }
+
+        let parse = parse("CREATE VIEW v AS SELECT 1; SELECT 2");
+        let tree = format_tree("CREATE VIEW v AS SELECT 1; SELECT 2");
+        assert!(
+            tree.contains("SELECT_STMT"),
+            "recovery should still parse the trailing statement:\n{tree}"
+        );
+        assert!(!parse.errors().is_empty());
+    }
+
+    #[test]
     fn test_drop_truncate() {
         assert_parses_with("DROP TABLE IF EXISTS a, b CASCADE", "DROP_STMT");
         assert_parses_with("DROP INDEX CONCURRENTLY idx", "DROP_STMT");

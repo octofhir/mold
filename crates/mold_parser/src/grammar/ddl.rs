@@ -47,11 +47,7 @@ pub fn create_stmt(p: &mut Parser<'_>) {
     match p.nth(n) {
         SyntaxKind::TABLE_KW => create_table_stmt(p),
         SyntaxKind::INDEX_KW => create_index_stmt(p),
-        other => {
-            let m = p.start();
-            p.err_recover(format!("unsupported CREATE statement: {other:?}"), STMT_RECOVERY);
-            m.complete(p, SyntaxKind::ERROR);
-        }
+        other => skip_unsupported(p, format!("unsupported CREATE statement: {other:?}")),
     }
 }
 
@@ -417,9 +413,7 @@ fn index_elem(p: &mut Parser<'_>) {
 
 pub fn alter_stmt(p: &mut Parser<'_>) {
     if p.nth(1) != SyntaxKind::TABLE_KW {
-        let m = p.start();
-        p.err_recover(format!("unsupported ALTER statement: {:?}", p.nth(1)), STMT_RECOVERY);
-        m.complete(p, SyntaxKind::ERROR);
+        skip_unsupported(p, format!("unsupported ALTER statement: {:?}", p.nth(1)));
         return;
     }
 
@@ -586,6 +580,20 @@ pub fn truncate_stmt(p: &mut Parser<'_>) {
 // ===========================================================================
 // Helpers
 // ===========================================================================
+
+/// Emit an error and consume an unsupported statement up to its boundary,
+/// always making forward progress so the top-level loop cannot stall.
+fn skip_unsupported(p: &mut Parser<'_>, msg: String) {
+    let m = p.start();
+    p.error(msg);
+    if !p.at(SyntaxKind::SEMICOLON) && !p.at_end() {
+        p.bump_any(); // guarantee progress past the leading keyword
+    }
+    while !p.at_end() && !p.at(SyntaxKind::SEMICOLON) {
+        p.bump_any();
+    }
+    m.complete(p, SyntaxKind::ERROR);
+}
 
 /// Schema-qualified relation name → TABLE_REF.
 fn relation_name(p: &mut Parser<'_>) {
