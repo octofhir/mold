@@ -187,6 +187,26 @@ const UTIL_CORPUS: &[&str] = &[
     "CREATE EXTENSION IF NOT EXISTS pg_trgm",
 ];
 
+/// CALL, DO, VACUUM, ANALYZE, COPY, GRANT/REVOKE, MERGE, and the remaining
+/// CREATE object statements.
+const COMMANDS_CORPUS: &[&str] = &[
+    "CALL my_proc(1, 2)",
+    "DO $$ BEGIN RAISE NOTICE 'hi'; END $$",
+    "VACUUM ANALYZE t",
+    "ANALYZE t",
+    "COPY t FROM '/tmp/f.csv' WITH (FORMAT csv)",
+    "COPY (SELECT 1) TO STDOUT",
+    "GRANT SELECT, INSERT ON t TO alice",
+    "REVOKE ALL ON t FROM alice",
+    "CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy')",
+    "CREATE TYPE pair AS (a int, b text)",
+    "CREATE FUNCTION f(x int) RETURNS int AS $$ SELECT x + 1 $$ LANGUAGE sql",
+    "CREATE OR REPLACE PROCEDURE p() LANGUAGE plpgsql AS $$ BEGIN END $$",
+    "CREATE TRIGGER trg BEFORE INSERT ON t FOR EACH ROW EXECUTE FUNCTION f()",
+    "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET v = s.v WHEN NOT MATCHED THEN INSERT (id, v) VALUES (s.id, s.v)",
+    "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED AND s.x > 0 THEN UPDATE SET v = CASE WHEN s.v > 0 THEN s.v ELSE 0 END WHEN NOT MATCHED THEN DO NOTHING",
+];
+
 fn pg_accepts(sql: &str) -> bool {
     pg_parse::parse(sql).is_ok()
 }
@@ -204,6 +224,11 @@ fn oracle_ddl_corpus_matches_postgres() {
 #[test]
 fn oracle_util_corpus_matches_postgres() {
     check_corpus(UTIL_CORPUS);
+}
+
+#[test]
+fn oracle_commands_corpus_matches_postgres() {
+    check_corpus(COMMANDS_CORPUS);
 }
 
 fn check_corpus(corpus: &[&str]) {

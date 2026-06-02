@@ -37,9 +37,12 @@ pub fn create_stmt(p: &mut Parser<'_>) {
     let mut n = 1; // 0 is CREATE
     loop {
         match p.nth(n) {
-            SyntaxKind::TEMP_KW | SyntaxKind::TEMPORARY_KW | SyntaxKind::UNLOGGED_KW => n += 1,
+            SyntaxKind::TEMP_KW
+            | SyntaxKind::TEMPORARY_KW
+            | SyntaxKind::UNLOGGED_KW
+            | SyntaxKind::CONSTRAINT_KW
+            | SyntaxKind::UNIQUE_KW => n += 1,
             SyntaxKind::OR_KW => n += 2, // OR REPLACE
-            SyntaxKind::UNIQUE_KW => n += 1,
             _ => break,
         }
     }
@@ -51,8 +54,51 @@ pub fn create_stmt(p: &mut Parser<'_>) {
         SyntaxKind::SEQUENCE_KW => create_sequence_stmt(p),
         SyntaxKind::SCHEMA_KW => create_schema_stmt(p),
         SyntaxKind::EXTENSION_KW => create_extension_stmt(p),
+        SyntaxKind::TYPE_KW => create_type_stmt(p),
+        SyntaxKind::FUNCTION_KW | SyntaxKind::PROCEDURE_KW => create_function_stmt(p),
+        SyntaxKind::TRIGGER_KW => create_trigger_stmt(p),
         other => skip_unsupported(p, format!("unsupported CREATE statement: {other:?}")),
     }
+}
+
+fn create_type_stmt(p: &mut Parser<'_>) {
+    let m = p.start();
+    p.bump(); // CREATE
+    p.expect(SyntaxKind::TYPE_KW);
+    relation_name(p);
+    // AS ENUM (…) | AS (…) | AS RANGE (…) | (shell type)
+    consume_until_semi(p);
+    m.complete(p, SyntaxKind::CREATE_TYPE_STMT);
+}
+
+fn create_function_stmt(p: &mut Parser<'_>) {
+    let m = p.start();
+    p.bump(); // CREATE
+    if p.eat(SyntaxKind::OR_KW) {
+        p.expect(SyntaxKind::REPLACE_KW);
+    }
+    let _ = p.eat(SyntaxKind::FUNCTION_KW) || p.eat(SyntaxKind::PROCEDURE_KW);
+    relation_name(p);
+    if p.at(SyntaxKind::L_PAREN) {
+        consume_balanced_parens(p); // argument list
+    }
+    // RETURNS …, body ($$ … $$ is a single token), LANGUAGE …, options.
+    consume_until_semi(p);
+    m.complete(p, SyntaxKind::CREATE_FUNCTION_STMT);
+}
+
+fn create_trigger_stmt(p: &mut Parser<'_>) {
+    let m = p.start();
+    p.bump(); // CREATE
+    if p.eat(SyntaxKind::OR_KW) {
+        p.expect(SyntaxKind::REPLACE_KW);
+    }
+    p.eat(SyntaxKind::CONSTRAINT_KW);
+    p.expect(SyntaxKind::TRIGGER_KW);
+    expect_ident(p, DDL_RECOVERY);
+    // timing/events ON table … EXECUTE { FUNCTION | PROCEDURE } f(…)
+    consume_until_semi(p);
+    m.complete(p, SyntaxKind::CREATE_TRIGGER_STMT);
 }
 
 fn create_view_stmt(p: &mut Parser<'_>) {

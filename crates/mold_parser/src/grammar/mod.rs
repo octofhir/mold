@@ -1,3 +1,4 @@
+pub mod commands;
 pub mod ddl;
 pub mod delete;
 pub mod expressions;
@@ -80,6 +81,30 @@ pub(super) fn statement(p: &mut Parser<'_>) {
         }
         SyntaxKind::COMMENT_KW => {
             util::comment_stmt(p);
+        }
+        SyntaxKind::CALL_KW => {
+            commands::call_stmt(p);
+        }
+        SyntaxKind::DO_KW => {
+            commands::do_stmt(p);
+        }
+        SyntaxKind::VACUUM_KW => {
+            commands::vacuum_stmt(p);
+        }
+        SyntaxKind::ANALYZE_KW | SyntaxKind::ANALYSE_KW => {
+            commands::analyze_stmt(p);
+        }
+        SyntaxKind::COPY_KW => {
+            commands::copy_stmt(p);
+        }
+        SyntaxKind::GRANT_KW => {
+            commands::grant_stmt(p);
+        }
+        SyntaxKind::REVOKE_KW => {
+            commands::revoke_stmt(p);
+        }
+        SyntaxKind::MERGE_KW => {
+            commands::merge_stmt(p);
         }
         _ => {
             if !p.at_end() {

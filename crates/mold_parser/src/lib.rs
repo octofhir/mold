@@ -915,20 +915,63 @@ mod tests {
     }
 
     #[test]
+    fn test_call_do_vacuum_analyze_copy() {
+        assert_parses_with("CALL my_proc(1, 2)", "CALL_STMT");
+        assert_parses_with("DO $$ BEGIN END $$", "DO_STMT");
+        assert_parses_with("VACUUM ANALYZE t", "VACUUM_STMT");
+        assert_parses_with("ANALYZE t", "ANALYZE_STMT");
+        assert_parses_with("COPY t FROM '/tmp/f.csv'", "COPY_STMT");
+    }
+
+    #[test]
+    fn test_grant_revoke() {
+        assert_parses_with("GRANT SELECT ON t TO alice", "GRANT_STMT");
+        assert_parses_with("REVOKE ALL ON t FROM alice", "REVOKE_STMT");
+    }
+
+    #[test]
+    fn test_merge() {
+        assert_parses_with(
+            "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET v = s.v",
+            "MERGE_STMT",
+        );
+        assert_parses_with(
+            "MERGE INTO t USING s ON t.id = s.id \
+             WHEN MATCHED AND s.x > 0 THEN UPDATE SET v = CASE WHEN s.v > 0 THEN s.v ELSE 0 END \
+             WHEN NOT MATCHED THEN INSERT (id) VALUES (s.id)",
+            "MERGE_STMT",
+        );
+    }
+
+    #[test]
+    fn test_create_type_function_trigger() {
+        assert_parses_with("CREATE TYPE mood AS ENUM ('a', 'b')", "CREATE_TYPE_STMT");
+        assert_parses_with("CREATE TYPE pair AS (a int, b text)", "CREATE_TYPE_STMT");
+        assert_parses_with(
+            "CREATE FUNCTION f(x int) RETURNS int AS $$ SELECT x + 1 $$ LANGUAGE sql",
+            "CREATE_FUNCTION_STMT",
+        );
+        assert_parses_with(
+            "CREATE TRIGGER trg BEFORE INSERT ON t FOR EACH ROW EXECUTE FUNCTION f()",
+            "CREATE_TRIGGER_STMT",
+        );
+    }
+
+    #[test]
     fn test_unsupported_ddl_recovers_without_hang() {
         // Unsupported CREATE/ALTER objects must error and make progress, never
         // stall the top-level loop, and must not swallow the following statement.
         for sql in [
-            "CREATE TYPE mood AS ENUM ('a', 'b')",
-            "CREATE TRIGGER trg BEFORE INSERT ON t EXECUTE FUNCTION f()",
+            "CREATE DATABASE db",
+            "CREATE ROLE r",
             "ALTER VIEW v RENAME TO w",
         ] {
             let parse = parse(sql);
             assert!(!parse.errors().is_empty(), "{sql}: expected an error");
         }
 
-        let parse = parse("CREATE TYPE mood AS ENUM ('a'); SELECT 2");
-        let tree = format_tree("CREATE TYPE mood AS ENUM ('a'); SELECT 2");
+        let parse = parse("CREATE DATABASE db; SELECT 2");
+        let tree = format_tree("CREATE DATABASE db; SELECT 2");
         assert!(
             tree.contains("SELECT_STMT"),
             "recovery should still parse the trailing statement:\n{tree}"
