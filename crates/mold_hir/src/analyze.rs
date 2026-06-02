@@ -1004,9 +1004,226 @@ pub fn expand_table_star(
 
 use mold_syntax::Parse;
 use mold_syntax::SyntaxKind;
-use mold_syntax::ast::{AstNode, ColumnRef, JsonbAccessExpr, WithClause};
+use mold_syntax::ast::{
+    AstNode, ColumnRef, CreateTableStmt, CreateViewStmt, JsonbAccessExpr, WithClause,
+};
 
 use crate::resolve::{validate_column_reference, validate_table_reference};
+
+/// A relation defined by DDL in the source under analysis.
+struct OverlayRelation {
+    table_type: TableType,
+    columns: Vec<ColumnInfo>,
+}
+
+/// Overlays relations defined by DDL in the same source on top of an external
+/// schema provider, so that references to just-created tables (and their
+/// columns) resolve instead of being reported as missing. Lookups consult the
+/// file-local relations first, then fall back to the inner provider.
+struct DdlOverlay<'a> {
+    inner: &'a dyn SchemaProvider,
+    relations: std::collections::BTreeMap<String, OverlayRelation>,
+}
+
+impl<'a> DdlOverlay<'a> {
+    fn new(inner: &'a dyn SchemaProvider, root: &mold_syntax::SyntaxNode) -> Self {
+        let mut relations = std::collections::BTreeMap::new();
+        for node in root.descendants() {
+            match node.kind() {
+                SyntaxKind::CREATE_TABLE_STMT => {
+                    let Some(ct) = CreateTableStmt::cast(node.clone()) else {
+                        continue;
+                    };
+                    let Some(name) = ct.name().and_then(|n| n.name()) else {
+                        continue;
+                    };
+                    let mut columns = Vec::new();
+                    for col in ct.columns() {
+                        let Some(col_name) = col.name() else { continue };
+                        columns.push(ColumnInfo {
+                            name: col_name.text().to_string(),
+                            data_type: col
+                                .type_name()
+                                .map(|t| data_type_from_text(&t.text()))
+                                .unwrap_or(DataType::Unknown),
+                            nullable: !col.is_not_null() && !col.is_primary_key(),
+                            ordinal: columns.len(),
+                        });
+                    }
+                    relations.insert(
+                        name.text().to_ascii_lowercase(),
+                        OverlayRelation {
+                            table_type: TableType::Table,
+                            columns,
+                        },
+                    );
+                }
+                SyntaxKind::CREATE_VIEW_STMT => {
+                    let Some(cv) = CreateViewStmt::cast(node.clone()) else {
+                        continue;
+                    };
+                    if let Some(name) = cv.name().and_then(|n| n.name()) {
+                        let table_type = if cv.is_materialized() {
+                            TableType::MaterializedView
+                        } else {
+                            TableType::View
+                        };
+                        relations.insert(
+                            name.text().to_ascii_lowercase(),
+                            OverlayRelation {
+                                table_type,
+                                columns: Vec::new(),
+                            },
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
+        Self { inner, relations }
+    }
+
+    fn relation(&self, name: &str) -> Option<&OverlayRelation> {
+        self.relations.get(&name.to_ascii_lowercase())
+    }
+}
+
+impl SchemaProvider for DdlOverlay<'_> {
+    fn lookup_table(&self, schema: Option<&str>, name: &str) -> Option<TableInfo> {
+        if let Some(rel) = self.relation(name) {
+            return Some(TableInfo {
+                schema: schema.map(str::to_string),
+                name: name.to_string(),
+                table_type: rel.table_type,
+            });
+        }
+        self.inner.lookup_table(schema, name)
+    }
+
+    fn lookup_columns(&self, schema: Option<&str>, table: &str) -> Vec<ColumnInfo> {
+        match self.relation(table) {
+            Some(rel) if !rel.columns.is_empty() => rel.columns.clone(),
+            Some(_) => Vec::new(),
+            None => self.inner.lookup_columns(schema, table),
+        }
+    }
+
+    fn table_exists(&self, schema: Option<&str>, name: &str) -> bool {
+        self.relation(name).is_some() || self.inner.table_exists(schema, name)
+    }
+
+    fn schema_exists(&self, schema: &str) -> bool {
+        self.inner.schema_exists(schema)
+    }
+
+    fn all_table_names(&self) -> Vec<String> {
+        let mut names = self.inner.all_table_names();
+        names.extend(self.relations.keys().cloned());
+        names
+    }
+
+    fn all_schema_names(&self) -> Vec<String> {
+        self.inner.all_schema_names()
+    }
+
+    fn lookup_jsonb_fields(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        column: &str,
+        path: &[&str],
+    ) -> Option<Vec<String>> {
+        self.inner.lookup_jsonb_fields(schema, table, column, path)
+    }
+
+    fn jsonb_field_is_array(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        column: &str,
+        path: &[&str],
+    ) -> Option<bool> {
+        self.inner.jsonb_field_is_array(schema, table, column, path)
+    }
+}
+
+/// Maps a column type's text to a coarse [`DataType`] for file-local relations.
+/// Resolution only relies on column names, so unrecognized types fall back to
+/// [`DataType::Custom`].
+fn data_type_from_text(text: &str) -> DataType {
+    let lower = text.to_ascii_lowercase();
+    let base = lower.split(['(', '[']).next().unwrap_or("").trim();
+    match base {
+        "smallint" | "int2" => DataType::SmallInt,
+        "integer" | "int" | "int4" => DataType::Integer,
+        "bigint" | "int8" => DataType::BigInt,
+        "real" | "float4" => DataType::Real,
+        "double precision" | "float8" => DataType::DoublePrecision,
+        "numeric" | "decimal" => DataType::Numeric {
+            precision: None,
+            scale: None,
+        },
+        "text" => DataType::Text,
+        "bytea" => DataType::ByteA,
+        "date" => DataType::Date,
+        "boolean" | "bool" => DataType::Boolean,
+        "uuid" => DataType::Uuid,
+        "json" => DataType::Json,
+        "jsonb" => DataType::Jsonb,
+        "interval" => DataType::Interval,
+        b if b.starts_with("varchar") || b.starts_with("character varying") => {
+            DataType::VarChar { length: None }
+        }
+        b if b.starts_with("char") || b.starts_with("character") => DataType::Char { length: None },
+        b if b.starts_with("timestamp") => DataType::Timestamp {
+            with_timezone: lower.contains("with time zone") || base.contains("timestamptz"),
+        },
+        b if b.starts_with("time") => DataType::Time {
+            with_timezone: lower.contains("with time zone"),
+        },
+        "" => DataType::Unknown,
+        other => DataType::Custom(other.to_string()),
+    }
+}
+
+/// Whether `kind` is a DDL or command statement (as opposed to a query).
+fn is_ddl_or_command_kind(kind: SyntaxKind) -> bool {
+    matches!(
+        kind,
+        SyntaxKind::CREATE_TABLE_STMT
+            | SyntaxKind::CREATE_INDEX_STMT
+            | SyntaxKind::CREATE_VIEW_STMT
+            | SyntaxKind::CREATE_SEQUENCE_STMT
+            | SyntaxKind::CREATE_SCHEMA_STMT
+            | SyntaxKind::CREATE_EXTENSION_STMT
+            | SyntaxKind::CREATE_TYPE_STMT
+            | SyntaxKind::CREATE_FUNCTION_STMT
+            | SyntaxKind::CREATE_TRIGGER_STMT
+            | SyntaxKind::ALTER_STMT
+            | SyntaxKind::DROP_STMT
+            | SyntaxKind::TRUNCATE_STMT
+            | SyntaxKind::COMMENT_STMT
+            | SyntaxKind::TRANSACTION_STMT
+            | SyntaxKind::SET_STMT
+            | SyntaxKind::SHOW_STMT
+            | SyntaxKind::RESET_STMT
+            | SyntaxKind::CALL_STMT
+            | SyntaxKind::DO_STMT
+            | SyntaxKind::VACUUM_STMT
+            | SyntaxKind::ANALYZE_STMT
+            | SyntaxKind::COPY_STMT
+            | SyntaxKind::GRANT_STMT
+            | SyntaxKind::REVOKE_STMT
+    )
+}
+
+/// Whether `node` lies within a DDL/command statement. Column references there
+/// are not part of a query scope, so the column checks are skipped to avoid
+/// false "column not found" diagnostics.
+fn within_ddl_or_command(node: &mold_syntax::SyntaxNode) -> bool {
+    std::iter::successors(Some(node.clone()), |n| n.parent().cloned())
+        .any(|n| is_ddl_or_command_kind(n.kind()))
+}
 
 /// Analyzes a parsed SQL query for semantic errors using default options.
 ///
@@ -1027,13 +1244,25 @@ pub fn analyze_query_with_options(
     provider: &dyn SchemaProvider,
     options: &AnalysisOptions,
 ) -> Analysis {
-    let mut analyzer = Analyzer::new(provider).with_rule_options(&options.rule_options);
-
     // Walk the syntax tree to find table and column references
     let root = parse.syntax();
 
+    // Overlay relations defined by DDL in this source so their names and
+    // columns resolve. All resolution below goes through the overlay.
+    let overlay = DdlOverlay::new(provider, &root);
+    let provider: &dyn SchemaProvider = &overlay;
+
+    let mut analyzer = Analyzer::new(provider).with_rule_options(&options.rule_options);
+
     for node in root.descendants() {
         if node.kind() != SyntaxKind::TABLE_REF {
+            continue;
+        }
+
+        // DDL/command statements name objects (definitions and targets) that
+        // mold does not track in the provider; the overlay resolves file-local
+        // ones, and existence checks on the rest would be noise.
+        if within_ddl_or_command(node) {
             continue;
         }
 
@@ -1081,6 +1310,11 @@ pub fn analyze_query_with_options(
 
     // Second pass: validate column references
     for node in root.descendants() {
+        // Column references inside DDL/command statements (index elements,
+        // CHECK predicates, DEFAULT expressions) are not part of a query scope.
+        if within_ddl_or_command(node) {
+            continue;
+        }
         if let Some(col_ref) = ColumnRef::cast(node.clone()) {
             let column = col_ref.column().map(|t| t.text().to_string());
             let table_qualifier = col_ref.table().map(|t| t.text().to_string());
