@@ -335,6 +335,7 @@ pub enum SyntaxKind {
     CREATE_TABLE_STMT,
     DROP_STMT,
     ALTER_STMT,
+    ALTER_TABLE_ACTION,
     CREATE_INDEX_STMT,
     TRUNCATE_STMT,
     EXPLAIN_STMT,
@@ -393,6 +394,9 @@ pub enum SyntaxKind {
     LEAST_EXPR,
     ANY_EXPR, // expr op ANY (array/subquery)
     ALL_EXPR, // expr op ALL (array/subquery)
+    AT_TIME_ZONE_EXPR, // expr AT TIME ZONE zone
+    COLLATE_EXPR,      // expr COLLATE collation
+    ARRAY_SLICE_EXPR,  // expr[lower:upper]
 
     // JSONB access expressions
     JSONB_ACCESS_EXPR,

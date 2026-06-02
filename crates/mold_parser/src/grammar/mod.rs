@@ -1,3 +1,4 @@
+pub mod ddl;
 pub mod delete;
 pub mod expressions;
 pub mod insert;
@@ -41,6 +42,18 @@ fn statement(p: &mut Parser<'_>) {
         }
         SyntaxKind::DELETE_KW => {
             delete::delete_stmt(p);
+        }
+        SyntaxKind::CREATE_KW => {
+            ddl::create_stmt(p);
+        }
+        SyntaxKind::ALTER_KW => {
+            ddl::alter_stmt(p);
+        }
+        SyntaxKind::DROP_KW => {
+            ddl::drop_stmt(p);
+        }
+        SyntaxKind::TRUNCATE_KW => {
+            ddl::truncate_stmt(p);
         }
         _ => {
             if !p.at_end() {
@@ -86,6 +99,10 @@ pub const STMT_RECOVERY: TokenSet = TokenSet::new(&[
     SyntaxKind::INSERT_KW,
     SyntaxKind::UPDATE_KW,
     SyntaxKind::DELETE_KW,
+    SyntaxKind::CREATE_KW,
+    SyntaxKind::ALTER_KW,
+    SyntaxKind::DROP_KW,
+    SyntaxKind::TRUNCATE_KW,
     SyntaxKind::SEMICOLON,
 ]);
 

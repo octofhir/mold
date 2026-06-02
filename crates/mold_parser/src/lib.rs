@@ -677,6 +677,166 @@ mod tests {
         insta::assert_snapshot!(format_tree(sql));
     }
 
+    // =========================================================================
+    // Expression correctness
+    // =========================================================================
+
+    /// Asserts the SQL parses without errors and the tree contains `needle`.
+    fn assert_parses_with(sql: &str, needle: &str) {
+        let parse = parse(sql);
+        assert!(parse.errors().is_empty(), "{sql}: errors: {:?}", parse.errors());
+        let tree = format_tree(sql);
+        assert!(tree.contains(needle), "{sql}: tree missing {needle}:\n{tree}");
+    }
+
+    #[test]
+    fn test_regex_match_operators() {
+        assert_parses_with("SELECT a ~ 'x' FROM t", "BINARY_EXPR");
+        assert_parses_with("SELECT a ~* 'x' FROM t", "BINARY_EXPR");
+        assert_parses_with("SELECT a !~ 'x' FROM t", "BINARY_EXPR");
+        assert_parses_with("SELECT a !~* 'x' FROM t", "BINARY_EXPR");
+    }
+
+    #[test]
+    fn test_exponent_operator() {
+        assert_parses_with("SELECT 2 ^ 3", "BINARY_EXPR");
+    }
+
+    #[test]
+    fn test_not_precedence() {
+        // `NOT a = b` must parse as `NOT (a = b)`: a UNARY_EXPR wrapping a BINARY_EXPR.
+        let sql = "SELECT 1 WHERE NOT a = b";
+        let tree = format_tree(sql);
+        let unary = tree.find("UNARY_EXPR").expect("UNARY_EXPR");
+        let binary = tree.find("BINARY_EXPR").expect("BINARY_EXPR");
+        assert!(unary < binary, "NOT should wrap the comparison:\n{tree}");
+    }
+
+    #[test]
+    fn test_multiword_types() {
+        assert_parses_with("SELECT x::double precision FROM t", "TYPE_NAME");
+        assert_parses_with("SELECT x::character varying FROM t", "TYPE_NAME");
+        assert_parses_with("SELECT x::char varying FROM t", "TYPE_NAME");
+        assert_parses_with("SELECT x::bit varying FROM t", "TYPE_NAME");
+        assert_parses_with("SELECT a::timestamp with time zone FROM t", "TYPE_NAME");
+        assert_parses_with("SELECT a::time without time zone FROM t", "TYPE_NAME");
+        assert_parses_with("SELECT a::timestamp(3) with time zone FROM t", "TYPE_NAME");
+    }
+
+    #[test]
+    fn test_at_time_zone() {
+        assert_parses_with("SELECT a AT TIME ZONE 'UTC' FROM t", "AT_TIME_ZONE_EXPR");
+    }
+
+    #[test]
+    fn test_collate() {
+        assert_parses_with("SELECT n COLLATE \"C\" FROM t", "COLLATE_EXPR");
+        assert_parses_with("SELECT n COLLATE \"en_US\" FROM t ORDER BY n", "COLLATE_EXPR");
+    }
+
+    #[test]
+    fn test_similar_to() {
+        assert_parses_with("SELECT a SIMILAR TO 'x%' FROM t", "LIKE_EXPR");
+        assert_parses_with("SELECT a NOT SIMILAR TO 'x%' FROM t", "LIKE_EXPR");
+    }
+
+    #[test]
+    fn test_isnull_notnull_postfix() {
+        assert_parses_with("SELECT x ISNULL FROM t", "IS_EXPR");
+        assert_parses_with("SELECT x NOTNULL FROM t", "IS_EXPR");
+    }
+
+    #[test]
+    fn test_array_slice() {
+        assert_parses_with("SELECT arr[1:2] FROM t", "ARRAY_SLICE_EXPR");
+        assert_parses_with("SELECT arr[:2] FROM t", "ARRAY_SLICE_EXPR");
+        assert_parses_with("SELECT arr[1:] FROM t", "ARRAY_SLICE_EXPR");
+        // Plain subscript stays a JSONB_ACCESS_EXPR.
+        assert_parses_with("SELECT arr[1] FROM t", "JSONB_ACCESS_EXPR");
+    }
+
+    // =========================================================================
+    // DDL: CREATE TABLE / ALTER TABLE / CREATE INDEX / DROP / TRUNCATE
+    // =========================================================================
+
+    #[test]
+    fn test_create_table() {
+        assert_parses_with(
+            "CREATE TABLE users (id bigint PRIMARY KEY, name text NOT NULL)",
+            "CREATE_TABLE_STMT",
+        );
+        assert_parses_with(
+            "CREATE TABLE users (id bigint PRIMARY KEY, name text NOT NULL)",
+            "COLUMN_DEF",
+        );
+        assert_parses_with(
+            "CREATE TABLE users (id bigint PRIMARY KEY)",
+            "PRIMARY_KEY_CONSTRAINT",
+        );
+        assert_parses_with(
+            "CREATE TABLE t (id int, name text NOT NULL)",
+            "NOT_NULL_CONSTRAINT",
+        );
+    }
+
+    #[test]
+    fn test_create_table_constraints() {
+        assert_parses_with(
+            "CREATE TABLE t (a int REFERENCES u(id) ON DELETE CASCADE)",
+            "FOREIGN_KEY_CONSTRAINT",
+        );
+        assert_parses_with("CREATE TABLE t (a int CHECK (a > 0))", "CHECK_CONSTRAINT");
+        assert_parses_with(
+            "CREATE TABLE t (a int, b int, PRIMARY KEY (a, b))",
+            "PRIMARY_KEY_CONSTRAINT",
+        );
+        assert_parses_with("CREATE TABLE t (a int, UNIQUE (a))", "UNIQUE_CONSTRAINT");
+    }
+
+    #[test]
+    fn test_create_table_as_select() {
+        assert_parses_with(
+            "CREATE TABLE archive AS SELECT * FROM users",
+            "CREATE_TABLE_STMT",
+        );
+        assert_parses_with("CREATE TABLE archive AS SELECT * FROM users", "SELECT_STMT");
+    }
+
+    #[test]
+    fn test_alter_table() {
+        assert_parses_with("ALTER TABLE t ADD COLUMN a int NOT NULL", "ALTER_STMT");
+        assert_parses_with("ALTER TABLE t ADD COLUMN a int", "ALTER_TABLE_ACTION");
+        assert_parses_with("ALTER TABLE t ADD COLUMN a int", "COLUMN_DEF");
+        assert_parses_with(
+            "ALTER TABLE t ADD CONSTRAINT ck CHECK (x > 0) NOT VALID",
+            "CHECK_CONSTRAINT",
+        );
+        assert_parses_with("ALTER TABLE t ALTER COLUMN id TYPE bigint", "TYPE_NAME");
+        assert_parses_with("ALTER TABLE t RENAME COLUMN a TO b", "ALTER_STMT");
+        assert_parses_with("ALTER TABLE t ADD COLUMN a int, DROP COLUMN b", "ALTER_TABLE_ACTION");
+    }
+
+    #[test]
+    fn test_create_index() {
+        assert_parses_with(
+            "CREATE INDEX CONCURRENTLY idx ON users (lower(email))",
+            "CREATE_INDEX_STMT",
+        );
+        assert_parses_with(
+            "CREATE UNIQUE INDEX idx ON t (a, b DESC NULLS LAST) WHERE active",
+            "WHERE_CLAUSE",
+        );
+        assert_parses_with("CREATE INDEX ON t (a)", "CREATE_INDEX_STMT");
+    }
+
+    #[test]
+    fn test_drop_truncate() {
+        assert_parses_with("DROP TABLE IF EXISTS a, b CASCADE", "DROP_STMT");
+        assert_parses_with("DROP INDEX CONCURRENTLY idx", "DROP_STMT");
+        assert_parses_with("TRUNCATE TABLE a, b RESTART IDENTITY CASCADE", "TRUNCATE_STMT");
+        assert_parses_with("TRUNCATE t", "TRUNCATE_STMT");
+    }
+
     #[test]
     fn test_with_clause_subquery_recovery() {
         // CTE parsing with missing closing paren - should still produce valid structure
