@@ -830,20 +830,65 @@ mod tests {
     }
 
     #[test]
+    fn test_transaction_control() {
+        assert_parses_with("BEGIN", "TRANSACTION_STMT");
+        assert_parses_with("COMMIT", "TRANSACTION_STMT");
+        assert_parses_with("ROLLBACK", "TRANSACTION_STMT");
+        assert_parses_with("START TRANSACTION ISOLATION LEVEL SERIALIZABLE", "TRANSACTION_STMT");
+        assert_parses_with("SAVEPOINT sp1", "TRANSACTION_STMT");
+        assert_parses_with("ROLLBACK TO SAVEPOINT sp1", "TRANSACTION_STMT");
+    }
+
+    #[test]
+    fn test_set_show_reset() {
+        assert_parses_with("SET search_path TO public", "SET_STMT");
+        assert_parses_with("SET TIME ZONE 'UTC'", "SET_STMT");
+        assert_parses_with("SHOW search_path", "SHOW_STMT");
+        assert_parses_with("RESET ALL", "RESET_STMT");
+    }
+
+    #[test]
+    fn test_explain() {
+        assert_parses_with("EXPLAIN SELECT 1", "EXPLAIN_STMT");
+        assert_parses_with("EXPLAIN SELECT 1", "SELECT_STMT");
+        assert_parses_with("EXPLAIN ANALYZE SELECT * FROM t", "SELECT_STMT");
+        assert_parses_with("EXPLAIN (ANALYZE, BUFFERS) SELECT 1", "SELECT_STMT");
+    }
+
+    #[test]
+    fn test_comment_on() {
+        assert_parses_with("COMMENT ON TABLE t IS 'hi'", "COMMENT_STMT");
+        assert_parses_with("COMMENT ON COLUMN t.c IS NULL", "COMMENT_STMT");
+    }
+
+    #[test]
+    fn test_create_view_sequence_schema_extension() {
+        assert_parses_with("CREATE VIEW v AS SELECT 1", "CREATE_VIEW_STMT");
+        assert_parses_with("CREATE VIEW v AS SELECT 1", "SELECT_STMT");
+        assert_parses_with(
+            "CREATE MATERIALIZED VIEW mv AS SELECT * FROM t WITH NO DATA",
+            "CREATE_VIEW_STMT",
+        );
+        assert_parses_with("CREATE SEQUENCE s START 1", "CREATE_SEQUENCE_STMT");
+        assert_parses_with("CREATE SCHEMA app", "CREATE_SCHEMA_STMT");
+        assert_parses_with("CREATE EXTENSION IF NOT EXISTS pg_trgm", "CREATE_EXTENSION_STMT");
+    }
+
+    #[test]
     fn test_unsupported_ddl_recovers_without_hang() {
         // Unsupported CREATE/ALTER objects must error and make progress, never
         // stall the top-level loop, and must not swallow the following statement.
         for sql in [
-            "CREATE VIEW v AS SELECT 1",
-            "CREATE SEQUENCE s",
+            "CREATE TYPE mood AS ENUM ('a', 'b')",
+            "CREATE TRIGGER trg BEFORE INSERT ON t EXECUTE FUNCTION f()",
             "ALTER VIEW v RENAME TO w",
         ] {
             let parse = parse(sql);
             assert!(!parse.errors().is_empty(), "{sql}: expected an error");
         }
 
-        let parse = parse("CREATE VIEW v AS SELECT 1; SELECT 2");
-        let tree = format_tree("CREATE VIEW v AS SELECT 1; SELECT 2");
+        let parse = parse("CREATE TYPE mood AS ENUM ('a'); SELECT 2");
+        let tree = format_tree("CREATE TYPE mood AS ENUM ('a'); SELECT 2");
         assert!(
             tree.contains("SELECT_STMT"),
             "recovery should still parse the trailing statement:\n{tree}"

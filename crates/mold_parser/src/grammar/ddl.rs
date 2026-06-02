@@ -47,8 +47,103 @@ pub fn create_stmt(p: &mut Parser<'_>) {
     match p.nth(n) {
         SyntaxKind::TABLE_KW => create_table_stmt(p),
         SyntaxKind::INDEX_KW => create_index_stmt(p),
+        SyntaxKind::VIEW_KW | SyntaxKind::MATERIALIZED_KW => create_view_stmt(p),
+        SyntaxKind::SEQUENCE_KW => create_sequence_stmt(p),
+        SyntaxKind::SCHEMA_KW => create_schema_stmt(p),
+        SyntaxKind::EXTENSION_KW => create_extension_stmt(p),
         other => skip_unsupported(p, format!("unsupported CREATE statement: {other:?}")),
     }
+}
+
+fn create_view_stmt(p: &mut Parser<'_>) {
+    let m = p.start();
+    p.bump(); // CREATE
+
+    if p.eat(SyntaxKind::OR_KW) {
+        p.expect(SyntaxKind::REPLACE_KW);
+    }
+    let _ = p.eat(SyntaxKind::TEMP_KW)
+        || p.eat(SyntaxKind::TEMPORARY_KW)
+        || p.eat(SyntaxKind::RECURSIVE_KW);
+    p.eat(SyntaxKind::MATERIALIZED_KW);
+    p.expect(SyntaxKind::VIEW_KW);
+
+    if p.eat(SyntaxKind::IF_KW) {
+        p.expect(SyntaxKind::NOT_KW);
+        p.expect(SyntaxKind::EXISTS_KW);
+    }
+
+    relation_name(p);
+
+    if p.at(SyntaxKind::L_PAREN) {
+        paren_column_list(p);
+    }
+
+    // WITH ( view_options ) before AS.
+    if p.at(SyntaxKind::WITH_KW) {
+        consume_until_as_or_semi(p);
+    }
+
+    if p.eat(SyntaxKind::AS_KW) {
+        if p.at(SyntaxKind::WITH_KW) || p.at(SyntaxKind::SELECT_KW) {
+            select_stmt(p);
+        } else {
+            p.error("expected SELECT after CREATE VIEW … AS");
+        }
+    }
+
+    // Trailing WITH [NO] DATA / WITH CHECK OPTION.
+    consume_until_semi(p);
+
+    m.complete(p, SyntaxKind::CREATE_VIEW_STMT);
+}
+
+fn create_sequence_stmt(p: &mut Parser<'_>) {
+    let m = p.start();
+    p.bump(); // CREATE
+    let _ = p.eat(SyntaxKind::TEMP_KW) || p.eat(SyntaxKind::TEMPORARY_KW);
+    p.expect(SyntaxKind::SEQUENCE_KW);
+    if p.eat(SyntaxKind::IF_KW) {
+        p.expect(SyntaxKind::NOT_KW);
+        p.expect(SyntaxKind::EXISTS_KW);
+    }
+    relation_name(p);
+    consume_until_semi(p); // AS type / INCREMENT / START / OWNED BY …
+    m.complete(p, SyntaxKind::CREATE_SEQUENCE_STMT);
+}
+
+fn create_schema_stmt(p: &mut Parser<'_>) {
+    let m = p.start();
+    p.bump(); // CREATE
+    p.expect(SyntaxKind::SCHEMA_KW);
+    if p.eat(SyntaxKind::IF_KW) {
+        p.expect(SyntaxKind::NOT_KW);
+        p.expect(SyntaxKind::EXISTS_KW);
+    }
+    if p.eat(SyntaxKind::AUTHORIZATION_KW) {
+        expect_ident(p, DDL_RECOVERY);
+    } else {
+        relation_name(p);
+        if p.eat(SyntaxKind::AUTHORIZATION_KW) {
+            expect_ident(p, DDL_RECOVERY);
+        }
+    }
+    // Optional inline schema elements (CREATE … inside).
+    consume_until_semi(p);
+    m.complete(p, SyntaxKind::CREATE_SCHEMA_STMT);
+}
+
+fn create_extension_stmt(p: &mut Parser<'_>) {
+    let m = p.start();
+    p.bump(); // CREATE
+    p.expect(SyntaxKind::EXTENSION_KW);
+    if p.eat(SyntaxKind::IF_KW) {
+        p.expect(SyntaxKind::NOT_KW);
+        p.expect(SyntaxKind::EXISTS_KW);
+    }
+    expect_ident(p, DDL_RECOVERY);
+    consume_until_semi(p); // WITH / SCHEMA / VERSION / CASCADE
+    m.complete(p, SyntaxKind::CREATE_EXTENSION_STMT);
 }
 
 fn create_table_stmt(p: &mut Parser<'_>) {
@@ -670,6 +765,19 @@ fn consume_balanced_parens(p: &mut Parser<'_>) {
 
 fn consume_until_semi(p: &mut Parser<'_>) {
     while !p.at_end() && !p.at(SyntaxKind::SEMICOLON) {
+        p.bump_any();
+    }
+}
+
+fn consume_until_as_or_semi(p: &mut Parser<'_>) {
+    let mut depth = 0i32;
+    while !p.at_end() {
+        match p.current() {
+            SyntaxKind::L_PAREN => depth += 1,
+            SyntaxKind::R_PAREN if depth > 0 => depth -= 1,
+            SyntaxKind::AS_KW | SyntaxKind::SEMICOLON if depth == 0 => break,
+            _ => {}
+        }
         p.bump_any();
     }
 }

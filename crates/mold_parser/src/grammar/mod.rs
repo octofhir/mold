@@ -6,6 +6,7 @@ pub mod jsonpath;
 pub mod jsonpath_lexer;
 pub mod select;
 pub mod update;
+pub mod util;
 
 use crate::parser::Parser;
 use mold_syntax::SyntaxKind;
@@ -22,7 +23,7 @@ pub fn root(p: &mut Parser<'_>) {
     m.complete(p, SyntaxKind::SOURCE_FILE);
 }
 
-fn statement(p: &mut Parser<'_>) {
+pub(super) fn statement(p: &mut Parser<'_>) {
     // WITH can start a CTE for SELECT, INSERT, UPDATE, or DELETE
     if p.at(SyntaxKind::WITH_KW) {
         // Look ahead to determine which statement follows the CTE
@@ -54,6 +55,31 @@ fn statement(p: &mut Parser<'_>) {
         }
         SyntaxKind::TRUNCATE_KW => {
             ddl::truncate_stmt(p);
+        }
+        SyntaxKind::BEGIN_KW
+        | SyntaxKind::START_KW
+        | SyntaxKind::COMMIT_KW
+        | SyntaxKind::END_KW
+        | SyntaxKind::ROLLBACK_KW
+        | SyntaxKind::ABORT_KW
+        | SyntaxKind::SAVEPOINT_KW
+        | SyntaxKind::RELEASE_KW => {
+            util::transaction_stmt(p);
+        }
+        SyntaxKind::SET_KW => {
+            util::set_stmt(p);
+        }
+        SyntaxKind::SHOW_KW => {
+            util::show_stmt(p);
+        }
+        SyntaxKind::RESET_KW => {
+            util::reset_stmt(p);
+        }
+        SyntaxKind::EXPLAIN_KW => {
+            util::explain_stmt(p);
+        }
+        SyntaxKind::COMMENT_KW => {
+            util::comment_stmt(p);
         }
         _ => {
             if !p.at_end() {

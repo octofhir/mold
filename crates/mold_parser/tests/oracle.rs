@@ -137,6 +137,38 @@ const DDL_CORPUS: &[&str] = &[
     "TRUNCATE TABLE a, b RESTART IDENTITY CASCADE",
 ];
 
+/// Session, transaction, and utility statements.
+const UTIL_CORPUS: &[&str] = &[
+    "BEGIN",
+    "COMMIT",
+    "ROLLBACK",
+    "START TRANSACTION ISOLATION LEVEL SERIALIZABLE",
+    "BEGIN TRANSACTION READ ONLY",
+    "SAVEPOINT sp1",
+    "RELEASE SAVEPOINT sp1",
+    "ROLLBACK TO SAVEPOINT sp1",
+    "COMMIT AND CHAIN",
+    "SET search_path TO public",
+    "SET LOCAL statement_timeout = '5s'",
+    "SET TIME ZONE 'UTC'",
+    "RESET ALL",
+    "SHOW search_path",
+    "SHOW ALL",
+    "EXPLAIN SELECT 1",
+    "EXPLAIN ANALYZE SELECT * FROM t",
+    "EXPLAIN (ANALYZE, BUFFERS, FORMAT json) SELECT 1",
+    "EXPLAIN VERBOSE SELECT 1",
+    "COMMENT ON TABLE t IS 'hi'",
+    "COMMENT ON COLUMN t.c IS NULL",
+    "CREATE VIEW v AS SELECT 1",
+    "CREATE OR REPLACE VIEW v (a, b) AS SELECT 1, 2",
+    "CREATE MATERIALIZED VIEW mv AS SELECT * FROM t WITH NO DATA",
+    "CREATE SEQUENCE s START 1 INCREMENT 2",
+    "CREATE SCHEMA app",
+    "CREATE SCHEMA AUTHORIZATION bob",
+    "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+];
+
 fn pg_accepts(sql: &str) -> bool {
     pg_parse::parse(sql).is_ok()
 }
@@ -149,6 +181,11 @@ fn oracle_corpus_matches_postgres() {
 #[test]
 fn oracle_ddl_corpus_matches_postgres() {
     check_corpus(DDL_CORPUS);
+}
+
+#[test]
+fn oracle_util_corpus_matches_postgres() {
+    check_corpus(UTIL_CORPUS);
 }
 
 fn check_corpus(corpus: &[&str]) {
