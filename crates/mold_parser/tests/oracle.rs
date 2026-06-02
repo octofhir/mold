@@ -80,6 +80,19 @@ const CORPUS: &[&str] = &[
     "UPDATE users SET active = true, name = 'x' WHERE id = 1 RETURNING *",
     "UPDATE u SET v = c.v FROM contacts c WHERE u.id = c.uid",
     "DELETE FROM users USING blocklist b WHERE users.id = b.uid RETURNING id",
+    // --- bitwise / shift operators ---
+    "SELECT flags & 1, flags | 2, flags # 4 FROM t",
+    "SELECT a << 2, b >> 1 FROM t",
+    "SELECT * FROM t WHERE flags & 1 = 0 AND a | b > c",
+    // --- escape / unicode string literals ---
+    "SELECT E'line\\n\\ttab' FROM t",
+    "SELECT U&'d\\0061t' FROM t",
+    // --- named / variadic function arguments ---
+    "SELECT make_interval(days => 5, hours => 3)",
+    "SELECT concat_ws(',', VARIADIC ARRAY['a', 'b'])",
+    // --- unicode identifiers ---
+    "SELECT имя FROM таблица WHERE имя = 1",
+    "SELECT * FROM \"Имя Таблицы\" t WHERE t.поле = 1",
 ];
 
 /// DDL statements. Same contract: PG-valid ⇒ mold parses cleanly.

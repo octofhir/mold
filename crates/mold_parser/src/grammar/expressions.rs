@@ -446,9 +446,9 @@ fn func_call_args(p: &mut Parser<'_>, m: crate::parser::Marker) -> CompletedMark
             p.bump();
         } else {
             // Arguments
-            expr(p);
+            func_arg(p);
             while p.eat(SyntaxKind::COMMA) {
-                expr(p);
+                func_arg(p);
             }
         }
 
@@ -475,6 +475,21 @@ fn func_call_args(p: &mut Parser<'_>, m: crate::parser::Marker) -> CompletedMark
     }
 
     m.complete(p, SyntaxKind::FUNC_CALL)
+}
+
+/// A function-call argument, optionally named (`name => value`) or VARIADIC.
+fn func_arg(p: &mut Parser<'_>) {
+    p.eat(SyntaxKind::VARIADIC_KW);
+
+    if at_ident(p) && p.nth(1) == SyntaxKind::FAT_ARROW {
+        let m = p.start();
+        p.bump(); // name
+        p.bump(); // =>
+        expr(p);
+        m.complete(p, SyntaxKind::NAMED_ARG);
+    } else {
+        expr(p);
+    }
 }
 
 fn order_by_in_aggregate(p: &mut Parser<'_>) {
@@ -994,6 +1009,13 @@ fn infix_binding_power(op: SyntaxKind) -> Option<(u8, u8)> {
 
         // Additive
         SyntaxKind::PLUS | SyntaxKind::MINUS => (8, 9),
+
+        // Bitwise and shift operators (below additive, above comparison).
+        SyntaxKind::AMP
+        | SyntaxKind::PIPE
+        | SyntaxKind::HASH
+        | SyntaxKind::SHL
+        | SyntaxKind::SHR => (7, 8),
 
         // JSONB containment and existence
         SyntaxKind::AT_GT | SyntaxKind::LT_AT => (6, 7),

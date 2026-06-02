@@ -59,6 +59,12 @@ pub enum SyntaxKind {
     TILDE_STAR,      // ~*  Case-insensitive regex
     BANG_TILDE,      // !~  Regex not match
     BANG_TILDE_STAR, // !~* Case-insensitive regex not match
+    AMP,             // &   Bitwise AND
+    PIPE,            // |   Bitwise OR
+    HASH,            // #   Bitwise XOR
+    SHL,             // <<  Bitwise shift left
+    SHR,             // >>  Bitwise shift right
+    FAT_ARROW,       // =>  Named argument
     SIMILAR_TO,      // SIMILAR TO (parsed as keyword sequence)
     LIKE,            // LIKE (parsed as keyword)
 
@@ -654,6 +660,12 @@ impl cstree::Syntax for SyntaxKind {
             Self::CARET => Some("^"),
             Self::PIPE_PIPE => Some("||"),
             Self::TILDE => Some("~"),
+            Self::AMP => Some("&"),
+            Self::PIPE => Some("|"),
+            Self::HASH => Some("#"),
+            Self::SHL => Some("<<"),
+            Self::SHR => Some(">>"),
+            Self::FAT_ARROW => Some("=>"),
             // JSONB operators
             Self::ARROW => Some("->"),
             Self::ARROW_TEXT => Some("->>"),
