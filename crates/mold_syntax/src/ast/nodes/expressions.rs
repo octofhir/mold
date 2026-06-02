@@ -661,6 +661,66 @@ impl AstNode for TypeName {
     }
 }
 
+impl TypeName {
+    /// The leading type token (the base type keyword or identifier).
+    pub fn name_token(&self) -> Option<SyntaxToken> {
+        support::first_token(&self.0)
+    }
+
+    /// `CHARACTER VARYING` / `CHAR VARYING` / `BIT VARYING`.
+    pub fn is_varying(&self) -> bool {
+        support::token(&self.0, SyntaxKind::VARYING_KW).is_some()
+    }
+
+    /// A length/precision modifier (`(n)` or `(p, s)`) is present.
+    pub fn has_modifier(&self) -> bool {
+        support::token(&self.0, SyntaxKind::L_PAREN).is_some()
+    }
+
+    /// An array type (`type[]`).
+    pub fn is_array(&self) -> bool {
+        support::token(&self.0, SyntaxKind::L_BRACKET).is_some()
+    }
+
+    /// The full type text, with single spaces between word tokens and none
+    /// around punctuation (e.g. `double precision`, `varchar(255)`, `int[]`).
+    pub fn text(&self) -> String {
+        fn is_word(kind: SyntaxKind) -> bool {
+            !matches!(
+                kind,
+                SyntaxKind::L_PAREN
+                    | SyntaxKind::R_PAREN
+                    | SyntaxKind::COMMA
+                    | SyntaxKind::L_BRACKET
+                    | SyntaxKind::R_BRACKET
+                    | SyntaxKind::DOT
+            )
+        }
+        fn walk(node: &SyntaxNode, out: &mut String, prev_word: &mut bool) {
+            for elem in node.children_with_tokens() {
+                match elem {
+                    cstree::util::NodeOrToken::Token(t) => {
+                        if t.kind() == SyntaxKind::WHITESPACE {
+                            continue;
+                        }
+                        let word = is_word(t.kind());
+                        if !out.is_empty() && word && *prev_word {
+                            out.push(' ');
+                        }
+                        out.push_str(t.text());
+                        *prev_word = word;
+                    }
+                    cstree::util::NodeOrToken::Node(n) => walk(n, out, prev_word),
+                }
+            }
+        }
+        let mut out = String::new();
+        let mut prev_word = false;
+        walk(&self.0, &mut out, &mut prev_word);
+        out
+    }
+}
+
 // =============================================================================
 // CASE Expression
 // =============================================================================

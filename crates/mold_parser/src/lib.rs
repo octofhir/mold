@@ -684,9 +684,16 @@ mod tests {
     /// Asserts the SQL parses without errors and the tree contains `needle`.
     fn assert_parses_with(sql: &str, needle: &str) {
         let parse = parse(sql);
-        assert!(parse.errors().is_empty(), "{sql}: errors: {:?}", parse.errors());
+        assert!(
+            parse.errors().is_empty(),
+            "{sql}: errors: {:?}",
+            parse.errors()
+        );
         let tree = format_tree(sql);
-        assert!(tree.contains(needle), "{sql}: tree missing {needle}:\n{tree}");
+        assert!(
+            tree.contains(needle),
+            "{sql}: tree missing {needle}:\n{tree}"
+        );
     }
 
     #[test]
@@ -731,7 +738,10 @@ mod tests {
     #[test]
     fn test_collate() {
         assert_parses_with("SELECT n COLLATE \"C\" FROM t", "COLLATE_EXPR");
-        assert_parses_with("SELECT n COLLATE \"en_US\" FROM t ORDER BY n", "COLLATE_EXPR");
+        assert_parses_with(
+            "SELECT n COLLATE \"en_US\" FROM t ORDER BY n",
+            "COLLATE_EXPR",
+        );
     }
 
     #[test]
@@ -813,7 +823,10 @@ mod tests {
         );
         assert_parses_with("ALTER TABLE t ALTER COLUMN id TYPE bigint", "TYPE_NAME");
         assert_parses_with("ALTER TABLE t RENAME COLUMN a TO b", "ALTER_STMT");
-        assert_parses_with("ALTER TABLE t ADD COLUMN a int, DROP COLUMN b", "ALTER_TABLE_ACTION");
+        assert_parses_with(
+            "ALTER TABLE t ADD COLUMN a int, DROP COLUMN b",
+            "ALTER_TABLE_ACTION",
+        );
     }
 
     #[test]
@@ -842,7 +855,10 @@ mod tests {
     fn test_parenthesized_set_ops() {
         assert_parses_with("(SELECT 1) UNION (SELECT 2)", "SELECT_STMT");
         assert_parses_with("SELECT 1 UNION VALUES (2)", "VALUES_CLAUSE");
-        assert_parses_with("(SELECT 1) UNION (SELECT 2) ORDER BY 1 LIMIT 5", "ORDER_BY_CLAUSE");
+        assert_parses_with(
+            "(SELECT 1) UNION (SELECT 2) ORDER BY 1 LIMIT 5",
+            "ORDER_BY_CLAUSE",
+        );
     }
 
     #[test]
@@ -874,7 +890,10 @@ mod tests {
         assert_parses_with("BEGIN", "TRANSACTION_STMT");
         assert_parses_with("COMMIT", "TRANSACTION_STMT");
         assert_parses_with("ROLLBACK", "TRANSACTION_STMT");
-        assert_parses_with("START TRANSACTION ISOLATION LEVEL SERIALIZABLE", "TRANSACTION_STMT");
+        assert_parses_with(
+            "START TRANSACTION ISOLATION LEVEL SERIALIZABLE",
+            "TRANSACTION_STMT",
+        );
         assert_parses_with("SAVEPOINT sp1", "TRANSACTION_STMT");
         assert_parses_with("ROLLBACK TO SAVEPOINT sp1", "TRANSACTION_STMT");
     }
@@ -911,7 +930,10 @@ mod tests {
         );
         assert_parses_with("CREATE SEQUENCE s START 1", "CREATE_SEQUENCE_STMT");
         assert_parses_with("CREATE SCHEMA app", "CREATE_SCHEMA_STMT");
-        assert_parses_with("CREATE EXTENSION IF NOT EXISTS pg_trgm", "CREATE_EXTENSION_STMT");
+        assert_parses_with(
+            "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+            "CREATE_EXTENSION_STMT",
+        );
     }
 
     #[test]
@@ -983,7 +1005,10 @@ mod tests {
     fn test_drop_truncate() {
         assert_parses_with("DROP TABLE IF EXISTS a, b CASCADE", "DROP_STMT");
         assert_parses_with("DROP INDEX CONCURRENTLY idx", "DROP_STMT");
-        assert_parses_with("TRUNCATE TABLE a, b RESTART IDENTITY CASCADE", "TRUNCATE_STMT");
+        assert_parses_with(
+            "TRUNCATE TABLE a, b RESTART IDENTITY CASCADE",
+            "TRUNCATE_STMT",
+        );
         assert_parses_with("TRUNCATE t", "TRUNCATE_STMT");
     }
 

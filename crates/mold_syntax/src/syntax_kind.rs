@@ -428,8 +428,8 @@ pub enum SyntaxKind {
     NULLIF_EXPR,
     GREATEST_EXPR,
     LEAST_EXPR,
-    ANY_EXPR, // expr op ANY (array/subquery)
-    ALL_EXPR, // expr op ALL (array/subquery)
+    ANY_EXPR,          // expr op ANY (array/subquery)
+    ALL_EXPR,          // expr op ALL (array/subquery)
     AT_TIME_ZONE_EXPR, // expr AT TIME ZONE zone
     COLLATE_EXPR,      // expr COLLATE collation
     ARRAY_SLICE_EXPR,  // expr[lower:upper]

@@ -280,11 +280,7 @@ fn oracle_valid_fixtures_match_postgres() {
         }
         let parse = mold_parser::parse(&sql);
         if !parse.errors().is_empty() {
-            mismatches.push(format!(
-                "  {}\n    -> {:?}",
-                path.display(),
-                parse.errors()
-            ));
+            mismatches.push(format!("  {}\n    -> {:?}", path.display(), parse.errors()));
         }
     }
 
