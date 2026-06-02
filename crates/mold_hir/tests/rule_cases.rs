@@ -49,6 +49,9 @@ struct Case {
     fail: Option<String>,
     #[serde(default)]
     fix: Option<String>,
+    /// Per-rule options: `code -> (key -> value)`, fed into the analyzer.
+    #[serde(default)]
+    options: std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>>,
 }
 
 /// The fixed schema fixtures resolve against when `schema: true`.
@@ -113,9 +116,11 @@ fn all_packs() -> AnalysisOptions {
 }
 
 /// Diagnostics carrying `rule`, in source order, with their fix edits.
-fn fires(sql: &str, rule: &str, schema: bool) -> Vec<mold_hir::Diagnostic> {
+fn fires(case: &Case, sql: &str) -> Vec<mold_hir::Diagnostic> {
+    let (rule, schema) = (case.rule.as_str(), case.schema);
     let parse = parse(sql);
-    let options = all_packs();
+    let mut options = all_packs();
+    options.rule_options = case.options.clone();
     let analysis = if schema {
         analyze_query_with_options(&parse, &TestProvider, &options)
     } else {
@@ -149,7 +154,7 @@ fn run_case(case: &Case) {
     let label = format!("{} [{}]", case.name, case.rule);
 
     if let Some(sql) = &case.pass {
-        let diags = fires(sql, &case.rule, case.schema);
+        let diags = fires(case, sql);
         assert!(
             diags.is_empty(),
             "{label}: expected no {} on `pass` SQL, got {} diagnostic(s)",
@@ -159,7 +164,7 @@ fn run_case(case: &Case) {
     }
 
     if let Some(sql) = &case.fail {
-        let diags = fires(sql, &case.rule, case.schema);
+        let diags = fires(case, sql);
         assert!(
             !diags.is_empty(),
             "{label}: expected {} to fire on `fail` SQL, but it did not",

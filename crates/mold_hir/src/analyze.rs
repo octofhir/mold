@@ -191,6 +191,8 @@ pub enum RuleCode {
     Cv06,
     /// `RIGHT JOIN` used where a `LEFT JOIN` reads more naturally.
     Cv08,
+    /// A configured blocked word appears in the SQL.
+    Cv09,
     /// `LIKE` with no wildcard behaves like `=`.
     Cv10,
     /// Cast style (`::` vs `CAST`) is inconsistent within a statement.
@@ -239,6 +241,7 @@ impl RuleCode {
             RuleCode::Cv05 => "CV05",
             RuleCode::Cv06 => "CV06",
             RuleCode::Cv08 => "CV08",
+            RuleCode::Cv09 => "CV09",
             RuleCode::Cv10 => "CV10",
             RuleCode::Cv11 => "CV11",
             RuleCode::Cp01 => "CP01",
@@ -397,7 +400,17 @@ pub struct AnalysisOptions {
     pub builtin_lint_packs: Vec<BuiltinLintPack>,
     /// Additional external lint packs.
     pub external_lint_packs: Vec<Arc<dyn LintRulePack>>,
+    /// Per-rule options, keyed by rule code then option name. Values are
+    /// stringified; list-valued options are comma-joined.
+    pub rule_options: RuleOptions,
 }
+
+/// Per-rule options: `code -> (key -> value)`.
+pub type RuleOptions =
+    std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>>;
+
+/// An empty option set, used when an analyzer is built without options.
+static EMPTY_RULE_OPTIONS: RuleOptions = std::collections::BTreeMap::new();
 
 impl AnalysisOptions {
     /// Creates options with default built-in lint packs enabled.
@@ -420,6 +433,20 @@ impl AnalysisOptions {
         self
     }
 
+    /// Sets a single per-rule option (`code`, `key` → `value`).
+    pub fn with_rule_option(
+        mut self,
+        code: impl Into<String>,
+        key: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.rule_options
+            .entry(code.into())
+            .or_default()
+            .insert(key.into(), value.into());
+        self
+    }
+
     pub(crate) fn has_builtin_pack(&self, pack: BuiltinLintPack) -> bool {
         self.builtin_lint_packs.contains(&pack)
     }
@@ -439,6 +466,7 @@ impl Clone for AnalysisOptions {
         Self {
             builtin_lint_packs: self.builtin_lint_packs.clone(),
             external_lint_packs: self.external_lint_packs.clone(),
+            rule_options: self.rule_options.clone(),
         }
     }
 }
@@ -448,6 +476,7 @@ impl Default for AnalysisOptions {
         Self {
             builtin_lint_packs: vec![BuiltinLintPack::Core, BuiltinLintPack::Jsonb],
             external_lint_packs: Vec::new(),
+            rule_options: RuleOptions::new(),
         }
     }
 }
@@ -718,6 +747,9 @@ pub struct Analyzer<'a> {
 
     /// Resolved table references.
     resolved_tables: Vec<ResolvedTableRef>,
+
+    /// Per-rule options consulted by config-driven rules.
+    rule_options: &'a RuleOptions,
 }
 
 impl<'a> Analyzer<'a> {
@@ -725,6 +757,7 @@ impl<'a> Analyzer<'a> {
     pub fn new(provider: &'a dyn SchemaProvider) -> Self {
         Self {
             provider,
+            rule_options: &EMPTY_RULE_OPTIONS,
             diagnostics: Vec::new(),
             resolved_columns: Vec::new(),
             resolved_tables: Vec::new(),
@@ -734,6 +767,32 @@ impl<'a> Analyzer<'a> {
     /// The schema provider backing this analyzer.
     pub fn provider(&self) -> &dyn SchemaProvider {
         self.provider
+    }
+
+    /// Attaches per-rule options (consumed by config-driven rules).
+    pub fn with_rule_options(mut self, options: &'a RuleOptions) -> Self {
+        self.rule_options = options;
+        self
+    }
+
+    /// A scalar option for `code`, e.g. `rule_option("CV11", "prefer")`.
+    pub fn rule_option(&self, code: &str, key: &str) -> Option<&str> {
+        self.rule_options
+            .get(code)
+            .and_then(|m| m.get(key))
+            .map(String::as_str)
+    }
+
+    /// A list-valued option, split on commas with surrounding space trimmed.
+    pub fn rule_option_list(&self, code: &str, key: &str) -> Vec<String> {
+        self.rule_option(code, key)
+            .map(|v| {
+                v.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Creates an analyzer with no schema information.
@@ -965,7 +1024,7 @@ pub fn analyze_query_with_options(
     provider: &dyn SchemaProvider,
     options: &AnalysisOptions,
 ) -> Analysis {
-    let mut analyzer = Analyzer::new(provider);
+    let mut analyzer = Analyzer::new(provider).with_rule_options(&options.rule_options);
 
     // Walk the syntax tree to find table and column references
     let root = parse.syntax();

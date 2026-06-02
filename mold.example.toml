@@ -27,6 +27,14 @@ enabled = true
 # [lint.rules.CP01]
 # severity = "warning"
 
+# Per-rule options:
+# [lint.rules.CV04]
+# prefer = "star"          # star | 1 | 0  — count(*) vs count(1)/count(0)
+# [lint.rules.CV11]
+# prefer = "consistent"    # consistent | shorthand | functional — cast style
+# [lint.rules.CV09]
+# blocked = ["old_status", "sysdate"]   # forbid these words (off until set)
+
 [database]
 # Connection string is read from this environment variable (preferred over an
 # inline `url` so credentials stay out of the file).

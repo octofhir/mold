@@ -86,6 +86,40 @@ impl LintSettings {
     pub fn severity_for(&self, code: &str) -> Option<SeverityLevel> {
         self.rules.get(code).and_then(|r| r.severity)
     }
+
+    /// Per-rule options stringified for the analyzer: `code -> (key -> value)`.
+    /// Arrays are comma-joined; non-string scalars use their display form.
+    #[must_use]
+    pub fn rule_options(&self) -> BTreeMap<String, BTreeMap<String, String>> {
+        let mut out = BTreeMap::new();
+        for (code, setting) in &self.rules {
+            let mut opts = BTreeMap::new();
+            for (key, value) in &setting.options {
+                if let Some(s) = toml_value_to_string(value) {
+                    opts.insert(key.clone(), s);
+                }
+            }
+            if !opts.is_empty() {
+                out.insert(code.clone(), opts);
+            }
+        }
+        out
+    }
+}
+
+/// Renders a TOML option value as the flat string the analyzer consumes.
+fn toml_value_to_string(value: &toml::Value) -> Option<String> {
+    match value {
+        toml::Value::String(s) => Some(s.clone()),
+        toml::Value::Integer(i) => Some(i.to_string()),
+        toml::Value::Boolean(b) => Some(b.to_string()),
+        toml::Value::Float(f) => Some(f.to_string()),
+        toml::Value::Array(items) => {
+            let parts: Vec<String> = items.iter().filter_map(toml_value_to_string).collect();
+            Some(parts.join(","))
+        }
+        toml::Value::Datetime(_) | toml::Value::Table(_) => None,
+    }
 }
 
 #[cfg(test)]

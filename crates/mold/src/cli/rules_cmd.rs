@@ -326,6 +326,18 @@ plain `LIKE` is rewritten (`ILIKE`/`NOT LIKE` differ from `=`).
   good: WHERE status = 'active'",
     },
     RuleDoc {
+        code: "CV09",
+        fixable: false,
+        summary: "Use of a configured blocked word",
+        explanation: "\
+Flags identifiers or keywords listed in the rule's `blocked` option — useful to
+ban deprecated columns, reserved names, or risky functions. Off until
+configured:
+
+  [lint.rules.CV09]
+  blocked = [\"old_status\", \"sysdate\"]",
+    },
+    RuleDoc {
         code: "CV11",
         fixable: false,
         summary: "Inconsistent cast style within a statement",

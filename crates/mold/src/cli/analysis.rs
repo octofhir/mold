@@ -101,7 +101,9 @@ fn build_options(config: &MoldConfig) -> AnalysisOptions {
     if config.lint.is_rule_enabled("CP01") || config.lint.is_rule_enabled("CP02") {
         packs.push(BuiltinLintPack::Capitalisation);
     }
-    AnalysisOptions::new().with_builtin_lint_packs(packs)
+    let mut options = AnalysisOptions::new().with_builtin_lint_packs(packs);
+    options.rule_options = config.lint.rule_options();
+    options
 }
 
 fn map_severity(level: SeverityLevel) -> Option<Severity> {

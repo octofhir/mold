@@ -70,6 +70,14 @@ enabled = true
 # [lint.rules.CP01]
 # severity = "warning"
 
+# Per-rule options (a rule reads its own keys):
+# [lint.rules.CV04]
+# prefer = "star"            # star | 1 | 0
+# [lint.rules.CV11]
+# prefer = "consistent"      # consistent | shorthand | functional
+# [lint.rules.CV09]
+# blocked = ["old_status", "sysdate"]   # words to forbid (off until set)
+
 [database]
 url-env = "DATABASE_URL"  # read the connection string from this env var
 schema  = "public"
@@ -108,6 +116,7 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 | CV05 | yes     | Compare with NULL using `IS NULL` / `IS NOT NULL` |
 | CV06 | yes     | Statements should end with a semicolon |
 | CV08 | —       | Prefer `LEFT JOIN` over `RIGHT JOIN` |
+| CV09 | —       | Use of a configured blocked word (off until set) |
 | CV10 | yes     | `LIKE` without a wildcard is just `=` |
 | CV11 | —       | Inconsistent cast style (`::` vs `CAST`) in a statement |
 | CP01 | yes     | Keywords should be upper case |

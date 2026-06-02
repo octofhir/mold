@@ -1,0 +1,50 @@
+# Config-driven rules: CV04 prefer, CV11 prefer, CV09 blocked words.
+
+# CV04 default prefers count(*).
+- name: cv04_default_flags_count_one
+  rule: CV04
+  fail: "SELECT count(1) FROM t"
+  fix: "SELECT count(*) FROM t"
+
+# CV04 prefer=1 flags count(*), rewrites to count(1).
+- name: cv04_prefer_one_flags_star
+  rule: CV04
+  options: { CV04: { prefer: "1" } }
+  fail: "SELECT count(*) FROM t"
+  fix: "SELECT count(1) FROM t"
+
+- name: cv04_prefer_one_accepts_one
+  rule: CV04
+  options: { CV04: { prefer: "1" } }
+  pass: "SELECT count(1) FROM t"
+
+# CV11 default (consistent): single cast can't be inconsistent.
+- name: cv11_single_cast_consistent_ok
+  rule: CV11
+  pass: "SELECT a::int FROM t"
+
+# CV11 prefer=functional flags every :: cast.
+- name: cv11_prefer_functional_flags_shorthand
+  rule: CV11
+  options: { CV11: { prefer: "functional" } }
+  fail: "SELECT a::int FROM t"
+
+- name: cv11_prefer_shorthand_accepts_shorthand
+  rule: CV11
+  options: { CV11: { prefer: "shorthand" } }
+  pass: "SELECT a::int FROM t"
+
+# CV09 only fires when a blocked list is configured.
+- name: cv09_no_config_silent
+  rule: CV09
+  pass: "SELECT secret FROM t"
+
+- name: cv09_blocked_word_flagged
+  rule: CV09
+  options: { CV09: { blocked: "secret,password" } }
+  fail: "SELECT secret FROM t"
+
+- name: cv09_unblocked_word_ok
+  rule: CV09
+  options: { CV09: { blocked: "secret,password" } }
+  pass: "SELECT name FROM t"

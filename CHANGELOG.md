@@ -18,8 +18,12 @@ the latest stable Rust toolchain.
   identifier quotes, fixable), AL04 (duplicate table alias), AL08 (duplicate
   column alias), AM01 (`DISTINCT` redundant with `GROUP BY`), CV04
   (`count(1)`/`count(0)` → `count(*)`, fixable), AM07 (set-operation branch
-  column-count mismatch), CV11 (inconsistent `::`/`CAST` style) — 33 lint
-  codes total.
+  column-count mismatch), CV11 (inconsistent `::`/`CAST` style), CV09
+  (configurable blocked words) — 34 lint codes total.
+- **Configurable rules**: per-rule options in `mold.toml` (`[lint.rules.<CODE>]`)
+  now reach the engine. `CV04` takes `prefer = star|1|0`, `CV11` takes
+  `prefer = consistent|shorthand|functional`, and `CV09` takes a `blocked` word
+  list.
 - **Placeholder templating** (`mold_templater`): substitute `:name`, `?` and
   `%(name)s` placeholders (configurable via `[templater] style`) so app SQL
   parses and lints; diagnostics map back to the source and fixes that would

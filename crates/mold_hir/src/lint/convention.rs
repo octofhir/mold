@@ -83,8 +83,8 @@ impl Rule for CastStyle {
     }
 }
 
-/// CV11 — mixing `x::int` and `CAST(x AS int)` in one statement is noise. The
-/// first cast's style is taken as canonical and the others are flagged.
+/// CV11 — cast style. `prefer` may be `consistent` (default — the first cast's
+/// style wins), `shorthand` (require `::`), or `functional` (require `CAST`).
 fn lint_cast_style(stmt: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
     // (is_shorthand, range) for each cast, in document order.
     let casts: Vec<(bool, text_size::TextRange)> = stmt
@@ -102,19 +102,28 @@ fn lint_cast_style(stmt: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) 
             shorthand.map(|s| (s, cast.text_range()))
         })
         .collect();
-    if casts.len() < 2 {
+    if casts.is_empty() {
         return;
     }
-    let canonical = casts[0].0;
-    for (shorthand, range) in &casts[1..] {
+    let canonical = match analyzer.rule_option("CV11", "prefer") {
+        Some("shorthand") => true,
+        Some("functional") => false,
+        // "consistent" (default): the first cast sets the canonical style, so a
+        // lone cast can never be inconsistent.
+        _ => {
+            if casts.len() < 2 {
+                return;
+            }
+            casts[0].0
+        }
+    };
+    let want = if canonical { "::" } else { "CAST(...)" };
+    for (shorthand, range) in &casts {
         if *shorthand != canonical {
-            let want = if canonical { "::" } else { "CAST(...)" };
             analyzer.emit(
-                Diagnostic::warning(format!(
-                    "Inconsistent cast style; match the statement's {want} form"
-                ))
-                .with_code(RuleCode::Cv11)
-                .with_range(*range),
+                Diagnostic::warning(format!("Inconsistent cast style; use the {want} form"))
+                    .with_code(RuleCode::Cv11)
+                    .with_range(*range),
             );
         }
     }
@@ -139,8 +148,8 @@ impl Rule for CountLiteral {
     }
 }
 
-/// CV04 — `count(1)` and `count(0)` count rows exactly like `count(*)`, which
-/// states the intent directly. Rewrites the literal argument to `*`.
+/// CV04 — count-rows spelling. `prefer` may be `star` (default — `count(*)`),
+/// `1` (`count(1)`) or `0` (`count(0)`). The non-preferred forms are rewritten.
 fn lint_count_literal(func: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
     let is_count = func
         .children_with_tokens()
@@ -157,29 +166,95 @@ fn lint_count_literal(func: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_
     {
         return;
     }
-    let Some(literal) = func.children().find(|c| c.kind() == SyntaxKind::LITERAL) else {
-        return;
-    };
-    let int_tokens: Vec<_> = literal
+
+    // Determine the current argument form and the range that spells it.
+    let star = func
         .children_with_tokens()
         .filter_map(|e| e.into_token())
-        .filter(|t| !t.kind().is_trivia())
-        .collect();
-    let is_zero_or_one = int_tokens.len() == 1
-        && int_tokens[0].kind() == SyntaxKind::INTEGER
-        && matches!(int_tokens[0].text(), "0" | "1");
-    if !is_zero_or_one {
+        .find(|t| t.kind() == SyntaxKind::STAR);
+    let (current, range) = if let Some(star) = star {
+        ("*", star.text_range())
+    } else if let Some(literal) = func.children().find(|c| c.kind() == SyntaxKind::LITERAL) {
+        let int_tokens: Vec<_> = literal
+            .children_with_tokens()
+            .filter_map(|e| e.into_token())
+            .filter(|t| !t.kind().is_trivia())
+            .collect();
+        if int_tokens.len() == 1
+            && int_tokens[0].kind() == SyntaxKind::INTEGER
+            && matches!(int_tokens[0].text(), "0" | "1")
+        {
+            (int_tokens[0].text(), literal.text_range())
+        } else {
+            return; // count(id), count(2), … are out of scope.
+        }
+    } else {
+        return;
+    };
+
+    let target = match analyzer.rule_option("CV04", "prefer") {
+        Some("1") => "1",
+        Some("0") => "0",
+        _ => "*", // "star" / default
+    };
+    if current == target {
         return;
     }
+    let show = |s: &str| {
+        if s == "*" {
+            "count(*)".to_string()
+        } else {
+            format!("count({s})")
+        }
+    };
     analyzer.emit(
-        Diagnostic::warning("Use count(*) instead of count(0)/count(1)")
+        Diagnostic::warning(format!("Use {} instead of {}", show(target), show(current)))
             .with_code(RuleCode::Cv04)
-            .with_range(literal.text_range())
+            .with_range(range)
             .with_fix(Fix::new(
-                "Replace with *",
-                vec![TextEdit::replace(literal.text_range(), "*")],
+                format!("Replace with {target}"),
+                vec![TextEdit::replace(range, target)],
             )),
     );
+}
+
+/// CV09 — flag identifiers/keywords listed in the `blocked` option.
+pub(super) struct BlockedWords;
+
+impl Rule for BlockedWords {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Cv09]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Convention
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        let blocked = analyzer.rule_option_list("CV09", "blocked");
+        if blocked.is_empty() {
+            return;
+        }
+        let mut hits = Vec::new();
+        for element in root.descendants_with_tokens() {
+            let Some(token) = element.as_token() else {
+                continue;
+            };
+            let kind = token.kind();
+            if kind != SyntaxKind::IDENT && kind != SyntaxKind::QUOTED_IDENT && !kind.is_keyword() {
+                continue;
+            }
+            let text = token.text().trim_matches('"');
+            if blocked.iter().any(|b| b.eq_ignore_ascii_case(text)) {
+                hits.push((text.to_string(), token.text_range()));
+            }
+        }
+        for (word, range) in hits {
+            analyzer.emit(
+                Diagnostic::warning(format!("Use of blocked word '{word}'"))
+                    .with_code(RuleCode::Cv09)
+                    .with_range(range),
+            );
+        }
+    }
 }
 
 /// CV10 — `LIKE` with no wildcard behaves like `=`.
