@@ -23,7 +23,10 @@ the latest stable Rust toolchain.
 - **Configurable rules**: per-rule options in `mold.toml` (`[lint.rules.<CODE>]`)
   now reach the engine. `CV04` takes `prefer = star|1|0`, `CV11` takes
   `prefer = consistent|shorthand|functional`, `CV09` takes a `blocked` word
-  list, and `CP01`/`CP02` take `policy = upper|lower`.
+  list, `CP01`/`CP02` take `policy = upper|lower`, and `AM02` takes
+  `prefer = all|distinct`.
+- **Lint rule** CV13: `IN` with a single value is equivalent to `=` (fixable) —
+  35 lint codes total.
 - **CLI**: `mold rules` gains `--format json` and `--group <category|prefix>`.
 - **Placeholder templating** (`mold_templater`): substitute `:name`, `?` and
   `%(name)s` placeholders (configurable via `[templater] style`) so app SQL

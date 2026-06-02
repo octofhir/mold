@@ -218,6 +218,74 @@ fn lint_count_literal(func: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_
     );
 }
 
+/// CV13 — `IN (single_value)` is equivalent to `=`.
+pub(super) struct InSingleValue;
+
+impl Rule for InSingleValue {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Cv13]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Convention
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::IN_EXPR {
+                lint_in_single_value(node, analyzer);
+            }
+        }
+    }
+}
+
+/// CV13 — `x IN (v)` tests a single value, so `x = v` (or `x <> v` for
+/// `NOT IN`) is clearer and index-friendly. Lists and subqueries are left
+/// alone. The fix swaps the operator and drops the parentheses.
+fn lint_in_single_value(expr: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    // Multiple values or a subquery — not a single-value IN.
+    if expr
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .any(|t| t.kind() == SyntaxKind::COMMA)
+        || expr
+            .descendants()
+            .any(|n| n.kind() == SyntaxKind::SELECT_STMT)
+    {
+        return;
+    }
+    let tokens: Vec<_> = expr
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .collect();
+    let in_kw = tokens.iter().find(|t| t.kind() == SyntaxKind::IN_KW);
+    let l_paren = tokens.iter().find(|t| t.kind() == SyntaxKind::L_PAREN);
+    let r_paren = tokens.iter().find(|t| t.kind() == SyntaxKind::R_PAREN);
+    let (Some(in_kw), Some(l_paren), Some(r_paren)) = (in_kw, l_paren, r_paren) else {
+        return;
+    };
+    let not_kw = tokens.iter().find(|t| t.kind() == SyntaxKind::NOT_KW);
+
+    let mut edits = Vec::new();
+    if let Some(not_kw) = not_kw {
+        // Replace `NOT … IN` with `<>`.
+        edits.push(TextEdit::replace(
+            text_size::TextRange::new(not_kw.text_range().start(), in_kw.text_range().end()),
+            "<>",
+        ));
+    } else {
+        edits.push(TextEdit::replace(in_kw.text_range(), "="));
+    }
+    edits.push(TextEdit::replace(l_paren.text_range(), ""));
+    edits.push(TextEdit::replace(r_paren.text_range(), ""));
+
+    let op = if not_kw.is_some() { "<>" } else { "=" };
+    analyzer.emit(
+        Diagnostic::warning(format!("IN with a single value is equivalent to {op}"))
+            .with_code(RuleCode::Cv13)
+            .with_range(expr.text_range())
+            .with_fix(Fix::new(format!("Replace with {op}"), edits)),
+    );
+}
+
 /// CV09 — flag identifiers/keywords listed in the `blocked` option.
 pub(super) struct BlockedWords;
 

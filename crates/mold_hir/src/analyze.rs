@@ -197,6 +197,8 @@ pub enum RuleCode {
     Cv10,
     /// Cast style (`::` vs `CAST`) is inconsistent within a statement.
     Cv11,
+    /// `IN` with a single value is equivalent to `=`.
+    Cv13,
     /// Keyword capitalisation.
     Cp01,
     /// Unquoted identifier capitalisation.
@@ -244,6 +246,7 @@ impl RuleCode {
             RuleCode::Cv09 => "CV09",
             RuleCode::Cv10 => "CV10",
             RuleCode::Cv11 => "CV11",
+            RuleCode::Cv13 => "CV13",
             RuleCode::Cp01 => "CP01",
             RuleCode::Cp02 => "CP02",
             RuleCode::Rf01 => "RF01",

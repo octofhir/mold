@@ -82,6 +82,7 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         &convention::MissingSemicolons,
         &convention::RightJoin,
         &convention::LikeWithoutWildcard,
+        &convention::InSingleValue,
         &convention::BlockedWords,
     ]
 }

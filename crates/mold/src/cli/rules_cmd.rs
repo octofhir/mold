@@ -58,7 +58,8 @@ ST08.)
         summary: "Set operators (UNION/EXCEPT/INTERSECT) should state ALL or DISTINCT",
         explanation: "\
 `UNION` defaults to `UNION DISTINCT`, which silently deduplicates. Stating
-`ALL` or `DISTINCT` makes the intent — and the cost — explicit.",
+`ALL` or `DISTINCT` makes the intent — and the cost — explicit. Set
+`prefer = all|distinct` to require one specific modifier.",
     },
     RuleDoc {
         code: "AM09",
@@ -348,6 +349,18 @@ one and stick to it.
 
   bad:  SELECT a::int, CAST(b AS text) FROM t
   good: SELECT a::int, b::text FROM t",
+    },
+    RuleDoc {
+        code: "CV13",
+        fixable: true,
+        summary: "IN with a single value is just =",
+        explanation: "\
+`x IN (v)` tests one value, so `x = v` (or `x <> v` for `NOT IN`) is clearer and
+lets the planner use an index. Lists and subqueries are left alone. The fix
+swaps the operator and drops the parentheses.
+
+  bad:  WHERE status IN ('active')
+  good: WHERE status = 'active'",
     },
     RuleDoc {
         code: "CP01",

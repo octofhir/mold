@@ -123,6 +123,7 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 | CV09 | —       | Use of a configured blocked word (off until set) |
 | CV10 | yes     | `LIKE` without a wildcard is just `=` |
 | CV11 | —       | Inconsistent cast style (`::` vs `CAST`) in a statement |
+| CV13 | yes     | `IN` with a single value is just `=` |
 | CP01 | yes     | Keywords should be upper case |
 | CP02 | yes     | Unquoted identifiers should be lower case |
 | RF01 | —       | Unknown table/column/alias (needs schema) |

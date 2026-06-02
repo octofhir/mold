@@ -341,8 +341,16 @@ fn lint_implicit_cross_join(from: &FromClause, analyzer: &mut Analyzer<'_>) {
     analyzer.emit(diag);
 }
 
-/// AM02 — a set operator should state `ALL` or `DISTINCT` explicitly.
+/// AM02 — a set operator should state `ALL`/`DISTINCT` explicitly. With
+/// `prefer = all|distinct`, a set operator must use that specific modifier;
+/// otherwise either explicit modifier is accepted.
 fn lint_set_op_modifier(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
+    // `prefer` requires a specific modifier; `None` just requires explicitness.
+    let prefer = match analyzer.rule_option("AM02", "prefer") {
+        Some("all") => Some(SyntaxKind::ALL_KW),
+        Some("distinct") => Some(SyntaxKind::DISTINCT_KW),
+        _ => None,
+    };
     let tokens: Vec<_> = stmt
         .syntax()
         .children_with_tokens()
@@ -359,14 +367,28 @@ fn lint_set_op_modifier(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
             .iter()
             .find(|t| !t.kind().is_trivia())
             .map(|t| t.kind());
-        if !matches!(next, Some(SyntaxKind::ALL_KW | SyntaxKind::DISTINCT_KW)) {
+        let explicit = matches!(next, Some(SyntaxKind::ALL_KW | SyntaxKind::DISTINCT_KW));
+        let message = match prefer {
+            _ if !explicit => Some(format!(
+                "'{}' should specify ALL or DISTINCT explicitly",
+                token.text().to_uppercase()
+            )),
+            Some(want) if next != Some(want) => Some(format!(
+                "'{}' should use {} (configured preference)",
+                token.text().to_uppercase(),
+                if want == SyntaxKind::ALL_KW {
+                    "ALL"
+                } else {
+                    "DISTINCT"
+                }
+            )),
+            _ => None,
+        };
+        if let Some(message) = message {
             analyzer.emit(
-                Diagnostic::warning(format!(
-                    "'{}' should specify ALL or DISTINCT explicitly",
-                    token.text().to_uppercase()
-                ))
-                .with_code(RuleCode::Am02)
-                .with_range(token.text_range()),
+                Diagnostic::warning(message)
+                    .with_code(RuleCode::Am02)
+                    .with_range(token.text_range()),
             );
         }
     }

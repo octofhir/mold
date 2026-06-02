@@ -1,0 +1,35 @@
+# CV13 single-value IN, AM02 prefer.
+
+- name: in_single_value_flagged_and_fixed
+  rule: CV13
+  fail: "SELECT x FROM t WHERE a IN (1)"
+  fix: "SELECT x FROM t WHERE a = 1"
+
+- name: not_in_single_value_flagged_and_fixed
+  rule: CV13
+  fail: "SELECT x FROM t WHERE a NOT IN (1)"
+  fix: "SELECT x FROM t WHERE a <> 1"
+
+- name: in_multiple_values_ok
+  rule: CV13
+  pass: "SELECT x FROM t WHERE a IN (1, 2)"
+
+- name: in_subquery_ok
+  rule: CV13
+  pass: "SELECT x FROM t WHERE a IN (SELECT id FROM u)"
+
+# AM02 default: explicit modifier of either kind is fine.
+- name: am02_union_all_ok_by_default
+  rule: AM02
+  pass: "SELECT 1 UNION ALL SELECT 2"
+
+# AM02 prefer=all: UNION DISTINCT must become ALL.
+- name: am02_prefer_all_flags_distinct
+  rule: AM02
+  options: { AM02: { prefer: "all" } }
+  fail: "SELECT 1 UNION DISTINCT SELECT 2"
+
+- name: am02_prefer_all_accepts_all
+  rule: AM02
+  options: { AM02: { prefer: "all" } }
+  pass: "SELECT 1 UNION ALL SELECT 2"
