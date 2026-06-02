@@ -27,7 +27,8 @@ the latest stable Rust toolchain.
   `prefer = all|distinct`.
 - **Lint rule** CV13: `IN` with a single value is equivalent to `=` (fixable) —
   35 lint codes total.
-- **CLI**: `mold rules` gains `--format json` and `--group <category|prefix>`.
+- **CLI**: `mold rules` gains `--format json` and `--group <category|prefix>`;
+  `mold lint` gains `--statistics` (per-rule count breakdown).
 - **Placeholder templating** (`mold_templater`): substitute `:name`, `?` and
   `%(name)s` placeholders (configurable via `[templater] style`) so app SQL
   parses and lints; diagnostics map back to the source and fixes that would

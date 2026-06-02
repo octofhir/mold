@@ -27,7 +27,7 @@ leave it off and the binary stays async-free, using a cached schema if present.
 
 ```
 mold format [--write|--check] [files…|-]
-mold lint   [--format human|json|github|sarif] [files…|-]
+mold lint   [--format human|json|github|sarif] [--statistics] [files…|-]
 mold fix    [--diff] [files…|-]
 mold parse  [--format tree|json] [files…|-]
 mold rules [--format human|json] [--group <category|prefix>]   # list lint rules

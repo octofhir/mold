@@ -22,6 +22,10 @@ pub struct LintArgs {
     /// Suppress the summary line (findings are still printed).
     #[arg(long)]
     quiet: bool,
+
+    /// Print a per-rule count breakdown after the findings.
+    #[arg(long)]
+    statistics: bool,
 }
 
 pub fn run(args: &LintArgs, cli: &Cli) -> Result<u8> {
@@ -49,6 +53,9 @@ pub fn run(args: &LintArgs, cli: &Cli) -> Result<u8> {
         for (input, diags) in inputs.iter().zip(&per_file) {
             report(args.format, input, diags, color);
         }
+        if args.statistics && matches!(args.format, ReportFormat::Human) {
+            print_statistics(per_file.iter().flatten());
+        }
         if !args.quiet && matches!(args.format, ReportFormat::Human) {
             if total == 0 {
                 eprintln!("No issues found.");
@@ -68,6 +75,25 @@ fn report(format: ReportFormat, input: &InputFile, diags: &[Diagnostic], color: 
         ReportFormat::Github => report_github(input, diags),
         // Aggregated separately in `run`.
         ReportFormat::Sarif => {}
+    }
+}
+
+/// Prints a per-rule count breakdown, most frequent first (ties by code).
+fn print_statistics<'a>(diags: impl Iterator<Item = &'a Diagnostic>) {
+    use std::collections::BTreeMap;
+    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for d in diags {
+        let code = d.code.map(|c| c.as_str()).unwrap_or("(other)");
+        *counts.entry(code).or_default() += 1;
+    }
+    if counts.is_empty() {
+        return;
+    }
+    let mut rows: Vec<(&str, usize)> = counts.into_iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+    eprintln!("\nfindings by rule:");
+    for (code, n) in rows {
+        eprintln!("  {code:<6} {n}");
     }
 }
 
