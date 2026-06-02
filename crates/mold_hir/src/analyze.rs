@@ -147,6 +147,8 @@ pub enum RuleCode {
     Am09,
     /// `ORDER BY` mixes explicit and implicit sort directions.
     Am03,
+    /// Set-operation branches select a different number of columns.
+    Am07,
     /// Redundant `ELSE NULL` in a `CASE` expression.
     St01,
     /// CTE defined but never referenced.
@@ -191,6 +193,8 @@ pub enum RuleCode {
     Cv08,
     /// `LIKE` with no wildcard behaves like `=`.
     Cv10,
+    /// Cast style (`::` vs `CAST`) is inconsistent within a statement.
+    Cv11,
     /// Keyword capitalisation.
     Cp01,
     /// Unquoted identifier capitalisation.
@@ -213,6 +217,7 @@ impl RuleCode {
             RuleCode::Am01 => "AM01",
             RuleCode::Am09 => "AM09",
             RuleCode::Am03 => "AM03",
+            RuleCode::Am07 => "AM07",
             RuleCode::Al01 => "AL01",
             RuleCode::Al02 => "AL02",
             RuleCode::St01 => "ST01",
@@ -235,6 +240,7 @@ impl RuleCode {
             RuleCode::Cv06 => "CV06",
             RuleCode::Cv08 => "CV08",
             RuleCode::Cv10 => "CV10",
+            RuleCode::Cv11 => "CV11",
             RuleCode::Cp01 => "CP01",
             RuleCode::Cp02 => "CP02",
             RuleCode::Rf01 => "RF01",

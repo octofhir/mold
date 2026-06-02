@@ -1,0 +1,33 @@
+# AM07 set-operation column count, CV11 cast-style consistency.
+
+- name: union_mismatched_columns_flagged
+  rule: AM07
+  fail: "SELECT a, b FROM t UNION SELECT c FROM u"
+
+- name: union_matched_columns_ok
+  rule: AM07
+  pass: "SELECT a, b FROM t UNION SELECT c, d FROM u"
+
+- name: union_with_star_skipped
+  rule: AM07
+  pass: "SELECT * FROM t UNION SELECT c FROM u"
+
+- name: plain_select_ok
+  rule: AM07
+  pass: "SELECT a, b FROM t"
+
+- name: mixed_cast_style_flagged
+  rule: CV11
+  fail: "SELECT a::int, CAST(b AS text) FROM t"
+
+- name: consistent_shorthand_casts_ok
+  rule: CV11
+  pass: "SELECT a::int, b::text FROM t"
+
+- name: consistent_functional_casts_ok
+  rule: CV11
+  pass: "SELECT CAST(a AS int), CAST(b AS text) FROM t"
+
+- name: single_cast_ok
+  rule: CV11
+  pass: "SELECT a::int FROM t"

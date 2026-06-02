@@ -60,6 +60,66 @@ impl Rule for MissingSemicolons {
     }
 }
 
+/// CV11 — cast style (`::` vs `CAST`) should be consistent within a statement.
+pub(super) struct CastStyle;
+
+impl Rule for CastStyle {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Cv11]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Convention
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            // Once per top-level statement, so a statement's casts compare only
+            // against each other.
+            if super::is_statement(node.kind())
+                && node.parent().map(|p| p.kind()) == Some(SyntaxKind::SOURCE_FILE)
+            {
+                lint_cast_style(node, analyzer);
+            }
+        }
+    }
+}
+
+/// CV11 — mixing `x::int` and `CAST(x AS int)` in one statement is noise. The
+/// first cast's style is taken as canonical and the others are flagged.
+fn lint_cast_style(stmt: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    // (is_shorthand, range) for each cast, in document order.
+    let casts: Vec<(bool, text_size::TextRange)> = stmt
+        .descendants()
+        .filter(|n| n.kind() == SyntaxKind::CAST_EXPR)
+        .filter_map(|cast| {
+            let mut shorthand = None;
+            for t in cast.children_with_tokens().filter_map(|e| e.into_token()) {
+                match t.kind() {
+                    SyntaxKind::DOUBLE_COLON => shorthand = Some(true),
+                    SyntaxKind::CAST_KW => shorthand = Some(false),
+                    _ => {}
+                }
+            }
+            shorthand.map(|s| (s, cast.text_range()))
+        })
+        .collect();
+    if casts.len() < 2 {
+        return;
+    }
+    let canonical = casts[0].0;
+    for (shorthand, range) in &casts[1..] {
+        if *shorthand != canonical {
+            let want = if canonical { "::" } else { "CAST(...)" };
+            analyzer.emit(
+                Diagnostic::warning(format!(
+                    "Inconsistent cast style; match the statement's {want} form"
+                ))
+                .with_code(RuleCode::Cv11)
+                .with_range(*range),
+            );
+        }
+    }
+}
+
 /// CV04 — `count(1)`/`count(0)` where `count(*)` is idiomatic.
 pub(super) struct CountLiteral;
 

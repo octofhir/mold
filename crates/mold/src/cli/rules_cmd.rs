@@ -100,6 +100,18 @@ A subquery embedded in `FROM` or `JOIN` is harder to read and reuse than the
 same query factored into a `WITH` clause. Extract it into a CTE.",
     },
     RuleDoc {
+        code: "AM07",
+        fixable: false,
+        summary: "Set-operation branches select different column counts",
+        explanation: "\
+`UNION`/`EXCEPT`/`INTERSECT` require every branch to project the same number of
+columns; otherwise Postgres rejects the query. Branches containing `*` are
+skipped because their width is not known without the schema.
+
+  bad:  SELECT a, b FROM t UNION SELECT c FROM u
+  good: SELECT a, b FROM t UNION SELECT c, d FROM u",
+    },
+    RuleDoc {
         code: "ST07",
         fixable: false,
         summary: "Avoid NATURAL JOIN",
@@ -312,6 +324,18 @@ plain `LIKE` is rewritten (`ILIKE`/`NOT LIKE` differ from `=`).
 
   bad:  WHERE status LIKE 'active'
   good: WHERE status = 'active'",
+    },
+    RuleDoc {
+        code: "CV11",
+        fixable: false,
+        summary: "Inconsistent cast style within a statement",
+        explanation: "\
+A statement that mixes the `x::type` shorthand with `CAST(x AS type)` is noisy.
+The first cast's style is taken as canonical and the others are flagged; pick
+one and stick to it.
+
+  bad:  SELECT a::int, CAST(b AS text) FROM t
+  good: SELECT a::int, b::text FROM t",
     },
     RuleDoc {
         code: "CP01",

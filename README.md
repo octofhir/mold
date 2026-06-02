@@ -93,6 +93,7 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 | AM03 | —       | `ORDER BY` mixes explicit and implicit sort directions |
 | AM04 | yes\*   | Avoid `SELECT *`; expand to columns (\*fix needs schema) |
 | AM05 | —       | Implicit cross join; use an explicit `JOIN` |
+| AM07 | —       | Set-operation branches select different column counts |
 | AM09 | —       | `LIMIT`/`OFFSET` without `ORDER BY` is non-deterministic |
 | ST01 | yes     | Redundant `ELSE NULL` in `CASE` |
 | ST03 | —       | CTE defined but never used |
@@ -108,6 +109,7 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 | CV06 | yes     | Statements should end with a semicolon |
 | CV08 | —       | Prefer `LEFT JOIN` over `RIGHT JOIN` |
 | CV10 | yes     | `LIKE` without a wildcard is just `=` |
+| CV11 | —       | Inconsistent cast style (`::` vs `CAST`) in a statement |
 | CP01 | yes     | Keywords should be upper case |
 | CP02 | yes     | Unquoted identifiers should be lower case |
 | RF01 | —       | Unknown table/column/alias (needs schema) |

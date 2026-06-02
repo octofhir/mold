@@ -50,6 +50,7 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         &ambiguity::LimitWithoutOrder,
         &ambiguity::OrderByDirection,
         &ambiguity::DistinctWithGroupBy,
+        &ambiguity::SetOpColumnCount,
         // Aliasing / references (Core)
         &aliasing::TableAliasAs,
         &aliasing::ColumnAliasAs,
@@ -75,6 +76,7 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         &capitalisation::Capitalisation,
         // Convention
         &convention::CountLiteral,
+        &convention::CastStyle,
         &convention::NeSpelling,
         &convention::NullComparison,
         &convention::MissingSemicolons,

@@ -187,6 +187,78 @@ fn lint_order_by_direction(clause: &mold_syntax::SyntaxNode, analyzer: &mut Anal
     analyzer.emit(diag);
 }
 
+/// AM07 — set-operation branches must select the same number of columns.
+pub(super) struct SetOpColumnCount;
+
+impl Rule for SetOpColumnCount {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Am07]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Core
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            if node.kind() == SyntaxKind::SELECT_STMT {
+                lint_set_op_column_count(node, analyzer);
+            }
+        }
+    }
+}
+
+/// AM07 — `UNION`/`EXCEPT`/`INTERSECT` require matching column counts on every
+/// branch, else Postgres rejects the query. Branches containing `*` are skipped
+/// since their width is unknown without resolving the schema.
+fn lint_set_op_column_count(stmt: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+    let has_set_op = stmt
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .any(|t| {
+            matches!(
+                t.kind(),
+                SyntaxKind::UNION_KW | SyntaxKind::EXCEPT_KW | SyntaxKind::INTERSECT_KW
+            )
+        });
+    if !has_set_op {
+        return;
+    }
+    let lists: Vec<_> = stmt
+        .children()
+        .filter(|c| c.kind() == SyntaxKind::SELECT_ITEM_LIST)
+        .collect();
+    if lists.len() < 2 {
+        return;
+    }
+    let mut counts = Vec::with_capacity(lists.len());
+    for list in &lists {
+        // A `*` makes the branch width unknown; bail rather than risk a false positive.
+        if list
+            .descendants_with_tokens()
+            .filter_map(|e| e.into_token())
+            .any(|t| t.kind() == SyntaxKind::STAR)
+        {
+            return;
+        }
+        let n = list
+            .children()
+            .filter(|c| c.kind() == SyntaxKind::SELECT_ITEM)
+            .count();
+        counts.push((n, list.text_range()));
+    }
+    let first = counts[0].0;
+    for (n, range) in &counts[1..] {
+        if *n != first {
+            analyzer.emit(
+                Diagnostic::warning(format!(
+                    "Set-operation branch selects {n} columns but the first selects {first}"
+                ))
+                .with_code(RuleCode::Am07)
+                .with_range(*range),
+            );
+        }
+    }
+}
+
 fn lint_select_star(stmt: &SelectStmt, analyzer: &mut Analyzer<'_>) {
     let expansion = single_table_column_list(stmt, analyzer);
     for node in stmt.syntax().descendants() {
