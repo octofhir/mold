@@ -414,18 +414,103 @@ pub(crate) fn find(code: &str) -> Option<&'static RuleDoc> {
     RULES.iter().find(|r| r.code.eq_ignore_ascii_case(code))
 }
 
-pub fn run() -> Result<u8> {
-    println!(
-        "Prefixes: AL = aliasing, AM = ambiguity, ST = structure, SF = safety, JB = JSONB, CV = convention, CP = capitalisation, RF = references\n"
-    );
-    println!("{:<6} {:<8} DESCRIPTION", "CODE", "FIXABLE");
-    for r in RULES {
-        println!(
-            "{:<6} {:<8} {}",
-            r.code,
-            if r.fixable { "yes" } else { "no" },
-            r.summary
-        );
+/// Output format for `mold rules`.
+#[derive(Clone, Copy, Debug, Default, clap::ValueEnum)]
+pub enum RulesFormat {
+    /// Aligned table for terminals.
+    #[default]
+    Human,
+    /// JSON array for tooling.
+    Json,
+}
+
+/// `mold rules` arguments.
+#[derive(clap::Args, Debug)]
+pub struct RulesArgs {
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = RulesFormat::Human)]
+    pub format: RulesFormat,
+    /// Only list rules in this category (e.g. `convention`) or prefix (`CV`).
+    #[arg(long)]
+    pub group: Option<String>,
+}
+
+/// The category a rule code belongs to, derived from its two-letter prefix.
+pub(crate) fn category(code: &str) -> &'static str {
+    match &code[..2] {
+        "AL" => "aliasing",
+        "AM" => "ambiguity",
+        "ST" => "structure",
+        "SF" => "safety",
+        "JB" => "jsonb",
+        "CV" => "convention",
+        "CP" => "capitalisation",
+        "RF" => "references",
+        _ => "other",
+    }
+}
+
+/// True when `code` matches a `--group` filter (category name or code prefix,
+/// case-insensitive).
+fn matches_group(code: &str, group: &str) -> bool {
+    category(code).eq_ignore_ascii_case(group) || code[..2].eq_ignore_ascii_case(group)
+}
+
+pub fn run(args: &RulesArgs) -> Result<u8> {
+    let selected: Vec<&RuleDoc> = RULES
+        .iter()
+        .filter(|r| {
+            args.group
+                .as_deref()
+                .is_none_or(|g| matches_group(r.code, g))
+        })
+        .collect();
+
+    match args.format {
+        RulesFormat::Json => {
+            let items: Vec<String> = selected
+                .iter()
+                .map(|r| {
+                    format!(
+                        "{{\"code\":\"{}\",\"group\":\"{}\",\"fixable\":{},\"summary\":\"{}\"}}",
+                        r.code,
+                        category(r.code),
+                        r.fixable,
+                        json_escape(r.summary),
+                    )
+                })
+                .collect();
+            println!("[{}]", items.join(","));
+        }
+        RulesFormat::Human => {
+            println!(
+                "Prefixes: AL = aliasing, AM = ambiguity, ST = structure, SF = safety, JB = JSONB, CV = convention, CP = capitalisation, RF = references\n"
+            );
+            println!("{:<6} {:<8} DESCRIPTION", "CODE", "FIXABLE");
+            for r in &selected {
+                println!(
+                    "{:<6} {:<8} {}",
+                    r.code,
+                    if r.fixable { "yes" } else { "no" },
+                    r.summary
+                );
+            }
+        }
     }
     Ok(exit::OK)
+}
+
+/// Minimal JSON string escaping for the summary text.
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            _ => out.push(c),
+        }
+    }
+    out
 }

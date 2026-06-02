@@ -78,7 +78,7 @@ enum Command {
     /// Print the concrete syntax tree.
     Parse(parse_cmd::ParseArgs),
     /// List available lint rules.
-    Rules,
+    Rules(rules_cmd::RulesArgs),
     /// Inspect and manage the .mold schema cache.
     Schema(schema_cmd::SchemaArgs),
     /// Scaffold a mold.toml in the current directory.
@@ -113,7 +113,7 @@ impl Cli {
             Command::Lint(args) => lint_cmd::run(args, &cli),
             Command::Fix(args) => fix_cmd::run(args, &cli),
             Command::Parse(args) => parse_cmd::run(args, &cli),
-            Command::Rules => rules_cmd::run(),
+            Command::Rules(args) => rules_cmd::run(args),
             Command::Schema(args) => schema_cmd::run(args, &cli),
             Command::Init(args) => init_cmd::run(args),
             Command::Explain(args) => explain_cmd::run(args),

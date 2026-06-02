@@ -30,7 +30,7 @@ mold format [--write|--check] [files…|-]
 mold lint   [--format human|json|github|sarif] [files…|-]
 mold fix    [--diff] [files…|-]
 mold parse  [--format tree|json] [files…|-]
-mold rules                 # list lint rules
+mold rules [--format human|json] [--group <category|prefix>]   # list lint rules
 mold explain <CODE>        # detailed rule description with examples
 mold init                  # scaffold a mold.toml
 mold lsp                   # language server over stdio
