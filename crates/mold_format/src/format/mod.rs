@@ -55,6 +55,12 @@ fn format_node(node: &SyntaxNode, printer: &mut Printer) {
         SyntaxKind::CREATE_TABLE_STMT => {
             statements::format_create_table(node, printer);
         }
+        SyntaxKind::CREATE_INDEX_STMT => {
+            statements::format_create_index(node, printer);
+        }
+        SyntaxKind::ALTER_STMT => {
+            statements::format_alter(node, printer);
+        }
         SyntaxKind::ERROR => {
             // Preserve original text for error nodes
             format_error_node(node, printer);

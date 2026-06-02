@@ -2,12 +2,12 @@
 
 #![allow(clippy::needless_borrow)]
 
-use mold_syntax::{SyntaxKind, SyntaxNode};
+use mold_syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 use crate::config::CommaStyle;
 use crate::printer::Printer;
 
-use super::{children_of_kind, find_child, format_children, format_token};
+use super::{children_of_kind, find_child, find_token, format_children, format_token};
 
 /// Formats a SELECT statement.
 pub fn format_select(node: &SyntaxNode, printer: &mut Printer) {
@@ -936,14 +936,31 @@ pub fn format_delete(node: &SyntaxNode, printer: &mut Printer) {
 }
 
 /// Formats a CREATE TABLE statement.
+/// Constraint node kinds that may appear in a column definition list.
+const CONSTRAINT_KINDS: &[SyntaxKind] = &[
+    SyntaxKind::PRIMARY_KEY_CONSTRAINT,
+    SyntaxKind::FOREIGN_KEY_CONSTRAINT,
+    SyntaxKind::UNIQUE_CONSTRAINT,
+    SyntaxKind::CHECK_CONSTRAINT,
+    SyntaxKind::NOT_NULL_CONSTRAINT,
+    SyntaxKind::DEFAULT_EXPR,
+    SyntaxKind::CONSTRAINT,
+];
+
+fn is_constraint_kind(kind: SyntaxKind) -> bool {
+    CONSTRAINT_KINDS.contains(&kind)
+}
+
 pub fn format_create_table(node: &SyntaxNode, printer: &mut Printer) {
     printer.write_keyword("CREATE");
     printer.space();
 
-    // Check for TEMP/TEMPORARY
     for element in node.children_with_tokens() {
         if let cstree::util::NodeOrToken::Token(token) = element
-            && (token.kind() == SyntaxKind::TEMP_KW || token.kind() == SyntaxKind::TEMPORARY_KW)
+            && matches!(
+                token.kind(),
+                SyntaxKind::TEMP_KW | SyntaxKind::TEMPORARY_KW | SyntaxKind::UNLOGGED_KW
+            )
         {
             printer.write_keyword(token.text());
             printer.space();
@@ -953,47 +970,47 @@ pub fn format_create_table(node: &SyntaxNode, printer: &mut Printer) {
     printer.write_keyword("TABLE");
     printer.space();
 
-    // Check for IF NOT EXISTS
-    for element in node.children_with_tokens() {
-        if let cstree::util::NodeOrToken::Token(token) = element
-            && token.kind() == SyntaxKind::IF_KW
-        {
-            printer.write_keyword("IF");
-            printer.space();
-            printer.write_keyword("NOT");
-            printer.space();
-            printer.write_keyword("EXISTS");
-            printer.space();
-        }
+    if find_token(node, SyntaxKind::IF_KW).is_some() {
+        printer.write_keyword("IF");
+        printer.space();
+        printer.write_keyword("NOT");
+        printer.space();
+        printer.write_keyword("EXISTS");
+        printer.space();
     }
 
-    // Format table name
-    if let Some(table_name) = find_child(node, SyntaxKind::TABLE_NAME) {
-        format_children(&table_name, printer);
+    // The relation name is a TABLE_REF in DDL.
+    if let Some(table_name) = find_child(node, SyntaxKind::TABLE_REF) {
+        format_inline(&table_name, printer, &mut Inline::default());
     }
 
-    // Format column definitions
+    // CREATE TABLE ... AS SELECT ...
+    if let Some(query) = find_child(node, SyntaxKind::SELECT_STMT) {
+        printer.space();
+        printer.write_keyword("AS");
+        printer.newline();
+        format_select(&query, printer);
+        return;
+    }
+
+    // Column/constraint list, one element per line.
     if let Some(columns) = find_child(node, SyntaxKind::COLUMN_DEF_LIST) {
         printer.space();
         printer.write("(");
         printer.newline();
         printer.indent();
 
-        let defs = children_of_kind(&columns, SyntaxKind::COLUMN_DEF);
-        for (i, def) in defs.iter().enumerate() {
+        let elements: Vec<SyntaxNode> = columns
+            .children()
+            .filter(|c| c.kind() == SyntaxKind::COLUMN_DEF || is_constraint_kind(c.kind()))
+            .cloned()
+            .collect();
+        for (i, element) in elements.iter().enumerate() {
             if i > 0 {
                 printer.write(",");
                 printer.newline();
             }
-            format_column_def(def, printer);
-        }
-
-        // Format table constraints
-        let constraints = children_of_kind(&columns, SyntaxKind::CONSTRAINT);
-        for constraint in &constraints {
-            printer.write(",");
-            printer.newline();
-            format_children(constraint, printer);
+            format_inline(element, printer, &mut Inline::default());
         }
 
         printer.dedent();
@@ -1002,19 +1019,184 @@ pub fn format_create_table(node: &SyntaxNode, printer: &mut Printer) {
     }
 }
 
-/// Formats a column definition.
-fn format_column_def(node: &SyntaxNode, printer: &mut Printer) {
+/// A `CREATE INDEX` statement: header inline, partial `WHERE` on its own line.
+pub fn format_create_index(node: &SyntaxNode, printer: &mut Printer) {
+    let mut state = Inline::default();
     for element in node.children_with_tokens() {
         match element {
-            cstree::util::NodeOrToken::Node(child) => {
-                if child.kind() == SyntaxKind::TYPE_NAME {
-                    printer.space();
-                }
-                format_children(&child, printer);
-            }
             cstree::util::NodeOrToken::Token(token) => {
-                format_token(&token, printer);
+                // The WHERE keyword is a child token; the predicate is in the
+                // WHERE_CLAUSE node. Emit both together when the node is reached.
+                if matches!(token.kind(), SyntaxKind::SEMICOLON | SyntaxKind::WHERE_KW) {
+                    continue;
+                }
+                emit_inline_token(&token, printer, &mut state);
+            }
+            cstree::util::NodeOrToken::Node(child) => {
+                if child.kind() == SyntaxKind::WHERE_CLAUSE {
+                    printer.newline();
+                    printer.write_keyword("WHERE");
+                    let mut where_state = Inline {
+                        prev_word: true,
+                        prev_kind: Some(SyntaxKind::WHERE_KW),
+                    };
+                    format_inline(&child, printer, &mut where_state);
+                } else {
+                    format_inline(&child, printer, &mut state);
+                }
             }
         }
     }
+}
+
+/// An `ALTER TABLE` statement: header inline, one action per line.
+pub fn format_alter(node: &SyntaxNode, printer: &mut Printer) {
+    printer.write_keyword("ALTER");
+    printer.space();
+    printer.write_keyword("TABLE");
+    printer.space();
+
+    if find_token(node, SyntaxKind::IF_KW).is_some() {
+        printer.write_keyword("IF");
+        printer.space();
+        printer.write_keyword("EXISTS");
+        printer.space();
+    }
+    if find_token(node, SyntaxKind::ONLY_KW).is_some() {
+        printer.write_keyword("ONLY");
+        printer.space();
+    }
+
+    if let Some(table_name) = find_child(node, SyntaxKind::TABLE_REF) {
+        format_inline(&table_name, printer, &mut Inline::default());
+    }
+
+    let actions = children_of_kind(node, SyntaxKind::ALTER_TABLE_ACTION);
+    if actions.is_empty() {
+        // RENAME (and other action-less tails): keep on the header line.
+        let mut state = Inline {
+            prev_word: true,
+            prev_kind: Some(SyntaxKind::TABLE_KW),
+        };
+        for element in node.children_with_tokens() {
+            if let cstree::util::NodeOrToken::Token(token) = element
+                && !matches!(
+                    token.kind(),
+                    SyntaxKind::ALTER_KW
+                        | SyntaxKind::TABLE_KW
+                        | SyntaxKind::ONLY_KW
+                        | SyntaxKind::SEMICOLON
+                )
+                && !token.kind().is_trivia()
+            {
+                emit_inline_token(&token, printer, &mut state);
+            }
+        }
+        return;
+    }
+
+    printer.indent();
+    for (i, action) in actions.iter().enumerate() {
+        if i > 0 {
+            printer.write(",");
+        }
+        printer.newline();
+        format_inline(action, printer, &mut Inline::default());
+    }
+    printer.dedent();
+}
+
+/// Spacing state for [`format_inline`]: whether the previous emitted token ended
+/// on a word character, and its kind (to decide spacing before `(`).
+#[derive(Default)]
+struct Inline {
+    prev_word: bool,
+    prev_kind: Option<SyntaxKind>,
+}
+
+/// Keywords after which a `(` opens a column/expression list and reads better
+/// with a leading space (`PRIMARY KEY (a)`, `UNIQUE (x)`, `CHECK (…)`), as
+/// opposed to a type modifier or function call (`varchar(255)`, `now()`).
+fn space_before_paren(prev_kind: Option<SyntaxKind>) -> bool {
+    matches!(
+        prev_kind,
+        Some(SyntaxKind::KEY_KW | SyntaxKind::UNIQUE_KW | SyntaxKind::CHECK_KW | SyntaxKind::IN_KW)
+    )
+}
+
+/// Walks a node's tokens (recursing into child nodes) and prints them with a
+/// single space between adjacent word tokens and none around punctuation —
+/// the spacing DDL fragments (types, constraints, actions) want.
+fn format_inline(node: &SyntaxNode, printer: &mut Printer, state: &mut Inline) {
+    for element in node.children_with_tokens() {
+        match element {
+            cstree::util::NodeOrToken::Node(child) => format_inline(&child, printer, state),
+            cstree::util::NodeOrToken::Token(token) => {
+                if token.kind() == SyntaxKind::SEMICOLON {
+                    continue;
+                }
+                emit_inline_token(&token, printer, state);
+            }
+        }
+    }
+}
+
+/// Emits one token for [`format_inline`], updating the spacing state.
+fn emit_inline_token(token: &SyntaxToken, printer: &mut Printer, state: &mut Inline) {
+    let kind = token.kind();
+    if kind.is_trivia() {
+        return;
+    }
+    match kind {
+        SyntaxKind::COMMA => {
+            printer.write(",");
+            printer.space();
+            state.prev_word = false;
+        }
+        SyntaxKind::L_PAREN => {
+            if space_before_paren(state.prev_kind) {
+                printer.space();
+            }
+            printer.write("(");
+            state.prev_word = false;
+        }
+        SyntaxKind::R_PAREN => {
+            printer.write(")");
+            state.prev_word = true;
+        }
+        SyntaxKind::L_BRACKET => {
+            printer.write("[");
+            state.prev_word = false;
+        }
+        SyntaxKind::R_BRACKET => {
+            printer.write("]");
+            state.prev_word = true;
+        }
+        SyntaxKind::DOT => {
+            printer.write(".");
+            state.prev_word = false;
+        }
+        k if k.is_keyword() => {
+            if state.prev_word {
+                printer.space();
+            }
+            printer.write_keyword(token.text());
+            state.prev_word = true;
+        }
+        SyntaxKind::IDENT => {
+            if state.prev_word {
+                printer.space();
+            }
+            printer.write_identifier(token.text());
+            state.prev_word = true;
+        }
+        _ => {
+            if state.prev_word {
+                printer.space();
+            }
+            printer.write(token.text());
+            state.prev_word = true;
+        }
+    }
+    state.prev_kind = Some(kind);
 }

@@ -184,3 +184,52 @@ fn test_trailing_comma_style() {
     let formatted = mold_format::format::format(sql, &config);
     insta::assert_snapshot!(formatted);
 }
+
+#[test]
+fn test_create_table() {
+    let sql = "create table public.users (id bigint primary key, name text not null, email varchar(255), constraint uq_email unique (email), check (id > 0));";
+    let formatted = format_sqlstyle(sql);
+    insta::assert_snapshot!(formatted);
+}
+
+#[test]
+fn test_create_table_as_select() {
+    let sql = "create table recent as select id from events where created_at > now();";
+    let formatted = format_sqlstyle(sql);
+    insta::assert_snapshot!(formatted);
+}
+
+#[test]
+fn test_create_index() {
+    let sql = "create unique index concurrently idx_users_email on public.users using btree (email) where active;";
+    let formatted = format_sqlstyle(sql);
+    insta::assert_snapshot!(formatted);
+}
+
+#[test]
+fn test_alter_table_multi_action() {
+    let sql = "alter table users add column age int not null default 0, drop column legacy, alter column name type text;";
+    let formatted = format_sqlstyle(sql);
+    insta::assert_snapshot!(formatted);
+}
+
+#[test]
+fn test_alter_table_rename() {
+    let sql = "alter table users rename column email to email_address;";
+    let formatted = format_sqlstyle(sql);
+    insta::assert_snapshot!(formatted);
+}
+
+#[test]
+fn test_ddl_formatting_is_idempotent() {
+    for sql in [
+        "create table t (id bigint primary key, name varchar(255), constraint u unique (name));",
+        "create index concurrently i on t using btree (a, b) where a > 0;",
+        "alter table t add column c int, drop column d, alter column e type bigint;",
+        "alter table t rename to t2;",
+    ] {
+        let once = format_sqlstyle(sql);
+        let twice = format_sqlstyle(&once);
+        assert_eq!(once, twice, "not idempotent for `{sql}`:\n{once}");
+    }
+}

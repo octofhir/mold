@@ -1,0 +1,11 @@
+---
+source: crates/mold_format/tests/snapshots.rs
+expression: formatted
+---
+CREATE TABLE public.users (
+    id BIGINT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email VARCHAR(255),
+    CONSTRAINT uq_email UNIQUE (email),
+    CHECK (id > 0)
+)

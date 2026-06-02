@@ -1,0 +1,5 @@
+---
+source: crates/mold_format/tests/snapshots.rs
+expression: formatted
+---
+ALTER TABLE users RENAME COLUMN email TO email_address
