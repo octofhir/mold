@@ -112,6 +112,7 @@ fn all_packs() -> AnalysisOptions {
         BuiltinLintPack::Jsonb,
         BuiltinLintPack::Capitalisation,
         BuiltinLintPack::Convention,
+        BuiltinLintPack::Migration,
     ])
 }
 

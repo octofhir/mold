@@ -97,6 +97,7 @@ fn build_options(config: &MoldConfig) -> AnalysisOptions {
         BuiltinLintPack::Core,
         BuiltinLintPack::Jsonb,
         BuiltinLintPack::Convention,
+        BuiltinLintPack::Migration,
     ];
     if config.lint.is_rule_enabled("CP01") || config.lint.is_rule_enabled("CP02") {
         packs.push(BuiltinLintPack::Capitalisation);

@@ -1,0 +1,174 @@
+# Migration-safety rules (MG01–MG12).
+
+# MG01 — CREATE INDEX without CONCURRENTLY
+- name: create_index_without_concurrently
+  rule: MG01
+  fail: "CREATE INDEX idx ON t (a);"
+  fix: "CREATE INDEX CONCURRENTLY idx ON t (a);"
+
+- name: create_index_concurrently_ok
+  rule: MG01
+  pass: "CREATE INDEX CONCURRENTLY idx ON t (a);"
+
+- name: create_unique_index_without_concurrently
+  rule: MG01
+  fail: "CREATE UNIQUE INDEX idx ON t (a);"
+  fix: "CREATE UNIQUE INDEX CONCURRENTLY idx ON t (a);"
+
+# MG12 — DROP INDEX without CONCURRENTLY
+- name: drop_index_without_concurrently
+  rule: MG12
+  fail: "DROP INDEX idx;"
+  fix: "DROP INDEX CONCURRENTLY idx;"
+
+- name: drop_index_concurrently_ok
+  rule: MG12
+  pass: "DROP INDEX CONCURRENTLY idx;"
+
+- name: drop_table_not_flagged_mg12
+  rule: MG12
+  pass: "DROP TABLE t;"
+
+# MG02 — ADD CONSTRAINT (FK/CHECK) without NOT VALID
+- name: add_fk_without_not_valid
+  rule: MG02
+  fail: "ALTER TABLE t ADD CONSTRAINT fk FOREIGN KEY (a) REFERENCES o (id);"
+  fix: "ALTER TABLE t ADD CONSTRAINT fk FOREIGN KEY (a) REFERENCES o (id) NOT VALID;"
+
+- name: add_check_without_not_valid
+  rule: MG02
+  fail: "ALTER TABLE t ADD CONSTRAINT c CHECK (a > 0);"
+  fix: "ALTER TABLE t ADD CONSTRAINT c CHECK (a > 0) NOT VALID;"
+
+- name: add_fk_not_valid_ok
+  rule: MG02
+  pass: "ALTER TABLE t ADD CONSTRAINT fk FOREIGN KEY (a) REFERENCES o (id) NOT VALID;"
+
+- name: add_unique_not_flagged
+  rule: MG02
+  pass: "ALTER TABLE t ADD CONSTRAINT u UNIQUE (a);"
+
+# MG03 — ADD COLUMN with a volatile DEFAULT
+- name: add_column_volatile_default
+  rule: MG03
+  fail: "ALTER TABLE t ADD COLUMN c timestamptz DEFAULT now();"
+
+- name: add_column_random_default
+  rule: MG03
+  fail: "ALTER TABLE t ADD COLUMN c double precision DEFAULT random();"
+
+- name: add_column_constant_default_ok
+  rule: MG03
+  pass: "ALTER TABLE t ADD COLUMN c int DEFAULT 0;"
+
+# MG04 — ADD COLUMN NOT NULL without DEFAULT
+- name: add_column_not_null_no_default
+  rule: MG04
+  fail: "ALTER TABLE t ADD COLUMN c int NOT NULL;"
+
+- name: add_column_not_null_with_default_ok
+  rule: MG04
+  pass: "ALTER TABLE t ADD COLUMN c int NOT NULL DEFAULT 0;"
+
+- name: add_column_nullable_ok
+  rule: MG04
+  pass: "ALTER TABLE t ADD COLUMN c int;"
+
+# MG05 — DROP COLUMN
+- name: drop_column_flagged
+  rule: MG05
+  fail: "ALTER TABLE t DROP COLUMN c;"
+
+- name: add_column_not_drop_ok
+  rule: MG05
+  pass: "ALTER TABLE t ADD COLUMN c int;"
+
+# MG06 — ALTER COLUMN TYPE
+- name: alter_column_type_flagged
+  rule: MG06
+  fail: "ALTER TABLE t ALTER COLUMN c TYPE bigint;"
+
+- name: alter_column_default_not_flagged
+  rule: MG06
+  pass: "ALTER TABLE t ALTER COLUMN c SET DEFAULT 0;"
+
+# MG07 — RENAME
+- name: rename_table_flagged
+  rule: MG07
+  fail: "ALTER TABLE t RENAME TO t2;"
+
+- name: rename_column_flagged
+  rule: MG07
+  fail: "ALTER TABLE t RENAME COLUMN a TO b;"
+
+- name: alter_add_column_not_rename
+  rule: MG07
+  pass: "ALTER TABLE t ADD COLUMN c int;"
+
+# MG08 — TRUNCATE ... CASCADE
+- name: truncate_cascade_flagged
+  rule: MG08
+  fail: "TRUNCATE t CASCADE;"
+
+- name: truncate_plain_ok
+  rule: MG08
+  pass: "TRUNCATE t;"
+
+- name: truncate_restart_identity_ok
+  rule: MG08
+  pass: "TRUNCATE t RESTART IDENTITY;"
+
+# MG09 — prefer text over char(n)/varchar(n)
+- name: varchar_flagged
+  rule: MG09
+  fail: "CREATE TABLE t (a varchar(255));"
+  fix: "CREATE TABLE t (a text);"
+
+- name: char_flagged
+  rule: MG09
+  fail: "CREATE TABLE t (a char(10));"
+  fix: "CREATE TABLE t (a text);"
+
+- name: text_ok
+  rule: MG09
+  pass: "CREATE TABLE t (a text);"
+
+- name: alter_add_varchar_flagged
+  rule: MG09
+  fail: "ALTER TABLE t ADD COLUMN a varchar(255);"
+  fix: "ALTER TABLE t ADD COLUMN a text;"
+
+# MG10 — prefer timestamptz over timestamp
+- name: timestamp_flagged
+  rule: MG10
+  fail: "CREATE TABLE t (a timestamp);"
+  fix: "CREATE TABLE t (a timestamptz);"
+
+- name: timestamptz_ok
+  rule: MG10
+  pass: "CREATE TABLE t (a timestamptz);"
+
+- name: timestamp_with_time_zone_ok
+  rule: MG10
+  pass: "CREATE TABLE t (a timestamp with time zone);"
+
+# MG11 — prefer bigint for a primary key
+- name: int_pk_flagged
+  rule: MG11
+  fail: "CREATE TABLE t (id int PRIMARY KEY);"
+
+- name: smallint_pk_flagged
+  rule: MG11
+  fail: "CREATE TABLE t (id smallint PRIMARY KEY);"
+
+- name: bigint_pk_ok
+  rule: MG11
+  pass: "CREATE TABLE t (id bigint PRIMARY KEY);"
+
+- name: int_non_pk_ok
+  rule: MG11
+  pass: "CREATE TABLE t (n int);"
+
+- name: table_level_pk_int_flagged
+  rule: MG11
+  fail: "CREATE TABLE t (id int, PRIMARY KEY (id));"

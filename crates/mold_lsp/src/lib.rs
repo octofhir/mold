@@ -207,6 +207,7 @@ impl Server {
             BuiltinLintPack::Core,
             BuiltinLintPack::Jsonb,
             BuiltinLintPack::Convention,
+            BuiltinLintPack::Migration,
         ];
         if self.config.lint.is_rule_enabled("CP01") || self.config.lint.is_rule_enabled("CP02") {
             packs.push(BuiltinLintPack::Capitalisation);

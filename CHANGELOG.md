@@ -27,6 +27,18 @@ the latest stable Rust toolchain.
   `prefer = all|distinct`.
 - **Lint rule** CV13: `IN` with a single value is equivalent to `=` (fixable) —
   35 lint codes total.
+- **Migration-safety lint pack** (`MG`, squawk-class): MG01 `CREATE INDEX`
+  without `CONCURRENTLY` (fixable), MG02 `ADD CONSTRAINT` (FK/CHECK) without
+  `NOT VALID` (fixable), MG03 `ADD COLUMN` with a volatile `DEFAULT`, MG04
+  `ADD COLUMN NOT NULL` without a `DEFAULT`, MG05 `DROP COLUMN`, MG06
+  `ALTER COLUMN … TYPE`, MG07 `RENAME`, MG08 `TRUNCATE … CASCADE`, MG09 prefer
+  `text` over `char(n)`/`varchar(n)` (fixable), MG10 prefer `timestamptz` over
+  `timestamp` (fixable), MG11 prefer `bigint` for primary keys, MG12
+  `DROP INDEX` without `CONCURRENTLY` (fixable) — 47 lint codes total.
+- **DDL typed AST and analysis** (`mold_syntax`, `mold_hir`): typed accessors
+  for the DDL and command statements; analysis resolves tables and columns
+  defined by `CREATE TABLE`/`CREATE VIEW` in the same source and no longer
+  reports a migration's own DDL targets as missing.
 - **CLI**: `mold rules` gains `--format json` and `--group <category|prefix>`;
   `mold lint` gains `--statistics` (per-rule count breakdown).
 - **Placeholder templating** (`mold_templater`): substitute `:name`, `?` and

@@ -130,9 +130,22 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 | RF02 | —       | Ambiguous column; qualify it (needs schema) |
 | RF03 | —       | Inconsistent column qualification in a single-table query |
 | RF06 | yes     | Identifier quoted unnecessarily |
+| MG01 | yes     | `CREATE INDEX` without `CONCURRENTLY` locks the table |
+| MG02 | yes     | `ADD CONSTRAINT` (FK/CHECK) without `NOT VALID` validates under a lock |
+| MG03 | —       | `ADD COLUMN` with a volatile `DEFAULT` rewrites the table |
+| MG04 | —       | `ADD COLUMN NOT NULL` without a `DEFAULT` fails on a non-empty table |
+| MG05 | —       | `DROP COLUMN` destroys data and breaks dependents |
+| MG06 | —       | `ALTER COLUMN … TYPE` rewrites the table under a lock |
+| MG07 | —       | `RENAME` breaks code that refers to the old name |
+| MG08 | —       | `TRUNCATE … CASCADE` empties dependent tables too |
+| MG09 | yes     | Prefer `text` to `char(n)`/`varchar(n)` |
+| MG10 | yes     | Prefer `timestamptz` to `timestamp` |
+| MG11 | —       | Prefer `bigint` over a narrower integer for a primary key |
+| MG12 | yes     | `DROP INDEX` without `CONCURRENTLY` locks the table |
 
 Prefixes: `AL` aliasing, `AM` ambiguity, `ST` structure, `SF` safety, `JB`
-JSONB, `CV` convention, `CP` capitalisation, `RF` references.
+JSONB, `CV` convention, `CP` capitalisation, `RF` references, `MG` migration
+safety.
 
 `mold fix` applies every available autofix; `mold explain <CODE>` prints the
 rationale and a before/after example. Reference checks (RF\*) only run when a

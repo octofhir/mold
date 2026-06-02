@@ -13,7 +13,7 @@
 //!
 //! Rule code prefixes: `AM` ambiguity · `AL` aliasing · `ST` structure ·
 //! `SF` safety · `RF` references · `CV` convention · `CP` capitalisation ·
-//! `JB` JSONB.
+//! `JB` JSONB · `MG` migration safety.
 
 use mold_syntax::SyntaxKind;
 
@@ -24,6 +24,7 @@ mod ambiguity;
 mod capitalisation;
 mod convention;
 mod jsonb;
+mod migration;
 mod references;
 mod safety;
 mod structure;
@@ -84,6 +85,17 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         &convention::LikeWithoutWildcard,
         &convention::InSingleValue,
         &convention::BlockedWords,
+        // Migration safety
+        &migration::IndexConcurrently,
+        &migration::DropIndexConcurrently,
+        &migration::ConstraintNotValid,
+        &migration::AddColumnVolatileDefault,
+        &migration::AddColumnNotNullNoDefault,
+        &migration::DropColumn,
+        &migration::AlterColumnType,
+        &migration::Rename,
+        &migration::TruncateCascade,
+        &migration::TypePreference,
     ]
 }
 

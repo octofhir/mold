@@ -422,6 +422,147 @@ automatically.
   bad:  SELECT \"id\" FROM \"patient\"
   good: SELECT id FROM patient",
     },
+    RuleDoc {
+        code: "MG01",
+        fixable: true,
+        summary: "CREATE INDEX without CONCURRENTLY locks the table",
+        explanation: "\
+A plain CREATE INDEX takes a lock that blocks writes for the whole build. On a
+large table that can mean a long outage. Build it CONCURRENTLY (outside a
+transaction block).
+
+  bad:  CREATE INDEX idx ON t (a);
+  good: CREATE INDEX CONCURRENTLY idx ON t (a);",
+    },
+    RuleDoc {
+        code: "MG02",
+        fixable: true,
+        summary: "ADD CONSTRAINT (FK/CHECK) without NOT VALID validates under a lock",
+        explanation: "\
+Adding a FOREIGN KEY or CHECK constraint scans and validates every existing row
+while holding a lock. Add it NOT VALID first, then VALIDATE CONSTRAINT in a
+separate statement, which takes a weaker lock.
+
+  bad:  ALTER TABLE t ADD CONSTRAINT c CHECK (a > 0);
+  good: ALTER TABLE t ADD CONSTRAINT c CHECK (a > 0) NOT VALID;",
+    },
+    RuleDoc {
+        code: "MG03",
+        fixable: false,
+        summary: "ADD COLUMN with a volatile DEFAULT rewrites the whole table",
+        explanation: "\
+A volatile default (now(), random(), gen_random_uuid(), …) is evaluated per row,
+forcing a full table rewrite under a lock. Add the column without a default,
+backfill in batches, then set the default for new rows.
+
+  bad:  ALTER TABLE t ADD COLUMN c uuid DEFAULT gen_random_uuid();
+  good: ALTER TABLE t ADD COLUMN c uuid; -- then backfill",
+    },
+    RuleDoc {
+        code: "MG04",
+        fixable: false,
+        summary: "ADD COLUMN NOT NULL without a DEFAULT fails on a non-empty table",
+        explanation: "\
+A NOT NULL column added without a default has no value for existing rows, so the
+statement errors on any table that already has data. Provide a DEFAULT, or add
+the column nullable and set NOT NULL after backfilling.
+
+  bad:  ALTER TABLE t ADD COLUMN c int NOT NULL;
+  good: ALTER TABLE t ADD COLUMN c int NOT NULL DEFAULT 0;",
+    },
+    RuleDoc {
+        code: "MG05",
+        fixable: false,
+        summary: "DROP COLUMN destroys data and breaks dependents",
+        explanation: "\
+Dropping a column permanently deletes its data and breaks views, indexes, and
+client code that still reference it. Stage the removal: stop using the column,
+deploy, then drop it once nothing depends on it.
+
+  bad:  ALTER TABLE t DROP COLUMN c;",
+    },
+    RuleDoc {
+        code: "MG06",
+        fixable: false,
+        summary: "ALTER COLUMN TYPE rewrites the table under a lock",
+        explanation: "\
+Changing a column's type rewrites the table under an exclusive lock and can fail
+or lose data on an incompatible conversion. Add a new column, backfill, and swap
+over instead.
+
+  bad:  ALTER TABLE t ALTER COLUMN c TYPE bigint;",
+    },
+    RuleDoc {
+        code: "MG07",
+        fixable: false,
+        summary: "RENAME breaks code that refers to the old name",
+        explanation: "\
+Renaming a table or column instantly breaks every query, view, and client still
+using the old name. Add the new name alongside the old, migrate readers, then
+remove the old name.
+
+  bad:  ALTER TABLE t RENAME COLUMN a TO b;",
+    },
+    RuleDoc {
+        code: "MG08",
+        fixable: false,
+        summary: "TRUNCATE ... CASCADE empties dependent tables too",
+        explanation: "\
+CASCADE truncates not only the named tables but every table with a foreign key
+into them, which can wipe far more data than intended. Truncate the dependent
+tables explicitly instead.
+
+  bad:  TRUNCATE t CASCADE;
+  good: TRUNCATE t, dependent_table;",
+    },
+    RuleDoc {
+        code: "MG09",
+        fixable: true,
+        summary: "Prefer text to char(n)/varchar(n)",
+        explanation: "\
+In PostgreSQL char(n) and varchar(n) have no storage or performance advantage
+over text, and the length limit becomes a migration hazard — widening it later
+can rewrite the table. Use text and enforce length with a CHECK if needed.
+
+  bad:  name varchar(255)
+  good: name text",
+    },
+    RuleDoc {
+        code: "MG10",
+        fixable: true,
+        summary: "Prefer timestamptz to timestamp",
+        explanation: "\
+`timestamp` (without time zone) stores wall-clock values that ignore the session
+time zone, a frequent source of off-by-hours bugs. Use timestamptz, which stores
+an absolute instant.
+
+  bad:  created_at timestamp
+  good: created_at timestamptz",
+    },
+    RuleDoc {
+        code: "MG11",
+        fixable: false,
+        summary: "Prefer bigint over a narrower integer for a primary key",
+        explanation: "\
+An int or smallint primary key can run out of values as a table grows, and
+widening a primary key later is an expensive, locking migration. Use bigint from
+the start.
+
+  bad:  id int PRIMARY KEY
+  good: id bigint PRIMARY KEY",
+    },
+    RuleDoc {
+        code: "MG12",
+        fixable: true,
+        summary: "DROP INDEX without CONCURRENTLY locks the table",
+        explanation: "\
+Dropping an index without CONCURRENTLY takes an exclusive lock on the table for
+the duration of the drop. Use DROP INDEX CONCURRENTLY (outside a transaction
+block).
+
+  bad:  DROP INDEX idx;
+  good: DROP INDEX CONCURRENTLY idx;",
+    },
 ];
 
 /// Looks up a rule by code (case-insensitive).

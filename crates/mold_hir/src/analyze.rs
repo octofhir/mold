@@ -209,6 +209,30 @@ pub enum RuleCode {
     Rf02,
     /// Identifier quoted unnecessarily.
     Rf06,
+    /// `CREATE INDEX` without `CONCURRENTLY` locks the table against writes.
+    Mg01,
+    /// `ADD CONSTRAINT` (FK/CHECK) without `NOT VALID` validates under a lock.
+    Mg02,
+    /// `ADD COLUMN` with a volatile `DEFAULT` rewrites the whole table.
+    Mg03,
+    /// `ADD COLUMN NOT NULL` without a `DEFAULT` fails on a non-empty table.
+    Mg04,
+    /// `DROP COLUMN` destroys data and breaks dependent objects.
+    Mg05,
+    /// `ALTER COLUMN … TYPE` rewrites the table under an exclusive lock.
+    Mg06,
+    /// `RENAME` of a table or column breaks code referring to the old name.
+    Mg07,
+    /// `TRUNCATE … CASCADE` silently empties dependent tables.
+    Mg08,
+    /// Prefer `text` over `char(n)`/`varchar(n)`.
+    Mg09,
+    /// Prefer `timestamptz` over `timestamp`.
+    Mg10,
+    /// Prefer `bigint` over a narrower integer type for a primary key.
+    Mg11,
+    /// `DROP INDEX` without `CONCURRENTLY` locks the table.
+    Mg12,
 }
 
 impl RuleCode {
@@ -252,6 +276,18 @@ impl RuleCode {
             RuleCode::Rf01 => "RF01",
             RuleCode::Rf02 => "RF02",
             RuleCode::Rf06 => "RF06",
+            RuleCode::Mg01 => "MG01",
+            RuleCode::Mg02 => "MG02",
+            RuleCode::Mg03 => "MG03",
+            RuleCode::Mg04 => "MG04",
+            RuleCode::Mg05 => "MG05",
+            RuleCode::Mg06 => "MG06",
+            RuleCode::Mg07 => "MG07",
+            RuleCode::Mg08 => "MG08",
+            RuleCode::Mg09 => "MG09",
+            RuleCode::Mg10 => "MG10",
+            RuleCode::Mg11 => "MG11",
+            RuleCode::Mg12 => "MG12",
         }
     }
 
@@ -386,6 +422,9 @@ pub enum BuiltinLintPack {
     Capitalisation,
     /// Convention checks (operator spelling, NULL comparison, semicolons).
     Convention,
+    /// Migration-safety checks for DDL (squawk-class): locking operations,
+    /// destructive changes, and type preferences.
+    Migration,
 }
 
 /// External lint pack hook.
