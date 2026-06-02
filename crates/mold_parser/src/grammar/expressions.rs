@@ -1,7 +1,7 @@
 use crate::parser::{CompletedMarker, ParseContext, Parser};
 use mold_syntax::SyntaxKind;
 
-use super::select::{at_ident, expect_ident};
+use super::select::{at_ident, at_query_start, expect_ident};
 use super::{CASE_RECOVERY, EXPR_LIST_RECOVERY, PAREN_RECOVERY, SUBQUERY_RECOVERY};
 
 pub fn expr(p: &mut Parser<'_>) -> Option<CompletedMarker> {
@@ -56,7 +56,7 @@ fn expr_bp(p: &mut Parser<'_>, min_bp: u8) -> Option<CompletedMarker> {
             p.expect(SyntaxKind::L_PAREN);
 
             // Can be an array expression or subquery
-            if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
+            if at_query_start(p) {
                 p.push_context(ParseContext::Subquery);
                 parse_subquery_with_recovery(p);
                 p.pop_context();
@@ -248,7 +248,7 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
                 let m = lhs.precede(p);
                 p.bump();
                 p.expect(SyntaxKind::L_PAREN);
-                if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
+                if at_query_start(p) {
                     // subquery with isolated recovery
                     p.push_context(ParseContext::Subquery);
                     parse_subquery_with_recovery(p);
@@ -270,7 +270,7 @@ fn postfix(p: &mut Parser<'_>, mut lhs: CompletedMarker) -> CompletedMarker {
                 p.bump(); // NOT
                 p.bump(); // IN
                 p.expect(SyntaxKind::L_PAREN);
-                if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
+                if at_query_start(p) {
                     // subquery with isolated recovery
                     p.push_context(ParseContext::Subquery);
                     parse_subquery_with_recovery(p);
@@ -628,7 +628,7 @@ fn paren_expr(p: &mut Parser<'_>) -> CompletedMarker {
     p.bump(); // (
 
     // Check for subquery
-    if p.at(SyntaxKind::SELECT_KW) || p.at(SyntaxKind::WITH_KW) {
+    if at_query_start(p) {
         p.push_context(ParseContext::Subquery);
         parse_subquery_with_recovery(p);
         p.pop_context();

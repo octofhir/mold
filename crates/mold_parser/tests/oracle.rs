@@ -93,6 +93,24 @@ const CORPUS: &[&str] = &[
     // --- unicode identifiers ---
     "SELECT имя FROM таблица WHERE имя = 1",
     "SELECT * FROM \"Имя Таблицы\" t WHERE t.поле = 1",
+    // --- query primaries: VALUES / TABLE / parenthesized / set ops ---
+    "VALUES (1, 'a'), (2, 'b')",
+    "TABLE users",
+    "(SELECT 1) UNION (SELECT 2)",
+    "SELECT 1 UNION VALUES (2)",
+    "(SELECT 1) UNION (SELECT 2) ORDER BY 1 LIMIT 5",
+    "WITH x AS (VALUES (1), (2)) SELECT * FROM x",
+    "SELECT * FROM (VALUES (1, 'a'), (2, 'b')) AS t (id, name)",
+    "SELECT * FROM t WHERE id IN (VALUES (1), (2))",
+    // --- grouping sets ---
+    "SELECT a, count(*) FROM t GROUP BY ROLLUP (a, b)",
+    "SELECT a FROM t GROUP BY CUBE (a, b)",
+    "SELECT a, b FROM t GROUP BY GROUPING SETS ((a), (b), ())",
+    "SELECT a FROM t GROUP BY a, ROLLUP (b, c)",
+    // --- TABLESAMPLE / WITH ORDINALITY ---
+    "SELECT * FROM t TABLESAMPLE BERNOULLI (10)",
+    "SELECT * FROM t TABLESAMPLE SYSTEM (10) REPEATABLE (42)",
+    "SELECT * FROM unnest(ARRAY[1, 2]) WITH ORDINALITY AS x(v, n)",
 ];
 
 /// DDL statements. Same contract: PG-valid ⇒ mold parses cleanly.

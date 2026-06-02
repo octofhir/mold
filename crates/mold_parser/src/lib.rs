@@ -830,6 +830,46 @@ mod tests {
     }
 
     #[test]
+    fn test_values_and_table_query() {
+        assert_parses_with("VALUES (1, 'a'), (2, 'b')", "VALUES_CLAUSE");
+        assert_parses_with("VALUES (1, 'a'), (2, 'b')", "VALUES_ROW");
+        assert_parses_with("TABLE users", "SELECT_STMT");
+        assert_parses_with("SELECT * FROM (VALUES (1), (2)) AS t (x)", "VALUES_CLAUSE");
+        assert_parses_with("SELECT * FROM t WHERE id IN (VALUES (1), (2))", "IN_EXPR");
+    }
+
+    #[test]
+    fn test_parenthesized_set_ops() {
+        assert_parses_with("(SELECT 1) UNION (SELECT 2)", "SELECT_STMT");
+        assert_parses_with("SELECT 1 UNION VALUES (2)", "VALUES_CLAUSE");
+        assert_parses_with("(SELECT 1) UNION (SELECT 2) ORDER BY 1 LIMIT 5", "ORDER_BY_CLAUSE");
+    }
+
+    #[test]
+    fn test_grouping_sets() {
+        assert_parses_with("SELECT a FROM t GROUP BY ROLLUP (a, b)", "GROUP_BY_CLAUSE");
+        assert_parses_with("SELECT a FROM t GROUP BY CUBE (a, b)", "GROUP_BY_CLAUSE");
+        assert_parses_with(
+            "SELECT a FROM t GROUP BY GROUPING SETS ((a), (b), ())",
+            "GROUP_BY_CLAUSE",
+        );
+        assert_parses_with("SELECT a FROM t GROUP BY a, ROLLUP (b)", "GROUP_BY_CLAUSE");
+    }
+
+    #[test]
+    fn test_tablesample_and_ordinality() {
+        assert_parses_with("SELECT * FROM t TABLESAMPLE BERNOULLI (10)", "FROM_CLAUSE");
+        assert_parses_with(
+            "SELECT * FROM t TABLESAMPLE SYSTEM (10) REPEATABLE (42)",
+            "FROM_CLAUSE",
+        );
+        assert_parses_with(
+            "SELECT * FROM unnest(ARRAY[1, 2]) WITH ORDINALITY AS x(v, n)",
+            "FROM_CLAUSE",
+        );
+    }
+
+    #[test]
     fn test_transaction_control() {
         assert_parses_with("BEGIN", "TRANSACTION_STMT");
         assert_parses_with("COMMIT", "TRANSACTION_STMT");

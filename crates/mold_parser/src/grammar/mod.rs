@@ -32,7 +32,7 @@ pub(super) fn statement(p: &mut Parser<'_>) {
     }
 
     match p.current() {
-        SyntaxKind::SELECT_KW => {
+        SyntaxKind::SELECT_KW | SyntaxKind::VALUES_KW | SyntaxKind::TABLE_KW | SyntaxKind::L_PAREN => {
             select::select_stmt(p);
         }
         SyntaxKind::INSERT_KW => {
