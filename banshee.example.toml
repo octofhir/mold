@@ -1,0 +1,52 @@
+# Example banshee configuration.
+#
+# Used by `just demo-db`. Copy to `banshee.toml` and adjust for your project; the
+# nearest `banshee.toml` is discovered automatically by the CLI and LSP.
+
+[format]
+# Base preset: "sqlstyle" (river alignment), "pgformatter", or "compact".
+# Every knob below is optional and overrides the preset's value.
+style = "sqlstyle"
+
+# keyword-case      = "upper"     # upper | lower | preserve
+# identifier-case   = "preserve"  # lower | preserve
+# indent-unit       = "space"     # space | tab
+# indent-width      = 4           # spaces per level (ignored for tabs)
+# max-width         = 100         # wrap width
+# comma-style       = "trailing"  # trailing | leading
+# river-alignment       = true    # right-align leading keywords (the "river")
+# newline-before-logical = true   # break before AND/OR in WHERE
+# spaces-around-operators = true
+# parentheses-spacing     = false
+# align-select-items      = true
+
+[lint]
+enabled = true
+# exclude = ["AM04"]
+
+# [lint.rules.CP01]
+# severity = "warning"
+
+# Per-rule options:
+# [lint.rules.CV04]
+# prefer = "star"          # star | 1 | 0  — count(*) vs count(1)/count(0)
+# [lint.rules.CV11]
+# prefer = "consistent"    # consistent | shorthand | functional — cast style
+# [lint.rules.CV09]
+# blocked = ["old_status", "sysdate"]   # forbid these words (off until set)
+# [lint.rules.CP01]
+# policy = "upper"         # upper | lower — keyword case
+# [lint.rules.CP02]
+# policy = "lower"         # lower | upper — unquoted identifier case
+
+# Migration-safety rules (MG01–MG16) fire on DDL. They are on by default;
+# silence individual checks via `exclude` or per-rule `enabled = false`, e.g.:
+# exclude = ["MG09", "MG10"]   # don't enforce text / timestamptz preferences
+# [lint.rules.MG01]
+# enabled = false              # allow CREATE INDEX without CONCURRENTLY
+
+[database]
+# Connection string is read from this environment variable (preferred over an
+# inline `url` so credentials stay out of the file).
+url-env = "DATABASE_URL"
+schema = "public"

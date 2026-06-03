@@ -1,8 +1,8 @@
 //! Drive completion with a custom schema provider.
 
-use mold_completion::providers::SchemaProvider;
-use mold_completion::types::JsonbSchema;
-use mold_completion::{
+use banshee_completion::providers::SchemaProvider;
+use banshee_completion::types::JsonbSchema;
+use banshee_completion::{
     ColumnInfo, CompletionRequest, CompletionResult, MemorySchemaProvider, TableInfo, complete,
 };
 use text_size::TextSize;

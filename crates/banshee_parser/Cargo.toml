@@ -1,0 +1,22 @@
+[package]
+name = "banshee_parser"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Recovering PostgreSQL SQL parser producing a lossless CST."
+keywords = ["sql", "postgres", "parser", "cst"]
+categories = ["parser-implementations"]
+
+[dependencies]
+banshee_syntax.workspace = true
+banshee_lexer.workspace = true
+cstree.workspace = true
+text-size.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+proptest.workspace = true
+# Oracle for differential testing: PostgreSQL's own parser (libpg_query).
+pg_parse = "0.14"

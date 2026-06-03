@@ -9,10 +9,10 @@ import {
 let client: LanguageClient | undefined;
 
 export function activate(context: ExtensionContext): void {
-  const config = workspace.getConfiguration("mold");
-  const command = config.get<string>("path", "mold");
+  const config = workspace.getConfiguration("banshee");
+  const command = config.get<string>("path", "banshee");
 
-  // mold speaks LSP over stdio via `mold lsp`.
+  // banshee speaks LSP over stdio via `banshee lsp`.
   const serverOptions: ServerOptions = {
     run: { command, args: ["lsp"], transport: TransportKind.stdio },
     debug: { command, args: ["lsp"], transport: TransportKind.stdio },
@@ -21,21 +21,21 @@ export function activate(context: ExtensionContext): void {
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "sql" }],
     synchronize: {
-      // Re-resolve config when a mold.toml changes.
-      fileEvents: workspace.createFileSystemWatcher("**/mold.toml"),
+      // Re-resolve config when a banshee.toml changes.
+      fileEvents: workspace.createFileSystemWatcher("**/banshee.toml"),
     },
   };
 
   client = new LanguageClient(
-    "mold",
-    "mold language server",
+    "banshee",
+    "banshee language server",
     serverOptions,
     clientOptions,
   );
 
   client.start().catch((err) => {
     window.showErrorMessage(
-      `mold: failed to start the language server (${command} lsp): ${err}`,
+      `banshee: failed to start the language server (${command} lsp): ${err}`,
     );
   });
 }

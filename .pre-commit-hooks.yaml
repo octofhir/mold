@@ -1,25 +1,25 @@
-# pre-commit hooks provided by mold.
+# pre-commit hooks provided by banshee.
 # Consumers reference this repo in their .pre-commit-config.yaml, e.g.:
 #
 #   repos:
-#     - repo: https://github.com/octofhir/mold
+#     - repo: https://github.com/octofhir/banshee
 #       rev: <tag-or-sha>
 #       hooks:
-#         - id: mold-format
-#         - id: mold-lint
+#         - id: banshee-format
+#         - id: banshee-lint
 #
-# Both hooks expect a `mold` binary on PATH.
+# Both hooks expect a `banshee` binary on PATH.
 
-- id: mold-format
-  name: mold format (check)
+- id: banshee-format
+  name: banshee format (check)
   description: Fail if any SQL file is not formatted.
-  entry: mold format --check
+  entry: banshee format --check
   language: system
   types: [sql]
 
-- id: mold-lint
-  name: mold lint
+- id: banshee-lint
+  name: banshee lint
   description: Lint staged SQL files.
-  entry: mold lint
+  entry: banshee lint
   language: system
   types: [sql]

@@ -1,0 +1,7 @@
+---
+source: crates/banshee_format/tests/snapshots.rs
+expression: formatted
+---
+SELECT id, name
+FROM users
+WHERE active = true

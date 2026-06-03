@@ -1,0 +1,13 @@
+---
+source: crates/banshee_hir/tests/snapshots.rs
+assertion_line: 196
+expression: render_analysis(&analysis)
+---
+diagnostics:
+- Warning | Table alias 'o' should be introduced with AS | 45..46
+tables:
+- <none>
+columns:
+- <none>
+output_columns:
+- <none>

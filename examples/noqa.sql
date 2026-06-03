@@ -1,6 +1,6 @@
 -- Demonstrates inline `-- noqa` lint suppression. Run:
 --
---     mold lint examples/noqa.sql
+--     banshee lint examples/noqa.sql
 --
 -- Only the unsuppressed findings should remain.
 

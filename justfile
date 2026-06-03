@@ -1,4 +1,4 @@
-# Development task runner for mold
+# Development task runner for banshee
 
 # Run all tests
 test:
@@ -36,37 +36,37 @@ dev:
 
 # === CLI ===
 
-# Build the mold binary (release)
-build-mold:
-    cargo build -p mold --release
+# Build the banshee binary (release)
+build-banshee:
+    cargo build -p banshee --release
 
 # Build with live database introspection (sqlx + tokio)
 build-db:
-    cargo build -p mold --release --features db
+    cargo build -p banshee --release --features db
 
 # Format a SQL string (reads via stdin)
 format-sql sql:
-    echo "{{sql}}" | cargo run -p mold --quiet -- format -
+    echo "{{sql}}" | cargo run -p banshee --quiet -- format -
 
 # Lint a SQL string (exits 0 even when findings exist, for convenience)
 lint-sql sql:
-    echo "{{sql}}" | cargo run -p mold --quiet -- lint - || true
+    echo "{{sql}}" | cargo run -p banshee --quiet -- lint - || true
 
 # Apply autofixes to a SQL string
 fix-sql sql:
-    echo "{{sql}}" | cargo run -p mold --quiet -- fix - || true
+    echo "{{sql}}" | cargo run -p banshee --quiet -- fix - || true
 
 # Dump the CST of a SQL string as JSON
 parse-sql sql:
-    echo "{{sql}}" | cargo run -p mold --quiet -- parse --format json - || true
+    echo "{{sql}}" | cargo run -p banshee --quiet -- parse --format json - || true
 
 # List built-in lint rules
 rules:
-    cargo run -p mold --quiet -- rules
+    cargo run -p banshee --quiet -- rules
 
 # Run the language server over stdio (with live schema support)
 lsp:
-    cargo run -p mold --features db -- lsp
+    cargo run -p banshee --features db -- lsp
 
 # === Postgres-backed demo ===
 
@@ -78,14 +78,14 @@ db-up:
 db-down:
     docker compose down -v
 
-# Introspect the live schema, cache it under .mold/, lint a sample (needs Docker)
+# Introspect the live schema, cache it under .banshee/, lint a sample (needs Docker)
 demo-db: db-up
-    DATABASE_URL=postgres://mold:mold@localhost:55432/mold_demo \
-        cargo run -p mold --features db -- --config mold.example.toml lint examples/demo.sql || true
+    DATABASE_URL=postgres://banshee:banshee@localhost:55432/banshee_demo \
+        cargo run -p banshee --features db -- --config banshee.example.toml lint examples/demo.sql || true
     @echo
     @echo "--- JSONB key completion after resource-> (sampled from live rows) ---"
     printf "select resource->'' from patient" | \
-        DATABASE_URL=postgres://mold:mold@localhost:55432/mold_demo \
-        cargo run -p mold --features db --quiet -- --config mold.example.toml complete --offset 18 - || true
+        DATABASE_URL=postgres://banshee:banshee@localhost:55432/banshee_demo \
+        cargo run -p banshee --features db --quiet -- --config banshee.example.toml complete --offset 18 - || true
     @echo
-    @echo "Schema (incl. JSONB shapes) cached at .mold/schema-cache.json"
+    @echo "Schema (incl. JSONB shapes) cached at .banshee/schema-cache.json"

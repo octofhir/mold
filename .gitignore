@@ -2,5 +2,5 @@ target
 .idea
 fuzz/artifacts
 fuzz/target
-.mold/
+.banshee/
 .DS_Store

@@ -1,6 +1,0 @@
----
-source: crates/mold_format/tests/pgformat_ddl.rs
-expression: out
----
-CREATE UNIQUE INDEX CONCURRENTLY i ON public.t USING btree(a, b)
-WHERE a > 0

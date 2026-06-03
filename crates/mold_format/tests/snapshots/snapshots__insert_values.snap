@@ -1,7 +1,0 @@
----
-source: crates/mold_format/tests/snapshots.rs
-expression: formatted
----
-INSERT INTO users (id,name,email)
-     VALUES (1,'Alice','alice@example.com'),
-            (2,'Bob','bob@example.com')

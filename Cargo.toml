@@ -1,25 +1,25 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/mold_syntax",
-    "crates/mold_lexer",
-    "crates/mold_parser",
-    "crates/mold_hir",
-    "crates/mold_completion",
-    "crates/mold_format",
-    "crates/mold_config",
-    "crates/mold_templater",
-    "crates/mold_schema",
-    "crates/mold_lsp",
-    "crates/mold",
+    "crates/banshee_syntax",
+    "crates/banshee_lexer",
+    "crates/banshee_parser",
+    "crates/banshee_hir",
+    "crates/banshee_completion",
+    "crates/banshee_format",
+    "crates/banshee_config",
+    "crates/banshee_templater",
+    "crates/banshee_schema",
+    "crates/banshee_lsp",
+    "crates/banshee",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/octofhir/mold"
-homepage = "https://github.com/octofhir/mold"
+repository = "https://github.com/octofhir/banshee"
+homepage = "https://github.com/octofhir/banshee"
 
 [workspace.dependencies]
 # CST infrastructure (rust-analyzer's rowan fork with interning)
@@ -46,13 +46,13 @@ clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 
 # Internal crates
-mold_syntax = { path = "crates/mold_syntax", version = "0.1.0" }
-mold_lexer = { path = "crates/mold_lexer", version = "0.1.0" }
-mold_parser = { path = "crates/mold_parser", version = "0.1.0" }
-mold_hir = { path = "crates/mold_hir", version = "0.1.0" }
-mold_completion = { path = "crates/mold_completion", version = "0.1.0" }
-mold_format = { path = "crates/mold_format", version = "0.1.0" }
-mold_config = { path = "crates/mold_config", version = "0.1.0" }
-mold_templater = { path = "crates/mold_templater", version = "0.1.0" }
-mold_schema = { path = "crates/mold_schema", version = "0.1.0" }
-mold_lsp = { path = "crates/mold_lsp", version = "0.1.0" }
+banshee_syntax = { path = "crates/banshee_syntax", version = "0.1.0" }
+banshee_lexer = { path = "crates/banshee_lexer", version = "0.1.0" }
+banshee_parser = { path = "crates/banshee_parser", version = "0.1.0" }
+banshee_hir = { path = "crates/banshee_hir", version = "0.1.0" }
+banshee_completion = { path = "crates/banshee_completion", version = "0.1.0" }
+banshee_format = { path = "crates/banshee_format", version = "0.1.0" }
+banshee_config = { path = "crates/banshee_config", version = "0.1.0" }
+banshee_templater = { path = "crates/banshee_templater", version = "0.1.0" }
+banshee_schema = { path = "crates/banshee_schema", version = "0.1.0" }
+banshee_lsp = { path = "crates/banshee_lsp", version = "0.1.0" }

@@ -1,0 +1,21 @@
+[package]
+name = "banshee_hir"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Name resolution, scopes and lint rules for PostgreSQL SQL."
+keywords = ["sql", "postgres", "analysis", "lint"]
+categories = ["development-tools"]
+
+[dependencies]
+banshee_syntax.workspace = true
+text-size.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+banshee_parser.workspace = true
+serde = { workspace = true }
+# Pure-Rust, serde-compatible YAML reader for the declarative rule fixtures.
+noyalib = "0.0.6"

@@ -1,0 +1,18 @@
+[package]
+name = "banshee_syntax"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Syntax kinds, lossless CST and AST for the banshee PostgreSQL toolchain."
+keywords = ["sql", "postgres", "cst", "syntax", "parser"]
+categories = ["parser-implementations", "development-tools"]
+
+[dependencies]
+cstree.workspace = true
+text-size.workspace = true
+phf.workspace = true
+
+[dev-dependencies]
+insta.workspace = true

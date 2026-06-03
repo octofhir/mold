@@ -1,10 +1,10 @@
-# mold
+# banshee
 
-[![CI](https://github.com/octofhir/mold/actions/workflows/ci.yml/badge.svg)](https://github.com/octofhir/mold/actions/workflows/ci.yml)
+[![CI](https://github.com/octofhir/banshee/actions/workflows/ci.yml/badge.svg)](https://github.com/octofhir/banshee/actions/workflows/ci.yml)
 
 A PostgreSQL SQL parser, formatter, linter, and language server, written in Rust.
 
-mold builds a **lossless concrete syntax tree** with error recovery, so it keeps
+banshee builds a **lossless concrete syntax tree** with error recovery, so it keeps
 working on incomplete or invalid SQL — the use case editors actually need. On
 top of the tree it resolves names, formats, lints (with autofixes), and serves
 an LSP. When a database connection is configured it introspects the live schema
@@ -16,36 +16,36 @@ layer; the grammar, JSONB/JSONPath support, and lint rules target Postgres.
 ## Install
 
 ```sh
-cargo build --release -p mold                  # parser, formatter, linter, LSP
-cargo build --release -p mold --features db    # + live schema introspection
+cargo build --release -p banshee                  # parser, formatter, linter, LSP
+cargo build --release -p banshee --features db    # + live schema introspection
 ```
 
-The binary is `target/release/mold`. The `db` feature pulls in `sqlx`/`tokio`;
+The binary is `target/release/banshee`. The `db` feature pulls in `sqlx`/`tokio`;
 leave it off and the binary stays async-free, using a cached schema if present.
 
 ## CLI
 
 ```
-mold format [--write|--check] [files…|-]
-mold lint   [--format human|json|github|sarif] [--statistics] [files…|-]
-mold fix    [--diff] [files…|-]
-mold parse  [--format tree|json] [files…|-]
-mold rules [--format human|json] [--group <category|prefix>]   # list lint rules
-mold explain <CODE>        # detailed rule description with examples
-mold init                  # scaffold a mold.toml
-mold lsp                   # language server over stdio
+banshee format [--write|--check] [files…|-]
+banshee lint   [--format human|json|github|sarif] [--statistics] [files…|-]
+banshee fix    [--diff] [files…|-]
+banshee parse  [--format tree|json] [files…|-]
+banshee rules [--format human|json] [--group <category|prefix>]   # list lint rules
+banshee explain <CODE>        # detailed rule description with examples
+banshee init                  # scaffold a banshee.toml
+banshee lsp                   # language server over stdio
 ```
 
 Inputs are files, directories (walked for `*.sql`), or stdin (`-`). Exit codes:
 `0` clean, `1` findings / unformatted, `2` error.
 
 ```sh
-echo "select id,name from users where active=true" | mold format -
+echo "select id,name from users where active=true" | banshee format -
 #  SELECT id, name
 #    FROM users
 #   WHERE active = true
 
-echo "select * from a, b" | mold lint -
+echo "select * from a, b" | banshee lint -
 #  warning[AM04]: Avoid SELECT *; list columns explicitly
 #  warning[AM05]: Implicit cross join; use an explicit JOIN clause
 #  …
@@ -56,7 +56,7 @@ a TTY). `--format json|github|sarif` is for CI and code-scanning.
 
 ## Configuration
 
-Configuration lives in `mold.toml`, discovered by walking up from the input.
+Configuration lives in `banshee.toml`, discovered by walking up from the input.
 The on-disk schema is decoupled from the engine's internal types.
 
 ```toml
@@ -151,13 +151,13 @@ Prefixes: `AL` aliasing, `AM` ambiguity, `ST` structure, `SF` safety, `JB`
 JSONB, `CV` convention, `CP` capitalisation, `RF` references, `MG` migration
 safety.
 
-`mold fix` applies every available autofix; `mold explain <CODE>` prints the
+`banshee fix` applies every available autofix; `banshee explain <CODE>` prints the
 rationale and a before/after example. Reference checks (RF\*) only run when a
 schema is available, so they never produce false positives offline.
 
 ### Suppressing diagnostics inline
 
-A `noqa` comment silences findings without touching `mold.toml`. It uses the
+A `noqa` comment silences findings without touching `banshee.toml`. It uses the
 familiar `-- noqa` convention, so existing suppressions carry over:
 
 ```sql
@@ -180,7 +180,7 @@ code in that family; a full code (`AM04`) matches only itself.
 Application SQL often contains parameter placeholders that are not valid
 PostgreSQL on their own (`:name`, `?`, `%(name)s`). Enable the templater to
 substitute them before parsing so the statement still lints; findings map back
-to the original text and the placeholders survive `mold fix` untouched.
+to the original text and the placeholders survive `banshee fix` untouched.
 
 ```toml
 [templater]
@@ -193,10 +193,10 @@ alone. See [`examples/templater.sql`](examples/templater.sql).
 
 ## Schema-aware features
 
-With `[database]` configured and a `db` build, mold introspects
+With `[database]` configured and a `db` build, banshee introspects
 `information_schema`/`pg_catalog` for tables, columns, primary keys, functions,
 and **samples JSONB columns** to infer their shape. The result is cached at
-`.mold/schema-cache.json` (keyed by connection + schema, with a TTL), so only
+`.banshee/schema-cache.json` (keyed by connection + schema, with a TTL), so only
 the first run touches the database.
 
 The cached schema drives:
@@ -205,12 +205,12 @@ The cached schema drives:
 - `RF01`/`RF02` reference checks and "did you mean?" suggestions,
 - `AM04`'s `SELECT *` expansion.
 
-A `.mold/` cache is plain JSON and can be read without the `db` feature, so
+A `.banshee/` cache is plain JSON and can be read without the `db` feature, so
 embedders stay async-free.
 
 ## Language server
 
-`mold lsp` speaks LSP over stdio. Implemented:
+`banshee lsp` speaks LSP over stdio. Implemented:
 
 - diagnostics (parse errors + lint findings, with quick-fix code actions),
 - completion (keywords, schema columns/tables, JSONB paths),
@@ -222,24 +222,24 @@ embedders stay async-free.
 
 ### Editor setup — VS Code
 
-A local extension lives in [`editors/code`](editors/code). Build `mold`, put it
-on your `PATH` (or set `mold.path`), then from `editors/code` run
+A local extension lives in [`editors/code`](editors/code). Build `banshee`, put it
+on your `PATH` (or set `banshee.path`), then from `editors/code` run
 `npm install && npm run compile` and press **F5** in VS Code to launch it. See
 [`editors/code/README.md`](editors/code/README.md) for details. It is not
 published to the Marketplace.
 
 ## CI integration
 
-`mold lint --format sarif` emits SARIF 2.1.0; upload it to GitHub code scanning:
+`banshee lint --format sarif` emits SARIF 2.1.0; upload it to GitHub code scanning:
 
 ```yaml
-- run: mold lint --format sarif . > mold.sarif
+- run: banshee lint --format sarif . > banshee.sarif
 - uses: github/codeql-action/upload-sarif@v3
   with:
-    sarif_file: mold.sarif
+    sarif_file: banshee.sarif
 ```
 
-For pre-commit, this repo ships hooks (`mold-format`, `mold-lint`) — see
+For pre-commit, this repo ships hooks (`banshee-format`, `banshee-lint`) — see
 `.pre-commit-hooks.yaml`.
 
 ## Library
@@ -248,31 +248,31 @@ The workspace is split into focused crates:
 
 | Crate | Purpose |
 |-------|---------|
-| `mold_lexer` | Tokenizer |
-| `mold_parser` | Recovering parser → lossless CST |
-| `mold_syntax` | Syntax kinds, AST, `Parse` container |
-| `mold_hir` | Name resolution, scopes, lint rules |
-| `mold_completion` | Completion engine and provider traits |
-| `mold_format` | Formatter (two engines) and edit diffing |
-| `mold_config` | `mold.toml` schema (serde) |
-| `mold_schema` | Schema snapshot, `.mold/` cache, live introspection |
-| `mold_lsp` | Language server |
-| `mold` | Facade crate and CLI |
+| `banshee_lexer` | Tokenizer |
+| `banshee_parser` | Recovering parser → lossless CST |
+| `banshee_syntax` | Syntax kinds, AST, `Parse` container |
+| `banshee_hir` | Name resolution, scopes, lint rules |
+| `banshee_completion` | Completion engine and provider traits |
+| `banshee_format` | Formatter (two engines) and edit diffing |
+| `banshee_config` | `banshee.toml` schema (serde) |
+| `banshee_schema` | Schema snapshot, `.banshee/` cache, live introspection |
+| `banshee_lsp` | Language server |
+| `banshee` | Facade crate and CLI |
 
 ```rust
-let parse = mold::parser::parse("SELECT id, name FROM users");
+let parse = banshee::parser::parse("SELECT id, name FROM users");
 assert!(parse.errors().is_empty());
 
-let formatted = mold_format::format_sqlstyle("select id,name from users");
+let formatted = banshee_format::format_sqlstyle("select id,name from users");
 println!("{formatted}");
 ```
 
 Runnable examples:
 
 ```sh
-cargo run -p mold --example parse_and_format
-cargo run -p mold --example completion
-cargo run -p mold --example custom_provider
+cargo run -p banshee --example parse_and_format
+cargo run -p banshee --example completion
+cargo run -p banshee --example custom_provider
 ```
 
 ## Development
@@ -284,7 +284,7 @@ just demo-db       # spin up Postgres, introspect, lint a sample (needs Docker)
 ```
 
 `just demo-db` brings up a seeded Postgres via `docker-compose.yml`, introspects
-it (writing `.mold/schema-cache.json`), and runs schema-aware lint plus JSONB
+it (writing `.banshee/schema-cache.json`), and runs schema-aware lint plus JSONB
 key completion against it end to end.
 
 The project tracks the latest stable Rust toolchain; there is no pinned MSRV.
@@ -293,16 +293,16 @@ The project tracks the latest stable Rust toolchain; there is no pinned MSRV.
 
 Pre-1.0: the public API of the engine crates may change between minor versions.
 The intended public surface is what each crate re-exports from its `lib.rs`
-(notably `Parse`/`SyntaxNode` in `mold_syntax`, `parse` in `mold_parser`,
-`analyze_query*` / `SchemaProvider` / `Diagnostic` / `RuleCode` in `mold_hir`,
-the provider traits in `mold_completion`, and `format*` in `mold_format`).
+(notably `Parse`/`SyntaxNode` in `banshee_syntax`, `parse` in `banshee_parser`,
+`analyze_query*` / `SchemaProvider` / `Diagnostic` / `RuleCode` in `banshee_hir`,
+the provider traits in `banshee_completion`, and `format*` in `banshee_format`).
 Items reachable but not part of that surface may change without notice.
 
-**Embedding the engine.** mold is built to be driven by other tools without a
-fork. `mold_hir` exposes a committed extension contract — `SchemaProvider`
+**Embedding the engine.** banshee is built to be driven by other tools without a
+fork. `banshee_hir` exposes a committed extension contract — `SchemaProvider`
 (feed schema from any source, e.g. FHIR `StructureDefinition` rather than live
 introspection), `LintRulePack` (add domain-specific rules), `AnalysisOptions` /
-`BuiltinLintPack`, and `analyze_query_with_options` — and `mold_completion`
+`BuiltinLintPack`, and `analyze_query_with_options` — and `banshee_completion`
 exposes its `SchemaProvider` / `FunctionProvider` traits. These will not change
 incompatibly within a minor version.
 

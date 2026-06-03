@@ -1,0 +1,20 @@
+[package]
+name = "banshee_completion"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Completion engine and schema provider traits for PostgreSQL SQL."
+keywords = ["sql", "postgres", "completion", "lsp"]
+categories = ["development-tools"]
+
+[dependencies]
+banshee_syntax.workspace = true
+banshee_hir.workspace = true
+banshee_parser.workspace = true
+text-size.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+proptest.workspace = true

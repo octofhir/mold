@@ -1,0 +1,17 @@
+[package]
+name = "banshee_lexer"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "PostgreSQL SQL tokenizer for the banshee toolchain."
+keywords = ["sql", "postgres", "lexer", "tokenizer"]
+categories = ["parser-implementations"]
+
+[dependencies]
+banshee_syntax.workspace = true
+text-size.workspace = true
+
+[dev-dependencies]
+insta.workspace = true

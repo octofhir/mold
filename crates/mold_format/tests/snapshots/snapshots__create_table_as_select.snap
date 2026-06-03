@@ -1,8 +1,0 @@
----
-source: crates/mold_format/tests/snapshots.rs
-expression: formatted
----
-CREATE TABLE recent AS
-    SELECT id
-      FROM events
-     WHERE created_at > now()

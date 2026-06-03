@@ -1,14 +1,14 @@
 {
-  "name": "mold-vscode",
-  "displayName": "mold (PostgreSQL SQL)",
-  "description": "Diagnostics, completion, formatting and more for PostgreSQL SQL via the mold language server.",
+  "name": "banshee-vscode",
+  "displayName": "banshee (PostgreSQL SQL)",
+  "description": "Diagnostics, completion, formatting and more for PostgreSQL SQL via the banshee language server.",
   "version": "0.1.0",
   "private": true,
   "publisher": "octofhir",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/octofhir/mold"
+    "url": "https://github.com/octofhir/banshee"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -18,14 +18,14 @@
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
-      "title": "mold",
+      "title": "banshee",
       "properties": {
-        "mold.path": {
+        "banshee.path": {
           "type": "string",
-          "default": "mold",
-          "description": "Path to the mold executable. Defaults to `mold` on PATH."
+          "default": "banshee",
+          "description": "Path to the banshee executable. Defaults to `banshee` on PATH."
         },
-        "mold.trace.server": {
+        "banshee.trace.server": {
           "type": "string",
           "enum": ["off", "messages", "verbose"],
           "default": "off",

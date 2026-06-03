@@ -1,0 +1,18 @@
+[package]
+name = "banshee_config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["sql", "postgres", "config"]
+categories = ["config", "development-tools"]
+description = "Unified, serde-based configuration for the banshee SQL toolchain."
+
+[dependencies]
+serde = { workspace = true }
+toml = { workspace = true }
+banshee_format = { workspace = true }
+banshee_templater = { workspace = true }
+
+[dev-dependencies]

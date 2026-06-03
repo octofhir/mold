@@ -4,6 +4,6 @@ use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(sql) = std::str::from_utf8(data) {
-        let _ = mold_format::format_sqlstyle(sql);
+        let _ = banshee_format::format_sqlstyle(sql);
     }
 });

@@ -1,9 +1,9 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `crates/` holds workspace crates: `mold_syntax`, `mold_lexer`, `mold_parser`, `mold_hir`, `mold_completion`, `mold_format`, and the `mold` facade/binary.
-- `crates/*/src/` contains library code; parser grammars live under `crates/mold_parser/src/grammar/`.
-- Snapshot test fixtures live under `crates/*/src/snapshots/` and `crates/mold_format/tests/snapshots/`.
+- `crates/` holds workspace crates: `banshee_syntax`, `banshee_lexer`, `banshee_parser`, `banshee_hir`, `banshee_completion`, `banshee_format`, and the `banshee` facade/binary.
+- `crates/*/src/` contains library code; parser grammars live under `crates/banshee_parser/src/grammar/`.
+- Snapshot test fixtures live under `crates/*/src/snapshots/` and `crates/banshee_format/tests/snapshots/`.
 - `tasks/` documents project milestones and planning notes.
 - `ARCHITECTURE.md` explains the core design and key components.
 
@@ -13,8 +13,8 @@ Use `just` targets from `justfile` (or run the cargo commands directly):
 - `just test-update` → runs tests then accepts new snapshots via `cargo insta accept`.
 - `just check` → format, clippy, and tests (`cargo fmt`, `cargo clippy`, `cargo test`).
 - `just fmt` → `cargo fmt --all` to apply rustfmt.
-- `just build-mold` → `cargo build -p mold --release`.
-- `just format-sql sql="SELECT 1"` → runs the formatter through the `mold` binary.
+- `just build-banshee` → `cargo build -p banshee --release`.
+- `just format-sql sql="SELECT 1"` → runs the formatter through the `banshee` binary.
 
 ## Coding Style & Naming Conventions
 - Rust style is idiomatic; prefer `?`, pattern matching, and iterators.
@@ -25,7 +25,7 @@ Use `just` targets from `justfile` (or run the cargo commands directly):
 ## Testing Guidelines
 - Tests are run with `cargo test --all`.
 - Snapshot testing uses `insta`; update snapshots with `just test-update`.
-- Snapshot files are stored under `crates/*/src/snapshots/` or `crates/mold_format/tests/snapshots/`.
+- Snapshot files are stored under `crates/*/src/snapshots/` or `crates/banshee_format/tests/snapshots/`.
 
 ## Commit & Pull Request Guidelines
 - Commit messages appear to follow a Conventional Commits style (e.g., `chore: ...`); keep the same pattern when possible.

@@ -1,0 +1,7 @@
+---
+source: crates/banshee_format/tests/snapshots.rs
+expression: formatted
+---
+DELETE FROM users
+      WHERE id = 1
+  RETURNING

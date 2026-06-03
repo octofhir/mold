@@ -1,4 +1,4 @@
-use mold_completion::{CompletionRequest, MemorySchemaProvider, TableInfo, complete};
+use banshee_completion::{CompletionRequest, MemorySchemaProvider, TableInfo, complete};
 use text_size::TextSize;
 
 fn main() {

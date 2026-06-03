@@ -1,7 +1,7 @@
-# mold — VS Code extension
+# banshee — VS Code extension
 
-A thin client that runs the [`mold`](../../README.md) language server
-(`mold lsp`) for PostgreSQL SQL files. It provides diagnostics, completion,
+A thin client that runs the [`banshee`](../../README.md) language server
+(`banshee lsp`) for PostgreSQL SQL files. It provides diagnostics, completion,
 hover, formatting, document symbols, semantic highlighting, signature help, and
 quick-fix code actions.
 
@@ -10,15 +10,15 @@ the Marketplace.
 
 ## Prerequisites
 
-Build the `mold` binary (with the `db` feature if you want live, schema-aware
+Build the `banshee` binary (with the `db` feature if you want live, schema-aware
 diagnostics and completion):
 
 ```sh
-cargo build --release -p mold --features db
+cargo build --release -p banshee --features db
 ```
 
-Put it on your `PATH`, or set `mold.path` in your VS Code settings to the built
-binary (e.g. `target/release/mold`).
+Put it on your `PATH`, or set `banshee.path` in your VS Code settings to the built
+binary (e.g. `target/release/banshee`).
 
 ## Run it
 
@@ -37,15 +37,15 @@ lightbulb.
 To install a packaged build instead of the debug host:
 
 ```sh
-npx vsce package        # produces mold-vscode-0.1.0.vsix
-code --install-extension mold-vscode-0.1.0.vsix
+npx vsce package        # produces banshee-vscode-0.1.0.vsix
+code --install-extension banshee-vscode-0.1.0.vsix
 ```
 
 ## Settings
 
-- `mold.path` — path to the `mold` executable (default: `mold`).
-- `mold.trace.server` — LSP trace verbosity (`off` | `messages` | `verbose`).
+- `banshee.path` — path to the `banshee` executable (default: `banshee`).
+- `banshee.trace.server` — LSP trace verbosity (`off` | `messages` | `verbose`).
 
 Schema-aware features (column/table completion, JSONB key completion, `RF*`
-reference checks) require a `mold.toml` with a `[database]` section and a
-`mold` binary built with `--features db`. See the top-level README.
+reference checks) require a `banshee.toml` with a `[database]` section and a
+`banshee` binary built with `--features db`. See the top-level README.

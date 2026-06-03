@@ -1,20 +1,20 @@
-# Demo Postgres for showcasing mold's schema-aware CLI/LSP.
+# Demo Postgres for showcasing banshee's schema-aware CLI/LSP.
 #
-#   just demo-db     # start, introspect, lint a sample (writes .mold/ cache)
+#   just demo-db     # start, introspect, lint a sample (writes .banshee/ cache)
 #   just db-down     # tear down
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: mold
-      POSTGRES_PASSWORD: mold
-      POSTGRES_DB: mold_demo
+      POSTGRES_USER: banshee
+      POSTGRES_PASSWORD: banshee
+      POSTGRES_DB: banshee_demo
     ports:
       - "55432:5432"
     volumes:
       - ./examples/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mold -d mold_demo"]
+      test: ["CMD-SHELL", "pg_isready -U banshee -d banshee_demo"]
       interval: 2s
       timeout: 3s
       retries: 20

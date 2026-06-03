@@ -1,0 +1,6 @@
+---
+source: crates/banshee_format/tests/snapshots.rs
+expression: formatted
+---
+SELECT id::TEXT, CAST(amount AS NUMERIC(10,2))
+FROM orders

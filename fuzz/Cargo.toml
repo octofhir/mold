@@ -1,5 +1,5 @@
 [package]
-name = "mold-fuzz"
+name = "banshee-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2024"
@@ -9,9 +9,9 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-mold_completion = { path = "../crates/mold_completion" }
-mold_format = { path = "../crates/mold_format" }
-mold_parser = { path = "../crates/mold_parser" }
+banshee_completion = { path = "../crates/banshee_completion" }
+banshee_format = { path = "../crates/banshee_format" }
+banshee_parser = { path = "../crates/banshee_parser" }
 text-size = "1.1"
 
 [profile.release]

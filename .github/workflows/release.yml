@@ -1,6 +1,6 @@
 name: Release (rolling)
 
-# Every push to main rebuilds the `mold` binary for each platform and republishes
+# Every push to main rebuilds the `banshee` binary for each platform and republishes
 # them under a single moving pre-release tagged `latest`. No manual versioning:
 # the release name carries the short commit SHA so each build is identifiable.
 
@@ -48,32 +48,32 @@ jobs:
         with:
           key: ${{ matrix.target }}
       - name: Build
-        run: cargo build --release -p mold --features db --target ${{ matrix.target }}
+        run: cargo build --release -p banshee --features db --target ${{ matrix.target }}
       - name: Package (unix)
         if: matrix.archive == 'tar.gz'
         shell: bash
         run: |
-          staging="mold-${{ matrix.target }}"
+          staging="banshee-${{ matrix.target }}"
           mkdir "$staging"
-          cp "target/${{ matrix.target }}/release/mold" "$staging/"
+          cp "target/${{ matrix.target }}/release/banshee" "$staging/"
           cp README.md LICENSE "$staging/" 2>/dev/null || true
           tar czf "$staging.tar.gz" "$staging"
       - name: Package (windows)
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          $staging = "mold-${{ matrix.target }}"
+          $staging = "banshee-${{ matrix.target }}"
           New-Item -ItemType Directory -Path $staging | Out-Null
-          Copy-Item "target/${{ matrix.target }}/release/mold.exe" $staging
+          Copy-Item "target/${{ matrix.target }}/release/banshee.exe" $staging
           Copy-Item README.md, LICENSE $staging -ErrorAction SilentlyContinue
           Compress-Archive -Path $staging -DestinationPath "$staging.zip"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mold-${{ matrix.target }}
+          name: banshee-${{ matrix.target }}
           path: |
-            mold-${{ matrix.target }}.tar.gz
-            mold-${{ matrix.target }}.zip
+            banshee-${{ matrix.target }}.tar.gz
+            banshee-${{ matrix.target }}.zip
           if-no-files-found: ignore
 
   publish:

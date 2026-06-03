@@ -1,0 +1,26 @@
+[package]
+name = "banshee_format"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "PostgreSQL SQL formatter with sqlstyle and pgFormatter engines."
+keywords = ["sql", "postgres", "formatter"]
+categories = ["development-tools"]
+
+[dependencies]
+banshee_syntax.workspace = true
+banshee_parser.workspace = true
+text-size.workspace = true
+cstree.workspace = true
+dirs = { workspace = true, optional = true }
+
+[features]
+default = []
+config-file = ["dirs"]
+
+[dev-dependencies]
+insta.workspace = true
+proptest.workspace = true
+banshee_parser.workspace = true

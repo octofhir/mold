@@ -1,6 +1,0 @@
----
-source: crates/mold_format/tests/snapshots.rs
-expression: formatted
----
-SELECT id, name, row_number() OVER (PARTITION BY department ORDER BY salary DESC) AS rank
-  FROM employees

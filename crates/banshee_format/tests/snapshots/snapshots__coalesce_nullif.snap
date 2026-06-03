@@ -1,0 +1,6 @@
+---
+source: crates/banshee_format/tests/snapshots.rs
+expression: formatted
+---
+SELECT COALESCE(name, 'Unknown'), NULLIF(status, 'deleted')
+FROM users
