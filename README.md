@@ -298,6 +298,14 @@ The intended public surface is what each crate re-exports from its `lib.rs`
 the provider traits in `mold_completion`, and `format*` in `mold_format`).
 Items reachable but not part of that surface may change without notice.
 
+**Embedding the engine.** mold is built to be driven by other tools without a
+fork. `mold_hir` exposes a committed extension contract — `SchemaProvider`
+(feed schema from any source, e.g. FHIR `StructureDefinition` rather than live
+introspection), `LintRulePack` (add domain-specific rules), `AnalysisOptions` /
+`BuiltinLintPack`, and `analyze_query_with_options` — and `mold_completion`
+exposes its `SchemaProvider` / `FunctionProvider` traits. These will not change
+incompatibly within a minor version.
+
 ## License
 
 MIT

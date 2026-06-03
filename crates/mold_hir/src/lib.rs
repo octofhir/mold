@@ -15,6 +15,26 @@
 //! resolution types. Internals of the `analyze`, `lint` and `resolve` modules
 //! may change without a semver bump.
 //!
+//! ## Extension surface
+//!
+//! Downstream crates can embed the engine without forking it. The following are
+//! a committed contract and will not change incompatibly within a minor version:
+//!
+//! - [`SchemaProvider`] — supply schema (tables, columns, JSONB shape) from any
+//!   source, e.g. a FHIR `StructureDefinition` instead of live introspection.
+//! - [`LintRulePack`] — add domain-specific lint rules.
+//! - [`AnalysisOptions`] / [`BuiltinLintPack`] — select built-in packs and inject
+//!   external packs via `external_lint_packs`.
+//! - [`analyze_query_with_options`] — the entry point that takes both.
+//!
+//! ```ignore
+//! use std::sync::Arc;
+//! use mold_hir::{analyze_query_with_options, AnalysisOptions, LintRulePack};
+//!
+//! let options = AnalysisOptions::new().with_external_lint_pack(Arc::new(MyPack));
+//! let analysis = analyze_query_with_options(&parse, &my_provider, &options);
+//! ```
+//!
 //! # Architecture
 //!
 //! The HIR crate is organized into several modules:
