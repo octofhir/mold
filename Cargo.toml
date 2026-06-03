@@ -46,13 +46,13 @@ clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 
 # Internal crates
-mold_syntax = { path = "crates/mold_syntax" }
-mold_lexer = { path = "crates/mold_lexer" }
-mold_parser = { path = "crates/mold_parser" }
-mold_hir = { path = "crates/mold_hir" }
-mold_completion = { path = "crates/mold_completion" }
-mold_format = { path = "crates/mold_format" }
-mold_config = { path = "crates/mold_config" }
-mold_templater = { path = "crates/mold_templater" }
-mold_schema = { path = "crates/mold_schema" }
-mold_lsp = { path = "crates/mold_lsp" }
+mold_syntax = { path = "crates/mold_syntax", version = "0.1.0" }
+mold_lexer = { path = "crates/mold_lexer", version = "0.1.0" }
+mold_parser = { path = "crates/mold_parser", version = "0.1.0" }
+mold_hir = { path = "crates/mold_hir", version = "0.1.0" }
+mold_completion = { path = "crates/mold_completion", version = "0.1.0" }
+mold_format = { path = "crates/mold_format", version = "0.1.0" }
+mold_config = { path = "crates/mold_config", version = "0.1.0" }
+mold_templater = { path = "crates/mold_templater", version = "0.1.0" }
+mold_schema = { path = "crates/mold_schema", version = "0.1.0" }
+mold_lsp = { path = "crates/mold_lsp", version = "0.1.0" }
