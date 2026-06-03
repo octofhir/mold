@@ -41,10 +41,15 @@ Compiled Rust, no Python or Perl runtime to start per file. Formatting a
 400-statement / 60&nbsp;KB Postgres file (median of 20 runs, including process
 startup):
 
-| tool | median | vs banshee |
-|------|--------|------------|
-| **banshee** | ~11 ms | 1× |
-| sqlfluff 4.2 | ~257 ms | ~24× slower |
-| pgFormatter 5.10 | ~1170 ms | ~105× slower |
+<table>
+  <thead>
+    <tr><th>tool</th><th>median</th><th>vs banshee</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>banshee</strong></td><td>~11 ms</td><td>1×</td></tr>
+    <tr><td>sqlfluff 4.2</td><td>~257 ms</td><td>~24× slower</td></tr>
+    <tr><td>pgFormatter 5.10</td><td>~1170 ms</td><td>~105× slower</td></tr>
+  </tbody>
+</table>
 
 Reproduce with [`scripts/bench.sh`](https://github.com/octofhir/banshee/blob/main/scripts/bench.sh).
