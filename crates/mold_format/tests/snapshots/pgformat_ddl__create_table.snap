@@ -1,0 +1,9 @@
+---
+source: crates/mold_format/tests/pgformat_ddl.rs
+expression: out
+---
+CREATE TABLE t (
+    id BIGINT PRIMARY KEY,
+    name VARCHAR(255),
+    CONSTRAINT u UNIQUE (name)
+)

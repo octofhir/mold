@@ -244,6 +244,9 @@ pub(crate) fn format_node(node: &SyntaxNode, printer: &mut PgPrinter) {
         SyntaxKind::INSERT_STMT => format_insert(node, printer),
         SyntaxKind::UPDATE_STMT => format_update(node, printer),
         SyntaxKind::DELETE_STMT => format_delete(node, printer),
+        SyntaxKind::CREATE_TABLE_STMT => format_create_table(node, printer),
+        SyntaxKind::CREATE_INDEX_STMT => format_create_index(node, printer),
+        SyntaxKind::ALTER_STMT => format_alter(node, printer),
         SyntaxKind::ERROR => format_error_node(node, printer),
         _ => format_children(node, printer),
     }
