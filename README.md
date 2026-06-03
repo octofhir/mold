@@ -13,6 +13,29 @@ to make completion and reference checks accurate.
 Scope is deliberately **PostgreSQL only**. There is no dialect-abstraction
 layer; the grammar, JSONB/JSONPath support, and lint rules target Postgres.
 
+## Why banshee
+
+- **One binary, three jobs.** Format, lint (with autofixes), and an LSP — not a
+  formatter *or* a linter you wire together.
+- **Keeps working on broken SQL.** A lossless, error-recovering CST means
+  editors get diagnostics on half-typed statements, not a hard parse failure.
+- **Correct by construction.** Every statement is cross-checked against
+  PostgreSQL's own parser (`libpg_query`) in a differential test.
+- **Postgres-native.** JSONB/JSONPath, plus a squawk-class migration-safety
+  pack (MG01–MG16) that generic SQL tools don't have.
+- **Fast.** Compiled Rust, no Python or Perl runtime to spin up per file:
+
+  | formatter (400-stmt, 60 KB Postgres file) | median | vs banshee |
+  |-------------------------------------------|--------|------------|
+  | **banshee**                               | ~11 ms | 1×         |
+  | sqlfluff 4.2 (`format --dialect postgres`)| ~257 ms| ~24× slower |
+  | pgFormatter 5.10 (`pg_format`)            | ~1170 ms| ~105× slower |
+
+  Linting shows the same gap (~9 ms vs sqlfluff's ~250 ms). Measured on Apple
+  Silicon, median of 20 runs including process startup; reproduce with
+  [`scripts/bench.sh`](scripts/bench.sh). Numbers vary by machine and corpus,
+  but the order of magnitude is the point.
+
 ## Install
 
 Prebuilt binary (Linux/macOS), verifies its SHA-256:
