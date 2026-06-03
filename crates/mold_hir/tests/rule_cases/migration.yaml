@@ -172,3 +172,64 @@
 - name: table_level_pk_int_flagged
   rule: MG11
   fail: "CREATE TABLE t (id int, PRIMARY KEY (id));"
+
+# MG01 — not flagged inside an explicit transaction (CONCURRENTLY invalid there)
+- name: create_index_in_transaction_ok
+  rule: MG01
+  pass: "BEGIN; CREATE INDEX idx ON t (a); COMMIT;"
+
+- name: create_index_after_commit_flagged
+  rule: MG01
+  fail: "BEGIN; COMMIT; CREATE INDEX idx ON t (a);"
+
+# MG13 — ADD PRIMARY KEY / UNIQUE constraint under a lock
+- name: add_primary_key_flagged
+  rule: MG13
+  fail: "ALTER TABLE t ADD CONSTRAINT pk PRIMARY KEY (id);"
+
+- name: add_unique_constraint_flagged
+  rule: MG13
+  fail: "ALTER TABLE t ADD CONSTRAINT u UNIQUE (email);"
+
+- name: add_pk_using_index_ok
+  rule: MG13
+  pass: "ALTER TABLE t ADD CONSTRAINT pk PRIMARY KEY USING INDEX idx;"
+
+- name: add_check_not_flagged_mg13
+  rule: MG13
+  pass: "ALTER TABLE t ADD CONSTRAINT c CHECK (id > 0) NOT VALID;"
+
+# MG14 — ALTER COLUMN SET NOT NULL
+- name: set_not_null_flagged
+  rule: MG14
+  fail: "ALTER TABLE t ALTER COLUMN c SET NOT NULL;"
+
+- name: set_default_not_flagged_mg14
+  rule: MG14
+  pass: "ALTER TABLE t ALTER COLUMN c SET DEFAULT 0;"
+
+- name: drop_not_null_not_flagged_mg14
+  rule: MG14
+  pass: "ALTER TABLE t ALTER COLUMN c DROP NOT NULL;"
+
+# MG15 — prefer GENERATED IDENTITY over serial
+- name: serial_flagged
+  rule: MG15
+  fail: "CREATE TABLE t (id serial PRIMARY KEY);"
+
+- name: bigserial_flagged
+  rule: MG15
+  fail: "CREATE TABLE t (id bigserial PRIMARY KEY);"
+
+- name: identity_ok
+  rule: MG15
+  pass: "CREATE TABLE t (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY);"
+
+# MG16 — DROP TABLE
+- name: drop_table_flagged
+  rule: MG16
+  fail: "DROP TABLE t;"
+
+- name: drop_index_not_flagged_mg16
+  rule: MG16
+  pass: "DROP INDEX i;"

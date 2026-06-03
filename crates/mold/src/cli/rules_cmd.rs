@@ -563,6 +563,52 @@ block).
   bad:  DROP INDEX idx;
   good: DROP INDEX CONCURRENTLY idx;",
     },
+    RuleDoc {
+        code: "MG13",
+        fixable: false,
+        summary: "ADD PRIMARY KEY/UNIQUE builds its index under a lock",
+        explanation: "\
+ADD PRIMARY KEY or ADD UNIQUE builds the backing index while holding an
+exclusive lock. Build a unique index CONCURRENTLY, then attach it with
+ADD CONSTRAINT ... USING INDEX, which only needs a brief lock.
+
+  bad:  ALTER TABLE t ADD CONSTRAINT u UNIQUE (email);
+  good: CREATE UNIQUE INDEX CONCURRENTLY u ON t (email);
+        ALTER TABLE t ADD CONSTRAINT u UNIQUE USING INDEX u;",
+    },
+    RuleDoc {
+        code: "MG14",
+        fixable: false,
+        summary: "ALTER COLUMN SET NOT NULL scans the table under a lock",
+        explanation: "\
+SET NOT NULL scans every existing row to verify the constraint while holding a
+lock. Add a CHECK (col IS NOT NULL) NOT VALID, VALIDATE it (a weaker lock), then
+SET NOT NULL — Postgres reuses the validated check and skips the scan.
+
+  bad:  ALTER TABLE t ALTER COLUMN c SET NOT NULL;",
+    },
+    RuleDoc {
+        code: "MG15",
+        fixable: false,
+        summary: "Prefer GENERATED ... AS IDENTITY over serial",
+        explanation: "\
+serial and bigserial are legacy pseudo-types that create a detached sequence
+with awkward ownership and grants. Prefer a standard identity column.
+
+  bad:  id bigserial PRIMARY KEY
+  good: id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY",
+    },
+    RuleDoc {
+        code: "MG16",
+        fixable: false,
+        summary: "DROP TABLE destroys the table and its dependents",
+        explanation: "\
+DROP TABLE permanently deletes the table and cascades to views, foreign keys,
+and policies that depend on it. Stage the removal behind a deploy that stops
+using the table first.
+
+  bad:  DROP TABLE t;",
+    },
 ];
 
 /// Looks up a rule by code (case-insensitive).

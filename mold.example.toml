@@ -39,7 +39,7 @@ enabled = true
 # [lint.rules.CP02]
 # policy = "lower"         # lower | upper — unquoted identifier case
 
-# Migration-safety rules (MG01–MG12) fire on DDL. They are on by default;
+# Migration-safety rules (MG01–MG16) fire on DDL. They are on by default;
 # silence individual checks via `exclude` or per-rule `enabled = false`, e.g.:
 # exclude = ["MG09", "MG10"]   # don't enforce text / timestamptz preferences
 # [lint.rules.MG01]

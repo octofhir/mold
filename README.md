@@ -142,6 +142,10 @@ and `pgformatter`. `style` selects the engine; shared knobs map across both.
 | MG10 | yes     | Prefer `timestamptz` to `timestamp` |
 | MG11 | —       | Prefer `bigint` over a narrower integer for a primary key |
 | MG12 | yes     | `DROP INDEX` without `CONCURRENTLY` locks the table |
+| MG13 | —       | `ADD PRIMARY KEY`/`UNIQUE` builds its index under a lock |
+| MG14 | —       | `ALTER COLUMN … SET NOT NULL` scans the table under a lock |
+| MG15 | —       | Prefer `GENERATED … AS IDENTITY` over `serial` |
+| MG16 | —       | `DROP TABLE` destroys the table and its dependents |
 
 Prefixes: `AL` aliasing, `AM` ambiguity, `ST` structure, `SF` safety, `JB`
 JSONB, `CV` convention, `CP` capitalisation, `RF` references, `MG` migration

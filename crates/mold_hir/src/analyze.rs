@@ -233,6 +233,14 @@ pub enum RuleCode {
     Mg11,
     /// `DROP INDEX` without `CONCURRENTLY` locks the table.
     Mg12,
+    /// `ADD PRIMARY KEY`/`UNIQUE` constraint that builds its index under a lock.
+    Mg13,
+    /// `ALTER COLUMN … SET NOT NULL` scans the whole table under a lock.
+    Mg14,
+    /// Prefer a `GENERATED … AS IDENTITY` column to `serial`.
+    Mg15,
+    /// `DROP TABLE` destroys the table and everything depending on it.
+    Mg16,
 }
 
 impl RuleCode {
@@ -288,6 +296,10 @@ impl RuleCode {
             RuleCode::Mg10 => "MG10",
             RuleCode::Mg11 => "MG11",
             RuleCode::Mg12 => "MG12",
+            RuleCode::Mg13 => "MG13",
+            RuleCode::Mg14 => "MG14",
+            RuleCode::Mg15 => "MG15",
+            RuleCode::Mg16 => "MG16",
         }
     }
 

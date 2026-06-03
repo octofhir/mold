@@ -6,7 +6,8 @@
 //! `MG05` drop column · `MG06` alter column type · `MG07` rename ·
 //! `MG08` `TRUNCATE … CASCADE` · `MG09` prefer `text` · `MG10` prefer
 //! `timestamptz` · `MG11` prefer `bigint` primary key · `MG12` concurrent
-//! index drop.
+//! index drop · `MG13` add PK/UNIQUE under lock · `MG14` `SET NOT NULL` ·
+//! `MG15` prefer identity over `serial` · `MG16` drop table.
 
 use mold_syntax::SyntaxKind;
 use mold_syntax::SyntaxToken;
@@ -68,7 +69,9 @@ impl Rule for IndexConcurrently {
             let Some(stmt) = CreateIndexStmt::cast(node.clone()) else {
                 continue;
             };
-            if stmt.is_concurrent() {
+            // CONCURRENTLY cannot run inside a transaction block, so do not ask
+            // for it when the statement is wrapped in one.
+            if stmt.is_concurrent() || in_open_transaction(stmt.syntax(), root) {
                 continue;
             }
             let mut diag = Diagnostic::warning(
@@ -104,7 +107,10 @@ impl Rule for DropIndexConcurrently {
             let Some(stmt) = DropStmt::cast(node.clone()) else {
                 continue;
             };
-            if stmt.object_kind() != Some(SyntaxKind::INDEX_KW) || stmt.is_concurrent() {
+            if stmt.object_kind() != Some(SyntaxKind::INDEX_KW)
+                || stmt.is_concurrent()
+                || in_open_transaction(stmt.syntax(), root)
+            {
                 continue;
             }
             let mut diag = Diagnostic::warning("DROP INDEX without CONCURRENTLY locks the table")
@@ -449,10 +455,11 @@ impl Rule for TypePreference {
                 if !is_pk {
                     continue;
                 }
+                // `serial`/`smallserial` are handled by MG15 (prefer identity).
                 if let Some(ty) = col.type_name()
                     && matches!(
                         base_type(&ty).as_str(),
-                        "int" | "integer" | "int4" | "smallint" | "int2" | "serial"
+                        "int" | "integer" | "int4" | "smallint" | "int2"
                     )
                 {
                     analyzer.emit(
@@ -542,4 +549,209 @@ fn primary_key_columns(table: &CreateTableStmt) -> Vec<String> {
         }
     }
     names
+}
+
+// ===========================================================================
+// MG13 / MG14 — locking ALTER TABLE constraint operations
+// ===========================================================================
+
+/// MG13 — `ADD PRIMARY KEY`/`ADD UNIQUE` builds the backing index while holding
+/// an exclusive lock. Build a unique index `CONCURRENTLY`, then attach it with
+/// `ADD CONSTRAINT … USING INDEX`.
+pub(super) struct AddPkUniqueConstraint;
+
+impl Rule for AddPkUniqueConstraint {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Mg13]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Migration
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            let Some(action) = AlterTableAction::cast(node.clone()) else {
+                continue;
+            };
+            if action.kind() != AlterActionKind::AddConstraint {
+                continue;
+            }
+            let Some(constraint) = action.added_constraint() else {
+                continue;
+            };
+            if !matches!(
+                constraint,
+                Constraint::PrimaryKey(_) | Constraint::Unique(_)
+            ) {
+                continue;
+            }
+            // `ADD CONSTRAINT … PRIMARY KEY USING INDEX idx` is the safe form.
+            if action
+                .syntax()
+                .descendants_with_tokens()
+                .filter_map(|e| e.into_token())
+                .any(|t| t.kind() == SyntaxKind::USING_KW)
+            {
+                continue;
+            }
+            analyzer.emit(
+                Diagnostic::warning(
+                    "ADD PRIMARY KEY/UNIQUE builds its index under an exclusive lock; build a \
+                     unique index CONCURRENTLY and attach it with ADD CONSTRAINT ... USING INDEX",
+                )
+                .with_code(RuleCode::Mg13)
+                .with_range(action.syntax().text_range()),
+            );
+        }
+    }
+}
+
+/// MG14 — `ALTER COLUMN … SET NOT NULL` scans every existing row to verify the
+/// constraint while holding a lock. Add a `CHECK (col IS NOT NULL) NOT VALID`,
+/// validate it, then set `NOT NULL` (which can then reuse the validated check).
+pub(super) struct SetNotNull;
+
+impl Rule for SetNotNull {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Mg14]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Migration
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            let Some(action) = AlterTableAction::cast(node.clone()) else {
+                continue;
+            };
+            if action.kind() != AlterActionKind::AlterColumn {
+                continue;
+            }
+            let tokens: Vec<SyntaxKind> = action
+                .syntax()
+                .descendants_with_tokens()
+                .filter_map(|e| e.into_token())
+                .map(|t| t.kind())
+                .collect();
+            let sets_not_null = tokens.contains(&SyntaxKind::SET_KW)
+                && tokens.contains(&SyntaxKind::NOT_KW)
+                && tokens.contains(&SyntaxKind::NULL_KW);
+            if sets_not_null {
+                analyzer.emit(
+                    Diagnostic::warning(
+                        "ALTER COLUMN SET NOT NULL scans the whole table under a lock; add a \
+                         CHECK (col IS NOT NULL) NOT VALID, VALIDATE it, then SET NOT NULL",
+                    )
+                    .with_code(RuleCode::Mg14)
+                    .with_range(action.syntax().text_range()),
+                );
+            }
+        }
+    }
+}
+
+// ===========================================================================
+// MG15 — prefer GENERATED IDENTITY over serial
+// ===========================================================================
+
+/// MG15 — `serial`/`bigserial` are legacy pseudo-types that create a detached
+/// sequence with awkward ownership and permissions. Prefer a standard
+/// `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY` column.
+pub(super) struct PreferIdentity;
+
+impl Rule for PreferIdentity {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Mg15]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Migration
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            let Some(col) = ColumnDef::cast(node.clone()) else {
+                continue;
+            };
+            let Some(ty) = col.type_name() else { continue };
+            if matches!(
+                base_type(&ty).as_str(),
+                "serial" | "serial4" | "bigserial" | "serial8" | "smallserial" | "serial2"
+            ) {
+                analyzer.emit(
+                    Diagnostic::warning(
+                        "prefer GENERATED ... AS IDENTITY to serial; serial leaves a detached \
+                         sequence with awkward ownership and grants",
+                    )
+                    .with_code(RuleCode::Mg15)
+                    .with_range(ty.syntax().text_range()),
+                );
+            }
+        }
+    }
+}
+
+// ===========================================================================
+// MG16 — DROP TABLE
+// ===========================================================================
+
+/// MG16 — `DROP TABLE` permanently destroys the table and cascades to views,
+/// foreign keys, and policies that depend on it.
+pub(super) struct DropTable;
+
+impl Rule for DropTable {
+    fn codes(&self) -> &'static [RuleCode] {
+        &[RuleCode::Mg16]
+    }
+    fn group(&self) -> BuiltinLintPack {
+        BuiltinLintPack::Migration
+    }
+    fn run(&self, root: &mold_syntax::SyntaxNode, analyzer: &mut Analyzer<'_>) {
+        for node in root.descendants() {
+            let Some(stmt) = DropStmt::cast(node.clone()) else {
+                continue;
+            };
+            if stmt.object_kind() == Some(SyntaxKind::TABLE_KW) {
+                analyzer.emit(
+                    Diagnostic::warning(
+                        "DROP TABLE destroys the table and everything depending on it",
+                    )
+                    .with_code(RuleCode::Mg16)
+                    .with_range(stmt.syntax().text_range()),
+                );
+            }
+        }
+    }
+}
+
+// ===========================================================================
+// Transaction tracking
+// ===========================================================================
+
+/// Whether `stmt` (a top-level statement) sits inside an open transaction
+/// block — i.e. a `BEGIN`/`START TRANSACTION` precedes it without an
+/// intervening `COMMIT`/`ROLLBACK`/`END`. `CONCURRENTLY` is invalid there.
+fn in_open_transaction(stmt: &mold_syntax::SyntaxNode, root: &mold_syntax::SyntaxNode) -> bool {
+    let start = stmt.text_range().start();
+    let mut depth = 0i32;
+    for child in root.children() {
+        if child.text_range().start() >= start {
+            break;
+        }
+        if child.kind() != SyntaxKind::TRANSACTION_STMT {
+            continue;
+        }
+        let opener = child
+            .children_with_tokens()
+            .filter_map(|e| e.into_token())
+            .find(|t| t.kind().is_keyword())
+            .map(|t| t.kind());
+        match opener {
+            Some(SyntaxKind::BEGIN_KW | SyntaxKind::START_KW) => depth += 1,
+            Some(
+                SyntaxKind::COMMIT_KW
+                | SyntaxKind::END_KW
+                | SyntaxKind::ROLLBACK_KW
+                | SyntaxKind::ABORT_KW,
+            ) => depth = (depth - 1).max(0),
+            _ => {}
+        }
+    }
+    depth > 0
 }

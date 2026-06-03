@@ -96,6 +96,10 @@ pub(crate) fn builtin_rules() -> &'static [&'static dyn Rule] {
         &migration::Rename,
         &migration::TruncateCascade,
         &migration::TypePreference,
+        &migration::AddPkUniqueConstraint,
+        &migration::SetNotNull,
+        &migration::PreferIdentity,
+        &migration::DropTable,
     ]
 }
 

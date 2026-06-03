@@ -34,7 +34,11 @@ the latest stable Rust toolchain.
   `ALTER COLUMN … TYPE`, MG07 `RENAME`, MG08 `TRUNCATE … CASCADE`, MG09 prefer
   `text` over `char(n)`/`varchar(n)` (fixable), MG10 prefer `timestamptz` over
   `timestamp` (fixable), MG11 prefer `bigint` for primary keys, MG12
-  `DROP INDEX` without `CONCURRENTLY` (fixable) — 47 lint codes total.
+  `DROP INDEX` without `CONCURRENTLY` (fixable), MG13 `ADD PRIMARY KEY`/`UNIQUE`
+  built under a lock, MG14 `ALTER COLUMN … SET NOT NULL`, MG15 prefer
+  `GENERATED … AS IDENTITY` over `serial`, MG16 `DROP TABLE` — 51 lint codes
+  total. MG01/MG12 are suppressed inside an explicit transaction block, where
+  `CONCURRENTLY` is not valid.
 - **DDL typed AST and analysis** (`mold_syntax`, `mold_hir`): typed accessors
   for the DDL and command statements; analysis resolves tables and columns
   defined by `CREATE TABLE`/`CREATE VIEW` in the same source and no longer
