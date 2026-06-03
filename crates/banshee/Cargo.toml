@@ -9,6 +9,16 @@ description = "PostgreSQL SQL parser, formatter, linter and language server."
 keywords = ["sql", "postgres", "linter", "formatter", "lsp"]
 categories = ["development-tools", "command-line-utilities"]
 
+# `cargo binstall banshee` pulls the tagged release archive instead of building.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.zip"
+pkg-fmt = "zip"
+
 [[bin]]
 name = "banshee"
 path = "src/main.rs"

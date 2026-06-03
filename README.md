@@ -15,6 +15,23 @@ layer; the grammar, JSONB/JSONPath support, and lint rules target Postgres.
 
 ## Install
 
+Prebuilt binary (Linux/macOS), verifies its SHA-256:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/octofhir/banshee/main/install.sh | sh
+```
+
+With a Rust toolchain:
+
+```sh
+cargo binstall banshee     # fetch the prebuilt release archive
+cargo install banshee      # or build from source via crates.io
+```
+
+Windows users can grab the `.zip` from [Releases](https://github.com/octofhir/banshee/releases/latest).
+
+From a checkout:
+
 ```sh
 cargo build --release -p banshee                  # parser, formatter, linter, LSP
 cargo build --release -p banshee --features db    # + live schema introspection

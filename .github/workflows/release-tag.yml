@@ -1,0 +1,55 @@
+name: Release (tagged)
+
+# Pushing a `vX.Y.Z` tag cuts a stable, versioned GitHub release: a binary per
+# platform, each with a `.sha256`, published under that tag and marked latest.
+# The rolling `latest` pre-release (release.yml) is unaffected.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      # Builds (cross-compiling where needed), archives as banshee-<target>.<ext>,
+      # writes a matching .sha256, and uploads both to the release for this tag.
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: banshee
+          target: ${{ matrix.target }}
+          features: db
+          archive: banshee-$target
+          checksum: sha256
+          include: README.md,LICENSE
+          token: ${{ secrets.GITHUB_TOKEN }}
