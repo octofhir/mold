@@ -66,17 +66,28 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           set -u
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "::warning::CARGO_REGISTRY_TOKEN not set — skipping crates.io publish"
+            exit 0
+          fi
+          version="${GITHUB_REF_NAME#v}"
           crates="banshee_syntax banshee_templater banshee_lexer banshee_parser \
                   banshee_hir banshee_format banshee_completion banshee_config \
                   banshee_schema banshee_lsp banshee"
           for c in $crates; do
-            echo "::group::publish $c"
-            out=$(cargo publish -p "$c" --no-verify 2>&1) || true
-            echo "$out"
-            echo "::endgroup::"
-            if echo "$out" | grep -qE 'Published|already exists|already uploaded'; then
-              echo "ok: $c"
-            else
-              echo "::error::failed to publish $c"; exit 1
+            echo "::group::$c $version"
+            # Pre-check: skip if this exact version is already on crates.io.
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              "https://crates.io/api/v1/crates/$c/$version" -A "banshee-release")
+            if [ "$code" = "200" ]; then
+              echo "already published, skipping"
+              echo "::endgroup::"
+              continue
             fi
+            if cargo publish -p "$c" --no-verify; then
+              echo "published $c $version"
+            else
+              echo "::endgroup::"; echo "::error::failed to publish $c"; exit 1
+            fi
+            echo "::endgroup::"
           done
