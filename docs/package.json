@@ -1,0 +1,23 @@
+{
+  "name": "banshee-docs",
+  "type": "module",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "gen:rules": "node scripts/gen-rules.mjs",
+    "dev": "astro dev",
+    "build": "npm run gen:rules && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.39.3",
+    "astro": "^6.4.4",
+    "sharp": "^0.34.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild"
+    ]
+  }
+}
