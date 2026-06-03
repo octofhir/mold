@@ -247,17 +247,30 @@ published to the Marketplace.
 
 ## CI integration
 
-`banshee lint --format sarif` emits SARIF 2.1.0; upload it to GitHub code scanning:
+This repo is itself a GitHub Action — it installs `banshee` and runs it, with
+findings shown inline on the PR (`github` format by default):
 
 ```yaml
-- run: banshee lint --format sarif . > banshee.sarif
+- uses: octofhir/banshee@v0.1.0
+  with:
+    command: lint        # or: format
+    args: migrations/
+```
+
+For code scanning, emit SARIF and upload it; the Action writes the file for you:
+
+```yaml
+- uses: octofhir/banshee@v0.1.0
+  with:
+    sarif-file: banshee.sarif
 - uses: github/codeql-action/upload-sarif@v3
   with:
     sarif_file: banshee.sarif
 ```
 
-For pre-commit, this repo ships hooks (`banshee-format`, `banshee-lint`) — see
-`.pre-commit-hooks.yaml`.
+`banshee lint --format sarif` emits SARIF 2.1.0 directly if you'd rather run the
+binary yourself. For pre-commit, this repo ships hooks (`banshee-format`,
+`banshee-lint`) — see `.pre-commit-hooks.yaml`.
 
 ## Library
 

@@ -1,0 +1,59 @@
+name: banshee
+description: Lint or format-check PostgreSQL SQL with banshee.
+branding:
+  icon: database
+  color: purple
+
+inputs:
+  command:
+    description: "banshee subcommand to run: lint or format."
+    default: lint
+  args:
+    description: "Files/directories to check (default: current directory)."
+    default: "."
+  format:
+    description: "Diagnostic format: human | json | github | sarif."
+    default: github
+  sarif-file:
+    description: "When set, write SARIF here (implies format: sarif). Upload it with github/codeql-action/upload-sarif."
+    default: ""
+  version:
+    description: "Release tag to install (default: latest stable)."
+    default: latest
+  working-directory:
+    description: "Directory to run in."
+    default: "."
+
+runs:
+  using: composite
+  steps:
+    - name: Install banshee
+      shell: bash
+      run: |
+        set -euo pipefail
+        ver="${{ inputs.version }}"
+        base="https://github.com/octofhir/banshee/releases"
+        url="$base/latest/download"
+        [ "$ver" != "latest" ] && url="$base/download/$ver"
+        case "$(uname -m)" in
+          x86_64|amd64) target="x86_64-unknown-linux-musl" ;;
+          aarch64|arm64) target="aarch64-unknown-linux-gnu" ;;
+          *) echo "::error::unsupported arch $(uname -m)"; exit 1 ;;
+        esac
+        archive="banshee-${target}.tar.gz"
+        curl -fsSL "$url/$archive" -o "$archive"
+        curl -fsSL "$url/$archive.sha256" -o "$archive.sha256"
+        echo "$(awk '{print $1}' "$archive.sha256")  $archive" | sha256sum -c -
+        tar -xzf "$archive"
+        install -m 0755 banshee "$HOME/.local/bin/banshee" 2>/dev/null || sudo install -m 0755 banshee /usr/local/bin/banshee
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+    - name: Run banshee
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        if [ -n "${{ inputs.sarif-file }}" ]; then
+          banshee ${{ inputs.command }} --format sarif ${{ inputs.args }} > "${{ inputs.sarif-file }}"
+        else
+          banshee ${{ inputs.command }} --format "${{ inputs.format }}" ${{ inputs.args }}
+        fi
