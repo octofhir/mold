@@ -1,0 +1,19 @@
+# cargo-release config (install: cargo install cargo-release).
+#
+# Release flow:
+#   cargo release minor        # bump shared version, commit, tag vX.Y.Z (dry-run by default)
+#   cargo release minor -x     # actually do it
+#   git push --follow-tags     # push commit + tag -> CI builds binaries + publishes crates.io
+#
+# Version is shared across the workspace (all crates use version.workspace), so
+# one bump moves every crate. crates.io publishing and binary builds run in CI
+# on the pushed tag (see .github/workflows/release-tag.yml), not from here.
+
+allow-branch = ["main"]
+shared-version = true
+tag-name = "v{{version}}"
+tag-message = "Release {{version}}"
+pre-release-commit-message = "release: v{{version}}"
+consolidate-commits = true
+publish = false
+push = false

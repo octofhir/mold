@@ -39,3 +39,29 @@ intentionally, review and accept with `cargo insta review` (or
 
 Conventional-commit style (`feat:`, `fix:`, `docs:`, `chore:`, `ci:`). Explain
 *why* in the body when it is not obvious from the subject.
+
+## Releasing
+
+Releases are cut manually, not on every push to `main`. The whole workspace
+shares one version (`version.workspace`), so a single bump moves all crates.
+
+```sh
+cargo install cargo-release          # once
+cargo release minor                  # dry-run: preview the bump + tag
+cargo release minor -x               # bump version, commit, tag vX.Y.Z
+git push --follow-tags               # push the commit + tag
+```
+
+Pushing the `vX.Y.Z` tag triggers `.github/workflows/release-tag.yml`, which:
+
+1. builds the `banshee` binary for six targets, each with a `.sha256`, and
+   publishes a stable GitHub release;
+2. publishes all crates to crates.io in dependency order (idempotent — already
+   published crates are skipped).
+
+crates.io publishing needs a `CARGO_REGISTRY_TOKEN` repository secret (Settings →
+Secrets → Actions) with `publish-update` scope. The first publish of a brand-new
+crate is rate-limited by crates.io; subsequent version bumps are not.
+
+The separate rolling `latest` pre-release (`release.yml`) rebuilds bleeding-edge
+binaries on every push to `main` and is independent of tagged releases.
