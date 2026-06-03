@@ -4,6 +4,8 @@
 
 A PostgreSQL SQL parser, formatter, linter, and language server, written in Rust.
 
+📖 **[Docs](https://octofhir.github.io/banshee/)** · **[Rule reference](https://octofhir.github.io/banshee/rules/)**
+
 banshee builds a **lossless concrete syntax tree** with error recovery, so it keeps
 working on incomplete or invalid SQL — the use case editors actually need. On
 top of the tree it resolves names, formats, lints (with autofixes), and serves
