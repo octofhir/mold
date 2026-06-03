@@ -1,4 +1,4 @@
-name: banshee
+name: banshee PostgreSQL SQL
 description: Lint or format-check PostgreSQL SQL with banshee.
 branding:
   icon: database
